@@ -459,6 +459,18 @@ Backend Hosting
 
 Exact providers belong in the deployment document.
 
+## 20A. Approved Language Strategy
+
+The MVP uses different languages for the frontend and backend.
+
+```text
+Frontend:
+React + TypeScript
+
+Backend:
+Node.js + Express.js + JavaScript
+```
+
 ## 21. Technology Selection Principle
 
 ```text

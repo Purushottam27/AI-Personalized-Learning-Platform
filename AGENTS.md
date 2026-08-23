@@ -164,6 +164,7 @@ Initial stack:
 ```text
 Frontend:
 React
+TypeScript
 Vite
 React Router
 Tailwind CSS
@@ -173,6 +174,21 @@ shadcn/ui
 Backend:
 Node.js
 Express.js
+JavaScript
+
+Language boundary:
+
+Frontend uses TypeScript.
+
+Backend uses JavaScript for the MVP.
+
+Do not mix JavaScript and TypeScript within the backend during the MVP.
+
+The frontend/backend boundary is the versioned HTTP/JSON API, so the two
+applications do not need to use the same implementation language.
+
+A future backend TypeScript migration is optional and requires a deliberate
+architectural decision before implementation.
 
 Database:
 MongoDB
