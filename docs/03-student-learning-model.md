@@ -8,15 +8,15 @@ observes, evaluates, and improves a student's learning journey.
 The platform is not intended to function only as a traditional LMS. Its
 primary objective is to help students:
 
--   gain conceptual and practical knowledge
--   identify strengths
--   identify weaknesses
--   receive targeted learning material
--   practice weak concepts
--   reassess understanding
--   measure improvement
--   receive personalized recommendations
--   become more capable and confident learners
+- gain conceptual and practical knowledge
+- identify strengths
+- identify weaknesses
+- receive targeted learning material
+- practice weak concepts
+- reassess understanding
+- measure improvement
+- receive personalized recommendations
+- become more capable and confident learners
 
 ### Core Learning Principle
 
@@ -24,7 +24,7 @@ primary objective is to help students:
 
 ## 2. High-Level Model
 
-``` text
+```text
 Student
    ↓
 Learning Profile
@@ -71,31 +71,31 @@ Student information has two conceptual categories.
 
 Examples:
 
--   name
--   email
--   authentication information
--   role
--   account status
--   profile information
--   preferences
+- name
+- email
+- authentication information
+- role
+- account status
+- profile information
+- preferences
 
 ### Learning Information
 
 Examples:
 
--   interests
--   learning goals
--   experience level
--   enrolled courses
--   completed lessons
--   assessment history
--   topic performance
--   strengths
--   weaknesses
--   mastery
--   recommendations
--   learning activity
--   improvement history
+- interests
+- learning goals
+- experience level
+- enrolled courses
+- completed lessons
+- assessment history
+- topic performance
+- strengths
+- weaknesses
+- mastery
+- recommendations
+- learning activity
+- improvement history
 
 Account information answers:
 
@@ -114,11 +114,11 @@ the student as a learner.
 
 Initially the system may know:
 
--   interests
--   goals
--   experience level
--   preferred learning duration
--   selected subjects
+- interests
+- goals
+- experience level
+- preferred learning duration
+- selected subjects
 
 This is initial learner context and should not automatically be treated
 as verified mastery.
@@ -127,7 +127,7 @@ as verified mastery.
 
 As the student learns, the profile can contain:
 
-``` text
+```text
 Learning Profile
 ├── Interests
 ├── Goals
@@ -150,26 +150,26 @@ A Course is a structured learning program created by a Teacher.
 
 A course contains:
 
--   course information
--   learning objectives
--   prerequisites
--   topics
--   lessons
--   resources
--   practice
--   assessments
--   final assessment
+- course information
+- learning objectives
+- prerequisites
+- topics
+- lessons
+- resources
+- practice
+- assessments
+- final assessment
 
 Students can:
 
--   explore a course
--   view its description
--   view objectives
--   view prerequisites
--   enroll
--   learn
--   complete assessments
--   receive course-level mastery analysis
+- explore a course
+- view its description
+- view objectives
+- view prerequisites
+- enroll
+- learn
+- complete assessments
+- receive course-level mastery analysis
 
 ## 6. Course Prerequisites
 
@@ -177,7 +177,7 @@ Courses may require prior knowledge.
 
 Example:
 
-``` text
+```text
 Advanced SQL
     ↓
 Prerequisite: Basic SQL
@@ -185,11 +185,11 @@ Prerequisite: Basic SQL
 
 Teachers should be able to configure:
 
--   no prerequisite
--   one prerequisite
--   multiple prerequisites
--   optional diagnostic assessment
--   required diagnostic assessment
+- no prerequisite
+- one prerequisite
+- multiple prerequisites
+- optional diagnostic assessment
+- required diagnostic assessment
 
 The purpose of prerequisites is to help students become ready, not
 merely to block them.
@@ -203,7 +203,7 @@ It is course-specific and teacher-configured.
 
 Example:
 
-``` text
+```text
 Advanced SQL
     ↓
 Diagnostic Assessment
@@ -229,7 +229,7 @@ Enrollment represents the relationship between a Student and a Course.
 
 Initial flow:
 
-``` text
+```text
 Course Overview
     ↓
 Enroll
@@ -245,7 +245,7 @@ A Topic is a conceptual area inside a course.
 
 Example:
 
-``` text
+```text
 DBMS
 ├── ER Model
 ├── Relational Model
@@ -266,14 +266,14 @@ A lesson should provide a complete learning experience.
 
 Possible components:
 
--   conceptual explanation
--   examples
--   visual material
--   video resources
--   documents/notes
--   external references
--   practice
--   assessment
+- conceptual explanation
+- examples
+- visual material
+- video resources
+- documents/notes
+- external references
+- practice
+- assessment
 
 Teachers should be able to provide meaningful educational content
 without being required to record their own videos.
@@ -290,19 +290,19 @@ Relevant YouTube videos may be embedded where permitted.
 
 Teacher-provided resources may include:
 
--   PDF
--   PPT/PPTX
--   DOC/DOCX
--   other supported formats
+- PDF
+- PPT/PPTX
+- DOC/DOCX
+- other supported formats
 
 ### External References
 
 Examples:
 
--   educational articles
--   official documentation
--   book/reference information
--   external learning websites
+- educational articles
+- official documentation
+- book/reference information
+- external learning websites
 
 The resource model should remain provider-independent so additional
 sources can be added later.
@@ -326,14 +326,14 @@ Assessment measures student understanding.
 
 Assessment configuration may include:
 
--   question count
--   question bank
--   passing threshold
--   time limit
--   marks/weightage
--   maximum attempts
--   question selection strategy
--   difficulty distribution
+- question count
+- question bank
+- passing threshold
+- time limit
+- marks/weightage
+- maximum attempts
+- question selection strategy
+- difficulty distribution
 
 ## 14. Final Assessment
 
@@ -348,20 +348,20 @@ evidence of mastery.
 
 A Question may contain:
 
--   question text
--   options
--   correct answer
--   explanation
--   marks
--   topic
--   lesson
--   difficulty
--   question type
+- question text
+- options
+- correct answer
+- explanation
+- marks
+- topic
+- lesson
+- difficulty
+- question type
 
 Initial question types may include:
 
--   multiple choice
--   true/false
+- multiple choice
+- true/false
 
 Additional types can be introduced later.
 
@@ -372,7 +372,7 @@ assessments select questions.
 
 Example:
 
-``` text
+```text
 Question Bank = 30 questions
 Assessment = 10 questions per attempt
 ```
@@ -406,16 +406,16 @@ Every assessment attempt should be represented separately.
 
 It may record:
 
--   attempt number
--   start time
--   submission time
--   score
--   total marks
--   time used
--   question responses
--   correct answers
--   incorrect answers
--   unanswered questions
+- attempt number
+- start time
+- submission time
+- score
+- total marks
+- time used
+- question responses
+- correct answers
+- incorrect answers
+- unanswered questions
 
 Historical attempts should remain distinguishable.
 
@@ -423,7 +423,7 @@ Historical attempts should remain distinguishable.
 
 Each question response should have a status:
 
-``` text
+```text
 CORRECT
 INCORRECT
 UNANSWERED
@@ -440,7 +440,7 @@ Assessments may optionally have a time limit.
 
 When time expires:
 
-``` text
+```text
 Assessment
     ↓
 Automatic submission
@@ -454,7 +454,7 @@ Time-related analytics can be introduced later.
 
 Initial scoring should be deterministic:
 
-``` text
+```text
 Score =
 earned marks / total possible marks × 100
 ```
@@ -471,7 +471,7 @@ The platform should not hard-code a universal value such as 85%.
 
 Example:
 
-``` text
+```text
 Lesson Assessment → 80%
 Diagnostic → 70%
 Final Assessment → 75%
@@ -486,7 +486,7 @@ configuration.
 
 Example:
 
-``` text
+```text
 Assessment passed
     ↓
 Next lesson unlocked
@@ -494,7 +494,7 @@ Next lesson unlocked
 
 or:
 
-``` text
+```text
 Assessment failed
     ↓
 Remediation recommended
@@ -512,7 +512,7 @@ weakness.
 
 Example:
 
-``` text
+```text
 Assessment
     ↓
 Normalization performance = 45%
@@ -541,12 +541,12 @@ For v1, mastery should be primarily based on deterministic evidence.
 
 Potential evidence includes:
 
--   assessment performance
--   question-level performance
--   practice performance
--   previous performance
--   recent performance
--   completed learning activities
+- assessment performance
+- question-level performance
+- practice performance
+- previous performance
+- recent performance
+- completed learning activities
 
 The exact formula will be designed separately.
 
@@ -554,10 +554,12 @@ The exact formula will be designed separately.
 
 A provisional v1 classification:
 
-``` text
-80%+       Strong
-60–79%     Developing
-Below 60%  Needs Improvement
+```text
+0–39       Weak
+40–59      Developing
+60–74      Functional
+75–89      Strong
+90–100     Mastered
 ```
 
 These values are intentionally simple and may be improved after the
@@ -585,20 +587,20 @@ Recommendations are actionable next learning suggestions.
 
 Possible recommendation types:
 
--   continue current lesson
--   start next lesson
--   revise weak topic
--   complete targeted practice
--   take a mini assessment
--   revisit prerequisite knowledge
--   enroll in a recommended course
--   explore related learning material
+- continue current lesson
+- start next lesson
+- revise weak topic
+- complete targeted practice
+- take a mini assessment
+- revisit prerequisite knowledge
+- enroll in a recommended course
+- explore related learning material
 
 ## 30. Recommendation Engine
 
 The recommendation engine combines deterministic rules and AI reasoning.
 
-``` text
+```text
 Learning Evidence
     ↓
 Performance Analysis
@@ -618,22 +620,22 @@ Recommended Action
 
 Used for:
 
--   assessment scoring
--   passing thresholds
--   progression
--   prerequisite requirements
--   basic mastery thresholds
--   access control
+- assessment scoring
+- passing thresholds
+- progression
+- prerequisite requirements
+- basic mastery thresholds
+- access control
 
 ### AI
 
 Used for:
 
--   personalized feedback
--   explanation of performance patterns
--   recommendation reasoning
--   targeted learning recommendations
--   personalized remediation suggestions
+- personalized feedback
+- explanation of performance patterns
+- recommendation reasoning
+- targeted learning recommendations
+- personalized remediation suggestions
 
 AI should interpret structured evidence rather than inventing the
 student's learning state.
@@ -644,7 +646,7 @@ The system should compare performance before and after an intervention.
 
 Example:
 
-``` text
+```text
 Normalization
 
 Before:
@@ -668,7 +670,7 @@ useful.
 
 ## 33. Core Personalization Loop
 
-``` text
+```text
 Student learns
     ↓
 Student practices
@@ -700,7 +702,7 @@ Repeat
 
 A student studies Normalization.
 
-``` text
+```text
 Lesson
     ↓
 Explanation
@@ -716,7 +718,7 @@ Assessment
 
 Result:
 
-``` text
+```text
 Correct = 5
 Incorrect = 3
 Unanswered = 2
@@ -725,7 +727,7 @@ Score = 50%
 
 Topic analysis:
 
-``` text
+```text
 ER Model → Strong
 Functional Dependency → Developing
 2NF → Weak
@@ -734,7 +736,7 @@ Functional Dependency → Developing
 
 The platform recommends:
 
-``` text
+```text
 1. Review 2NF explanation
 2. Watch recommended video
 3. Study example
@@ -744,7 +746,7 @@ The platform recommends:
 
 After remediation:
 
-``` text
+```text
 2NF → 78%
 3NF → 74%
 ```
@@ -768,15 +770,15 @@ The learning profile is updated and future recommendations change.
 
 Not part of v1:
 
--   sophisticated ML recommendation models
--   reinforcement learning
--   advanced knowledge graphs
--   complex psychometric modeling
--   AI-generated complete courses
--   AI-generated assessments without teacher approval
--   advanced spaced repetition
--   predictive dropout modeling
--   voice tutor
--   real-time adaptive lesson generation
+- sophisticated ML recommendation models
+- reinforcement learning
+- advanced knowledge graphs
+- complex psychometric modeling
+- AI-generated complete courses
+- AI-generated assessments without teacher approval
+- advanced spaced repetition
+- predictive dropout modeling
+- voice tutor
+- real-time adaptive lesson generation
 
 These can be considered after the core platform works reliably.

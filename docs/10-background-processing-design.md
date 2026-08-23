@@ -578,26 +578,35 @@ AI workers should respect provider rate limits, timeouts, retries, and fallback 
 
 ## 26. Personalization Processing Flow
 
+The authoritative assessment result and learning evidence must be
+persisted before downstream personalization work is queued.
+
 ```text
 Assessment Submitted
        ↓
-Persist Result
+Validate Attempt
        ↓
-Create Learning Evidence
+Calculate Score
        ↓
-Queue update-personalization
+Persist Assessment Result
+       ↓
+Persist Learning Evidence
+       ↓
+Queue Personalization Job
+       ↓
+Return Assessment Response
        ↓
 Worker
        ↓
-Load Student Learning Model
+Load Current Learning State
        ↓
-Update Mastery
+Recalculate Mastery
        ↓
 Detect Weakness
        ↓
 Generate Candidate Actions
        ↓
-Persist Recommendation
+Persist / Update Recommendation
        ↓
 Optional AI Enhancement
 ```

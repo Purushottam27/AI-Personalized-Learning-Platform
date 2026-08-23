@@ -448,6 +448,30 @@ Conceptual scale:
 
 These thresholds are initial design values and can be tuned using evaluation data.
 
+### Centralized MVP Personalization Policy
+
+The mastery categories above describe the student's estimated mastery state.
+
+The following intervention thresholds serve a different purpose and must
+not be interpreted as additional mastery categories:
+
+```text
+Mastery below 60%
+    ↓
+Weakness candidate
+
+Mastery below 50%
+    ↓
+Prioritize review / remediation
+
+Mastery 50–70%
+    ↓
+Prioritize targeted practice
+
+Mastery above 70%
+    ↓
+Generally continue the learning path unless other evidence indicates a weakness
+```
 ---
 
 # 15. Mastery Calculation Principle
@@ -698,7 +722,7 @@ SQL SELECT queries
 A topic may be classified as a weakness when:
 
 ```text
-Mastery low
+Mastery below 60%
 OR
 Repeated errors
 OR

@@ -721,9 +721,12 @@ Testing strategy
 Remaining:
 
 ```text
-Deployment documentation
 Implementation preparation
 ```
+### Architecture Audit
+
+Status: ✅ Complete
+
 
 ---
 
@@ -883,6 +886,12 @@ Lesson unlocking follows approved learning rules
 Unanswered assessment questions are meaningful evidence
 Question pools support meaningful retry variation
 Personalization is evidence-driven
+Mastery uses five categories: Weak, Developing, Functional, Strong, Mastered
+Mastery below 60% is a weakness candidate threshold
+Intervention thresholds are distinct from mastery categories
+Below 50% prioritizes review/remediation
+50–70% prioritizes targeted practice
+Above 70% generally supports continuation
 Hard constraints override AI recommendations
 Most specific useful intervention is preferred
 Intervention escalates when insufficient
