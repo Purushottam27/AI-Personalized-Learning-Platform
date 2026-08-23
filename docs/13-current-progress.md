@@ -85,8 +85,9 @@ The goal is:
 ## Implementation Phase
 
 ```text
-Backend                         ⬜ Not started
-Database implementation         ⬜ Not started
+Backend                         🟢 Complete
+Database implementation         🟢 Complete
+User model                      🟡 In progress
 Authentication implementation   ⬜ Not started
 Frontend implementation         ⬜ Not started
 AI integration                  ⬜ Not started
@@ -768,8 +769,8 @@ Recommended order:
 1. Repository/project setup
 2. Backend foundation
 3. Database connection
-4. Authentication
-5. User/role handling
+4. User/role handling
+5. Authentication
 6. Frontend foundation
 7. Application shell
 8. Student course foundation
@@ -804,10 +805,14 @@ Active milestone:
 Foundation
 
 Active task:
-Prepare repository/project structure and implementation environment.
+Implement the foundational User model according to
+06-database-design.md.
+
+Current status:
+Database infrastructure is complete and verified.
 
 Next:
-Backend + frontend foundation
+User model → Authentication
 ```
 
 This section must be updated whenever the active task changes.
