@@ -232,7 +232,7 @@ The future model is expected to associate a session with a User and maintain inf
 - revocation,
 - session management.
 
-A protected representation of the refresh credential should be persisted rather than storing the raw refresh token when persistence is required.
+A protected representation of the refresh credential should be persisted rather than storing the raw refresh token.
 
 Potential conceptual fields include:
 
@@ -387,7 +387,7 @@ The following should NOT be implemented merely because they appear in this docum
 - trusted teacher verification,
 - invitation-based teacher creation,
 - institutional teacher verification,
-- advanced refresh-session management,
+- advanced refresh-session management beyond the approved MVP authentication requirements,
 - advanced recommendation scheduling.
 
 They become active implementation items only when explicitly moved into the relevant implementation phase.

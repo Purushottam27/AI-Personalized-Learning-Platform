@@ -38,12 +38,53 @@ Onboarding
 
 ### Onboarding
 
-Collect initial context:
+The student onboarding follows this progressive flow:
 
--   interests
--   goals
--   experience level
--   optional study-time preference
+Signup
+  ↓
+Account Created
+  ↓
+Login
+  ↓
+Welcome / Onboarding Introduction
+  ↓
+Start Onboarding
+  ↓
+Interests
+  ↓
+Goals
+  ↓
+Experience Level
+  ↓
+Daily Study Capacity
+  ↓
+Preferred Learning Format
+  ↓
+Onboarding Completed
+  ↓
+Personalized Student Experience
+
+onboarding uses a combination of:
+
+- structured options
+- multiple selection where appropriate
+- custom/Other input where appropriate
+
+Experience question:
+
+"How would you describe your current experience with the subjects
+you've selected?"
+
+Options:
+
+- I'm completely new to these subjects
+- I know some basics
+- I'm comfortable with the fundamentals
+- I have substantial experience
+- I'm not sure
+
+The onboarding experience should be concise and progressive rather than
+a large single form.
 
 This is not verified mastery.
 

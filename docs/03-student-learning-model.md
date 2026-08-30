@@ -116,9 +116,29 @@ Initially the system may know:
 
 - interests
 - goals
-- experience level
-- preferred learning duration
-- selected subjects
+- overall self-reported experience level
+- daily study capacity
+- preferred learning format
+- selected subjects/interests
+
+Clarify:
+
+daily study capacity is used as an initial personalization constraint.
+
+It can influence the amount/granularity of learning activity that the
+system recommends.
+
+Do NOT imply that the system generates the student's entire future
+learning plan at onboarding.
+
+Also preserve the existing distinction:
+
+Declared learner context
+        ≠
+Verified mastery
+
+The system should later update its understanding using actual learning
+evidence.
 
 This is initial learner context and should not automatically be treated
 as verified mastery.

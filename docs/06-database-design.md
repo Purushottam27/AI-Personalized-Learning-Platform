@@ -179,13 +179,28 @@ Assessment
 There should be one central User identity.
 
 ```text
+Approved common User fields:
+
 User
-├── identity
-├── authentication
+├── name
+├── email
+├── password
 ├── role
-├── account state
-└── common profile information
+├── status
+├── avatar
+└── timestamps
 ```
+Clarify:
+
+- name is common identity information.
+- email is normalized account identity.
+- password represents stored password authentication information;
+  never plaintext.
+- role is STUDENT / TEACHER / ADMIN.
+- status is ACTIVE / SUSPENDED / DEACTIVATED.
+- avatar is common User-level profile information.
+
+Do NOT put avatar into StudentProfile or TeacherProfile.
 
 Roles:
 
@@ -208,10 +223,101 @@ StudentProfile
 ├── goals
 ├── experienceLevel
 ├── studyPreferences
-└── onboardingState
+│   ├── dailyStudyTime
+│   └── preferredLearningFormat
+├── onboardingState
+└── timestamps
 ```
+Clarify:
 
-This represents declared or initial learner context, not verified mastery.
+### interests
+
+Multiple learner interests selected during onboarding.
+
+### goals
+
+Learner goals declared during onboarding.
+
+### experienceLevel
+
+A single overall, self-reported experience level relating to the
+subjects/interests selected by the student.
+
+It is NOT:
+
+- platform experience
+- verified mastery
+- subject-specific mastery
+
+Onboarding question:
+
+"How would you describe your current experience with the subjects
+you've selected?"
+
+Options:
+
+- I'm completely new to these subjects
+- I know some basics
+- I'm comfortable with the fundamentals
+- I have substantial experience
+- I'm not sure
+
+The project intentionally uses ONE overall experience level for the MVP,
+even if multiple interests are selected.
+
+Do not create per-interest experience records.
+
+### studyPreferences
+
+MVP contains only:
+
+studyPreferences
+├── dailyStudyTime
+└── preferredLearningFormat
+
+dailyStudyTime represents realistic daily learning capacity.
+
+Approved displayed choices:
+
+- < 1 hour
+- 1–2 hours
+- 2–3 hours
+- 3–4 hours
+- 5+ hours
+
+This information is intentionally relevant to personalization because
+recommendation volume/granularity can be adjusted according to learner
+capacity.
+
+preferredLearningFormat supports multiple selections.
+
+Approved options:
+
+- Reading
+- Video
+- Interactive
+- Practice
+- Projects
+
+Do NOT make preferredLearningFormat a single-value preference.
+
+Conceptually:
+
+preferredLearningFormat → array of strings
+
+Exact implementation-level enum naming belongs to schema implementation.
+
+### onboardingState
+
+Approved states:
+
+NOT_STARTED
+IN_PROGRESS
+COMPLETED
+
+Reason:
+
+The MVP uses a multi-step onboarding experience.
 
 ## 9. Teacher Profile
 
@@ -224,10 +330,57 @@ TeacherProfile
 ├── department
 ├── subjectAreas
 ├── bio
-└── avatar
+└── timestamps
 ```
+Avatar belongs to User because it is common across Student, Teacher,
+and Admin.
 
 Courses reference the teacher/user as owner rather than duplicating the full teacher profile.
+
+## User → Profile Relationship
+
+For Student:
+
+User.role = STUDENT
+        ↓
+StudentProfile
+
+For Teacher:
+
+User.role = TEACHER
+        ↓
+TeacherProfile
+
+For Admin:
+
+User.role = ADMIN
+        ↓
+No StudentProfile/TeacherProfile required.
+
+For both StudentProfile and TeacherProfile:
+
+userId is:
+
+- required
+- reference to User
+- unique within the respective profile collection
+
+This represents one profile per user for the applicable profile type.
+
+This is an APPLICATION-LEVEL invariant.
+
+Do not imply that MongoDB must atomically create User + Profile through
+a schema hook.
+
+Registration/onboarding may temporarily have:
+
+User exists
+    ↓
+Profile not yet completed
+    ↓
+Onboarding
+    ↓
+Profile completed
 
 ## 10. Course Model
 
@@ -1588,7 +1741,28 @@ Updated State
 
 This makes the database a foundation for an actual personalized learning system rather than simply a CRUD course-management database.
 
-## 65. Scope Boundary
+## 65. Refresh Session
+
+Do NOT place refreshToken directly inside User.
+
+The authentication architecture uses a separate RefreshSession
+persistence model.
+
+Conceptually:
+
+RefreshSession
+├── userId
+├── protected refresh credential representation
+├── expiry
+├── rotation/revocation state
+└── timestamps
+
+One User may have multiple RefreshSession records.
+
+The exact RefreshSession schema remains deferred until the
+Authentication implementation phase.
+
+## 66. Scope Boundary
 
 This document intentionally does not yet finalize:
 
@@ -1604,3 +1778,5 @@ This document intentionally does not yet finalize:
 - advanced sharding/partitioning
 
 Those decisions belong to later design and implementation documents.
+
+

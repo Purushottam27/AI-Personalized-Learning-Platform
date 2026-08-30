@@ -232,7 +232,62 @@ SUSPENDED
 DEACTIVATED
 ```
 
-A valid token does not automatically grant access to a suspended/deactivated account.
+A valid JWT does NOT automatically grant access to a suspended or deactivated account.
+
+### Account State Enforcement
+
+Protected request:
+
+```text
+Request
+ ↓
+Verify access token
+ ↓
+Identify User
+ ↓
+Check User.status
+ ↓
+ACTIVE?
+ ├── YES → continue
+ └── NO → reject
+```
+
+### Refresh behavior
+
+Refresh request:
+
+```text
+Refresh credential
+ ↓
+Validate refresh session
+ ↓
+Find User
+ ↓
+Check User.status
+ ↓
+ACTIVE?
+ ├── YES → rotate and issue new access token
+ └── NO → reject
+```
+
+### Suspension / Deactivation
+
+When an account becomes SUSPENDED or DEACTIVATED:
+
+- revoke active refresh sessions
+- reject future refresh attempts
+- reject protected API requests even when an old access token is
+  otherwise cryptographically valid
+
+Do NOT introduce an access-token blacklist for MVP.
+
+### RefreshSession
+
+Refresh-session persistence is separate from User.
+
+One User can have multiple RefreshSession records.
+
+The exact RefreshSession schema remains open until authentication implementation.
 
 ## 16. Logout and Session Management
 

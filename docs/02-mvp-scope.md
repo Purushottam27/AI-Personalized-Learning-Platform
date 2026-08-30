@@ -97,13 +97,30 @@ The student MVP should include:
 
 ### Onboarding
 
--   learning interests
--   learning goals
--   experience level
--   optional learning-time preference
 
-Onboarding information should be treated as initial learner context
-rather than verified mastery.
+The MVP onboarding collects:
+
+- learning interests
+- learning goals
+- overall self-reported experience level
+- daily study capacity
+- preferred learning format
+
+Onboarding information represents initial learner context, not verified
+mastery.
+
+The onboarding is a multi-step experience.
+
+The student should be able to answer structured choices, with custom
+input where appropriate.
+
+The onboarding should not collect:
+
+- preferred study time
+- preferred session duration
+- study days
+
+Those are deferred future scheduling features.
 
 ### Dashboard
 

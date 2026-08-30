@@ -446,7 +446,14 @@ Conceptual request:
 
 The backend must validate the requested role.
 
-Public users must not be allowed to create an ADMIN account.
+For the current MVP/testing flow, the signup request may contain
+the requested Student or Teacher role.
+
+The backend must validate the requested role and explicitly reject
+ADMIN.
+
+Trusted teacher verification is deferred to a future implementation
+and is not part of the current MVP API.
 
 Possible response:
 

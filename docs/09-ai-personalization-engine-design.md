@@ -309,7 +309,11 @@ Practice activity
 Topic mastery
 Prerequisite relationships
 Course metadata
-Student preferences
+Learning interests
+Learning goals
+Self-reported experience level
+Daily study capacity
+Preferred learning format
 Recent activity
 Learning trends
 Recommendation history
