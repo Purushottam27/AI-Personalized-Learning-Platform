@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import pinoHttp from 'pino-http';
 import pino from 'pino';
+import errorMiddleware from './middleware/error.middleware.js';
 
 const app = express();
 const logger = pino();
@@ -20,16 +21,7 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Centralized Error-handling Foundation
-app.use((err, req, res, next) => {
-  req.log.error(err);
-  const status = err.status || 500;
-  res.status(status).json({
-    error: {
-      message: err.message || 'Internal Server Error',
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-    },
-  });
-});
+// Global Error-handling response Middleware
+app.use(errorMiddleware);
 
 export default app;
