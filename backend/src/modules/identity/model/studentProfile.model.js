@@ -19,11 +19,16 @@ const studentProfileSchema = new mongoose.Schema({
             required:true
         }
     ],
-    experienceLevel:{
-        type:String,
-        enum:['BEGINNER','INTERMEDIATE','ADVANCED'],
-        default:'BEGINNER',
-        required:true
+    experienceLevel: {
+        type: String,
+        required: true,
+        enum: [
+            'NEW_TO_SUBJECT',
+            'BASIC_KNOWLEDGE',
+            'COMFORTABLE_WITH_FUNDAMENTALS',
+            'SUBSTANTIAL_EXPERIENCE',
+            'NOT_SURE'
+        ]
     },
     studyPreferences:{
         dailyStudyTime: {
@@ -51,9 +56,10 @@ const studentProfileSchema = new mongoose.Schema({
         }
     },
     onboardingState:{
-        type:Boolean,
+        type:String,
         required:true,
-        default:false
+        enum:['NOT_STARTED','IN_PROGRESS','COMPLETED'],
+        default:'NOT_STARTED'
     }
 
 },{timestamps:true})
