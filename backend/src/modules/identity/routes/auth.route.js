@@ -1,7 +1,8 @@
 import express from 'express'
 import { validateLogin, validateSignup } from '../validations/auth.validation.middleware.js'
 import upload from '../../../middleware/upload.middleware.js'
-import { loginUser, registerUser } from '../controllers/auth.controller.js'
+import { currentUser, loginUser, logoutUser, refresh, registerUser } from '../controllers/auth.controller.js'
+import { authMiddleware } from '../../../middleware/auth.middleware.js'
 
 const authRouter = express.Router()
 
@@ -16,11 +17,10 @@ authRouter.post('/signup',upload.single("avatar"),validateSignup,registerUser)
 
 authRouter.post('/login',validateLogin,loginUser)
 
-authRouter.post('/refresh')
+authRouter.post('/refresh',refresh)
 
-authRouter.post('/logout')
+authRouter.post('/logout',authMiddleware,logoutUser)
 
-authRouter.get('/me')
-
+authRouter.get('/me',authMiddleware,currentUser)
 
 export {authRouter}

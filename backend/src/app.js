@@ -1,6 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import cookieParser from 'cookie-parser'
 import pinoHttp from 'pino-http';
 import pino from 'pino';
 import errorMiddleware from './middleware/error.middleware.js';
@@ -12,6 +13,7 @@ const logger = pino();
 // Security Middleware Foundation
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
+app.use(cookieParser())
 
 // Logging Foundation
 app.use(pinoHttp({ logger }));

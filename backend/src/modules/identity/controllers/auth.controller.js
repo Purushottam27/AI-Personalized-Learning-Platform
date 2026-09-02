@@ -1,5 +1,5 @@
 import { ApiResponse } from "../../../shared/responses/ApiResponse.js"
-import { loginService, signupService } from "../services/auth.service.js"
+import { loginService, logoutService, refreshService, signupService } from "../services/auth.service.js"
 
 const registerUser = async(req,res)=>{
     const {name,email,password} = req.body
@@ -39,10 +39,52 @@ const loginUser = async(req,res)=>{
 }
 
 const refresh = async(req,res)=>{
-    
+    const incomingRefreshToken = req.cookies?.refreshToken
+
+    const {accessToken,refreshToken} = await refreshService(incomingRefreshToken)
+
+    const options = {
+        httpOnly : true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite:'strict'
+    }
+
+    return res.status(200)
+    .cookie('accessToken',accessToken,options).cookie('refreshToken',refreshToken,options)
+    .json(
+        new ApiResponse({accessToken,refreshToken},'Refresh and Access token created successfully')
+    )
+}
+
+const logoutUser = async(req,res)=>{
+    const incomingRefreshToken = req.cookies?.refreshToken
+
+    await logoutService(incomingRefreshToken)
+
+    const options = {
+        httpOnly:true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite:'strict'
+    }
+
+    return res.status(200)
+    .clearCookie("accessToken",options)
+    .clearCookie("refreshToken",options)
+    .json(
+        new ApiResponse(null,"User Log Out successfully")
+    )
+}
+
+const currentUser = async(req,res)=>{
+    return res.status(200).json(
+        new ApiResponse({user:req.user},"Current user fetched successfully")
+    )
 }
 
 export {
     registerUser,
-    loginUser
+    loginUser,
+    refresh,
+    logoutUser,
+    currentUser
 }

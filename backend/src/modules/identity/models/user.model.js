@@ -65,8 +65,8 @@ userSchema.methods.generateAccessToken = function(){ // these is the method we h
 }
 userSchema.methods.generateRefreshToken = function(jti){
   const payload = {    // it contain less info as it got refresh and its duration is more than access
-    sub:this._id.toString(),
-    jti 
+    sub:this._id.toString(), // user id
+    jti  // unique id for each token
   }
   const secret = process.env.JWT_REFRESH_SECRET
   const expiry = process.env.JWT_REFRESH_EXPIRY
