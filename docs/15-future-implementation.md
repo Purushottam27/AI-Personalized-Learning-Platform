@@ -190,7 +190,7 @@ This must be decided before implementing the future teacher-verification system.
 
 ## Status
 
-**Architecture Direction Approved — Exact Schema Deferred**
+**Status: Implemented for MVP**
 
 The authentication architecture uses:
 
@@ -222,7 +222,8 @@ One user may have multiple refresh sessions, for example:
 
 ## Future RefreshSession Model
 
-The exact schema is not finalized.
+The RefreshSession persistence model has been finalized and
+implemented as part of the authentication foundation.
 
 The future model is expected to associate a session with a User and maintain information required for:
 
@@ -234,14 +235,14 @@ The future model is expected to associate a session with a User and maintain inf
 
 A protected representation of the refresh credential should be persisted rather than storing the raw refresh token.
 
-Potential conceptual fields include:
-
-- `userId`
-- protected refresh-token representation
-- expiration information
-- rotation information
-- revocation information
-- timestamps
+RefreshSession
+├── userId
+├── jti
+├── tokenHash
+├── expiresAt
+├── revokedAt
+├── tokenFamily
+└── timestamps
 
 These are conceptual only until the authentication implementation phase formally finalizes the schema.
 
@@ -387,7 +388,7 @@ The following should NOT be implemented merely because they appear in this docum
 - trusted teacher verification,
 - invitation-based teacher creation,
 - institutional teacher verification,
-- advanced refresh-session management beyond the approved MVP authentication requirements,
+- advanced refresh-session management beyond the approved MVP authentication foundation,
 - advanced recommendation scheduling.
 
 They become active implementation items only when explicitly moved into the relevant implementation phase.
@@ -445,7 +446,7 @@ to:
 | Study reminders | Deferred |
 | Trusted teacher creation | Deferred |
 | Teacher verification | Deferred |
-| RefreshSession exact schema | Deferred / Open |
+| RefreshSession persistence | Implemented as authentication foundation |
 | Access-token blacklist | Not required for current MVP |
 | Account-state token enforcement | Approved for MVP |
 | Refresh-session revocation on suspension/deactivation | Approved for MVP |

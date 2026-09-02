@@ -196,6 +196,8 @@ Clarify:
 - email is normalized account identity.
 - password represents stored password authentication information;
   never plaintext.
+- Passwords are hashed with bcryptjs before persistence.
+  The current implementation uses a cost factor of 12.
 - role is STUDENT / TEACHER / ADMIN.
 - status is ACTIVE / SUSPENDED / DEACTIVATED.
 - avatar is common User-level profile information.
@@ -1748,19 +1750,42 @@ Do NOT place refreshToken directly inside User.
 The authentication architecture uses a separate RefreshSession
 persistence model.
 
-Conceptually:
-
 RefreshSession
 ├── userId
-├── protected refresh credential representation
-├── expiry
-├── rotation/revocation state
+├── jti
+├── tokenHash
+├── expiresAt
+├── revokedAt
+├── tokenFamily
 └── timestamps
+
+Login
+ ↓
+Create RefreshSession
+
+Refresh
+ ↓
+Same RefreshSession
+ ↓
+Update jti + tokenHash
+ ↓
+Keep tokenFamily
+
+Logout
+ ↓
+Set revokedAt
 
 One User may have multiple RefreshSession records.
 
-The exact RefreshSession schema remains deferred until the
-Authentication implementation phase.
+RefreshSession persistence has been finalized for the current
+authentication implementation.
+
+RefreshSession is maintained separately from User.
+Each session is associated with a User through userId.
+The refresh token contains a unique jti that identifies the
+corresponding persisted refresh session.
+
+A User may have multiple refresh sessions.
 
 ## 66. Scope Boundary
 

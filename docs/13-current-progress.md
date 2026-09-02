@@ -88,7 +88,7 @@ The goal is:
 Backend                         🟢 Complete
 Database implementation         🟢 Complete
 User model                      🟢 Complete
-Authentication implementation   ⬜ Not started
+Authentication implementation   🟡 In progress
 Frontend implementation         ⬜ Not started
 AI integration                  ⬜ Not started
 Personalization implementation  ⬜ Not started
@@ -290,11 +290,11 @@ Continue
 ## Authentication
 
 ```text
-Signup                         ⬜
-Login                          ⬜
-Access token                   ⬜
-Refresh token                  ⬜
-Logout                         ⬜
+Signup                         ✅
+Login                          ✅
+Access token                   ✅
+Refresh token                  ✅
+Logout                         ✅
 Protected routes               ⬜
 Role resolution                ⬜
 ```
@@ -420,7 +420,8 @@ Approved database design exists in document `06`.
 Implementation status:
 
 ```text
-User model                     ⬜
+User model                     ✅
+RefreshSession model           ✅
 Course model                   ⬜
 Lesson model                   ⬜
 Resource model                 ⬜
@@ -521,16 +522,16 @@ Approved security and authentication design exists in `08-security-authenticatio
 Current implementation:
 
 ```text
-Authentication foundation          ⬜
-Signup                             ⬜
-Login                              ⬜
-Access-token handling              ⬜
-Refresh-token handling             ⬜
-Logout                             ⬜
+Authentication foundation          🟡
+Signup                             ✅
+Login                              ✅
+Access-token handling              ✅
+Refresh-token handling             ✅
+Logout                             ✅
 Protected routes                   ⬜
 Role-based authorization           ⬜
 Teacher ownership authorization    ⬜
-Input validation                   ⬜
+Input validation                   ✅
 Rate limiting                      ⬜
 Cookie security                    ⬜
 Sensitive-data protection          ⬜

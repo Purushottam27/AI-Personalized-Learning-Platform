@@ -60,15 +60,20 @@ Use two conceptual credentials:
 - Access token: short-lived, minimal claims, used for API authorization.
 - Refresh token: longer-lived, more sensitive, protected and revocable/rotatable.
 
-Conceptual access-token payload:
+Access-token payload:
 
 ```json
 {
   "sub": "userId",
   "role": "STUDENT",
-  "iat": 0,
-  "exp": 0,
-  "jti": "optional-session-id"
+}
+```
+Refresh-token payload:
+
+```json
+{
+  "sub": "userId",
+  "jti": "refresh-token-id"
 }
 ```
 
@@ -81,14 +86,26 @@ Recommended flow:
 ```text
 Refresh Token A
       ↓
-Refresh
+Verify JWT
       ↓
-Invalidate A
+Find RefreshSession using userId + jti
       ↓
-Issue Refresh Token B
+Compare SHA-256 token hash
+      ↓
+Generate Refresh Token B
+      ↓
+Generate new JTI
+      ↓
+Update SAME RefreshSession
       ↓
 Issue new Access Token
 ```
+
+jti        → changed
+tokenHash  → changed
+tokenFamily → unchanged
+expiresAt   → unchanged
+revokedAt   → remains null
 
 Reuse of an already-rotated refresh token should be treated as suspicious and can invalidate the affected token family/session.
 
@@ -119,11 +136,16 @@ Password hash
 Database
 ```
 
-Argon2id is a strong choice; bcrypt can also be used when properly configured and justified by project constraints. Confirm exact library/configuration against current official documentation during implementation.
+The current MVP implementation uses bcryptjs with a cost factor
+of 12. Password hashing is performed by the User model before
+persistence. Plaintext passwords are never stored.
 
 ## 11. Signup and Public Roles
 
-Signup validates name, email, password, and role. The backend normalizes appropriate fields, checks uniqueness, hashes the password, creates the user/profile, and returns a safe response.
+Signup validates name, email, password, and role. The backend normalizes appropriate fields, validates uniqueness,
+hashes the password, creates the User record, and returns a safe
+response. Role-specific profile creation/onboarding is handled
+according to the approved user/profile flow.
 
 Public signup may support:
 
@@ -285,21 +307,42 @@ Do NOT introduce an access-token blacklist for MVP.
 
 Refresh-session persistence is separate from User.
 
+RefreshSession
+├── userId
+├── jti
+├── tokenHash
+├── expiresAt
+├── revokedAt
+├── tokenFamily
+└── timestamps
+
 One User can have multiple RefreshSession records.
 
-The exact RefreshSession schema remains open until authentication implementation.
+Refresh-session persistence has been finalized for the current
+authentication implementation.
+
+RefreshSession is maintained separately from User. One User may have multiple RefreshSession records. The refresh token contains a unique jti that identifies the corresponding persisted session.
 
 ## 16. Logout and Session Management
 
 ```text
 POST /auth/logout
       ↓
-Identify refresh session/token family
+Read refreshToken cookie
       ↓
-Revoke refresh state
+Verify refresh JWT
       ↓
-Clear refresh cookie
+Extract sub + jti
+      ↓
+Find RefreshSession
+      ↓
+Set revokedAt = current time
+      ↓
+Clear accessToken cookie
+      ↓
+Clear refreshToken cookie
 ```
+Normal logout revokes the current refresh session only. Other active sessions belonging to the same user remain unaffected.
 
 Access tokens are short-lived; refresh credentials should be revoked on logout.
 

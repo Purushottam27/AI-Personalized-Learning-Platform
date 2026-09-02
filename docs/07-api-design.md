@@ -444,6 +444,22 @@ Conceptual request:
 }
 ```
 
+The current signup implementation accepts multipart/form-data
+because avatar is optional.
+
+Optional field:
+- avatar — uploaded profile image
+
+The backend processes the uploaded file through the shared upload
+infrastructure and stores the resulting external storage URL
+in User.avatar.
+
+Signup input validation currently enforces:
+
+- name: required string, trimmed
+- email: required string, trimmed, lowercased, valid email format
+- password: required string, minimum 8 characters
+
 The backend must validate the requested role.
 
 For the current MVP/testing flow, the signup request may contain
@@ -460,6 +476,8 @@ Possible response:
 ```text
 201 Created
 ```
+The response returns a safe user representation and does not
+include the password.
 
 ---
 
@@ -487,13 +505,21 @@ The backend:
 ```text
 Credentials
    ↓
-Verify user
+Find User
    ↓
-Verify account status
+Verify Password
    ↓
-Create/rotate authentication tokens
+Check User.status
    ↓
-Return authenticated response
+Generate Access Token
+   ↓
+Generate Refresh Token + JTI
+   ↓
+Create RefreshSession
+   ↓
+Store hashed refresh token
+   ↓
+Set authentication cookies
 ```
 
 ---
@@ -507,6 +533,33 @@ POST /api/v1/auth/refresh
 Purpose:
 
 Issue a new access token using a valid refresh mechanism.
+Refresh Token from HttpOnly Cookie
+        ↓
+Verify JWT
+        ↓
+Extract sub + jti
+        ↓
+Find RefreshSession
+        ↓
+Check expiration/revocation
+        ↓
+Hash incoming token
+        ↓
+Compare tokenHash
+        ↓
+Find User
+        ↓
+Check User.status
+        ↓
+Generate new Access Token
+        ↓
+Generate new Refresh Token + new JTI
+        ↓
+Update same RefreshSession
+        ↓
+Set new cookies
+
+Refresh-token rotation updates the existing RefreshSession; it does not create a new session for every refresh.
 
 The client must not be allowed to create arbitrary access tokens.
 
@@ -523,6 +576,24 @@ POST /api/v1/auth/logout
 Purpose:
 
 Invalidate/revoke the appropriate authentication state.
+
+POST /api/v1/auth/logout
+        ↓
+Read refreshToken cookie
+        ↓
+Verify refresh JWT
+        ↓
+Extract sub + jti
+        ↓
+Find RefreshSession
+        ↓
+Set revokedAt
+        ↓
+Clear accessToken cookie
+        ↓
+Clear refreshToken cookie
+
+Normal logout revokes the current refresh session. Logout-all is not part of the current MVP.
 
 Logout should be designed so that refresh credentials cannot simply remain usable forever.
 
