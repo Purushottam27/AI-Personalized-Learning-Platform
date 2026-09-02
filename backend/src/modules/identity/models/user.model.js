@@ -1,6 +1,5 @@
 import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
-import { randomUUID } from "crypto";
 import jwt from 'jsonwebtoken'
 
 
@@ -26,13 +25,13 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ['STUDENT', 'TEACHER', 'ADMIN'],
         default: 'STUDENT',
-        required: true
+        // required: true
     },
     status: {
         type: String,
         enum: ['ACTIVE', 'SUSPENDED', 'DEACTIVATED'],
         default: 'ACTIVE',
-        required: true
+        // required: true
     },
     avatar: {
         type: String,
@@ -40,8 +39,6 @@ const userSchema = new mongoose.Schema({
         // required: true
     }
 }, { timestamps: true })
-
-export const User = mongoose.model('User', userSchema)
 
 
 userSchema.pre("save", async function () { // there we have to use normal function not arrow to use this property
@@ -66,13 +63,16 @@ userSchema.methods.generateAccessToken = function(){ // these is the method we h
 
   return jwt.sign(payload,secret,{expiresIn:expiry})
 }
-userSchema.methods.generateRefreshToken = function(){
+userSchema.methods.generateRefreshToken = function(jti){
   const payload = {    // it contain less info as it got refresh and its duration is more than access
     sub:this._id.toString(),
-    jti: randomUUID() // 
+    jti 
   }
   const secret = process.env.JWT_REFRESH_SECRET
   const expiry = process.env.JWT_REFRESH_EXPIRY
   
   return jwt.sign(payload,secret,{expiresIn:expiry})
 }
+
+
+export const User = mongoose.model('User', userSchema)

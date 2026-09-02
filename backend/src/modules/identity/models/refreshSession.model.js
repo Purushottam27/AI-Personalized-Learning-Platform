@@ -7,6 +7,11 @@ const refreshSessionSchema  = new mongoose.Schema({
         required: true,
         index: true, // index: true, because refresh operations will frequently need to find sessions belonging to a user.
     },
+    jti:{
+        type: String,
+        required: true,
+        unique: true
+    },
     tokenHash:{
         type: String,
         required: true,

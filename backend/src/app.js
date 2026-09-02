@@ -4,6 +4,7 @@ import cors from 'cors';
 import pinoHttp from 'pino-http';
 import pino from 'pino';
 import errorMiddleware from './middleware/error.middleware.js';
+import { authRouter } from './modules/identity/routes/auth.route.js';
 
 const app = express();
 const logger = pino();
@@ -20,6 +21,8 @@ app.use(express.json());
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+app.use('/api/v1/auth',authRouter) 
 
 // Global Error-handling response Middleware
 app.use(errorMiddleware);
