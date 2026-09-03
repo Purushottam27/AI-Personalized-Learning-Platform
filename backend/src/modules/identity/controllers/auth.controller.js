@@ -1,5 +1,5 @@
 import { ApiResponse } from "../../../shared/responses/ApiResponse.js"
-import { loginService, logoutService, refreshService, signupService } from "../services/auth.service.js"
+import { loginService, logoutService, passwordService, refreshService, signupService } from "../services/auth.service.js"
 
 const registerUser = async(req,res)=>{
     const {name,email,password} = req.body
@@ -81,10 +81,23 @@ const currentUser = async(req,res)=>{
     )
 }
 
+const changePassword = async(req,res)=>{
+    const {oldPassword,newPassword} = req.body;
+    const userId = req.user?._id
+    const refreshToken = req.cookie?.refreshToken
+
+    await passwordService(oldPassword,newPassword,userId,refreshToken)
+
+    return res.status(200).json(
+        new ApiResponse(null,"Password is changed successfully")
+    )
+}
+
 export {
     registerUser,
     loginUser,
     refresh,
     logoutUser,
-    currentUser
+    currentUser,
+    changePassword
 }

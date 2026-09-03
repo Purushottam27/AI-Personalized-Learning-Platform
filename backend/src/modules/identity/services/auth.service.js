@@ -1,4 +1,3 @@
-import { ReceiptPoundSterling } from "lucide-react";
 import { ApiError } from "../../../shared/errors/ApiError.js"
 import { uploadOnCloudinary } from "../../../shared/utils/cloudinary.js"
 import { hashToken } from "../../../shared/utils/hashToken.js";
@@ -203,10 +202,118 @@ const logoutService = async (incomingRefreshToken) => {
     return
 };
 
+const passwordService = async(oldPassword,newPassword,userId,refreshToken)=>{
+    // find the user and validate it
+    // check the old password
+    // verify the refresh token
+    // extract the jti from it
+    // find the refresh session 
+    // check if it exist 
+    // then check if already expires or revoked or not
+    // then match the refresh token with the token hash 
+    // after that change the password
+    // then revoke all other devices except current one
+    
+    const user = await User.findById(userId)
+
+    if (!user) {
+        throw new ApiError(
+            404,
+            "USER_NOT_FOUND",
+            "User not found"
+        );
+    }
+
+    // check the old password
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+
+    if(!isPasswordCorrect){
+        throw new ApiError(400,'INVALID_PASSWORD',"Invaild old password")
+    }
+
+    // Check the refresh token
+    let verifyToken
+
+    try {
+        verifyToken = jwt.verify(
+            refreshToken,
+            process.env.JWT_REFRESH_SECRET
+        )
+    } catch (error) {
+        throw new ApiError(
+            401,
+            "INVALID_REFRESH_TOKEN",
+            "Refresh token is invalid or expired"
+        )
+    }
+
+    // extract the jti from the token
+    const currentJti = verifyToken.jti
+
+    // find current device the refresh session
+    const currentSession = await RefreshSession.findOne({
+        userId,
+        jti: currentJti
+    });
+
+    // check if it exist or not
+    if (!currentSession) {
+        throw new ApiError(
+            401,
+            "INVALID_SESSION",
+            "Current refresh session is invalid"
+        );
+    }
+
+    // check if it expires or revoked already or not
+    if (
+        currentSession.expiresAt <= new Date() ||
+        currentSession.revokedAt !== null
+    ) {
+        throw new ApiError(
+            401,
+            "INVALID_SESSION",
+            "Current refresh session is expired or revoked"
+        );
+    }
+
+    // then check the refresh token with the refresh session token
+    const tokenHash = hashToken(refreshToken);
+
+    if (tokenHash !== currentSession.tokenHash) {
+        throw new ApiError(
+            401,
+            "INVALID_REFRESH_TOKEN",
+            "Refresh token is no longer valid"
+        );
+    }
+
+    // Now change the password
+    user.password = newPassword;
+    await user.save()
+
+
+    // update(revoke) all the refresh session except the current one 
+    await RefreshSession.updateMany(
+        {
+            userId,
+            jti:{$ne:currentJti},
+            revokedAt:null
+        },
+        {
+            $set:{
+                revokedAt:new Date()
+            }
+        }
+    )
+
+    return 
+}
 
 export {
     signupService,
     loginService,
     refreshService,
-    logoutService
+    logoutService,
+    passwordService
 }
