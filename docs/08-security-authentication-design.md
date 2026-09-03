@@ -182,6 +182,23 @@ Attach authenticated context
 next()
 ```
 
+The MVP authentication middleware:
+
+- accepts the access token from the authentication cookie or
+  Authorization: Bearer <token> header,
+- verifies the JWT signature and expiration,
+- uses the JWT `sub` to identify the User,
+- retrieves the current User state,
+- checks User.status,
+- attaches the required safe User context to req.user,
+- allows the request to continue.
+
+req.user
+├── _id
+├── name
+├── role
+└── status
+
 Authentication middleware should remain focused and not contain large business rules.
 
 ## 13. Authorization Architecture
@@ -246,15 +263,34 @@ A student's platform-wide history must not become visible merely because a teach
 
 ## 15. Account State
 
-Recommended states:
+Final account states:
 
 ```text
 ACTIVE
 SUSPENDED
 DEACTIVATED
 ```
+Account-state ownership:
 
-A valid JWT does NOT automatically grant access to a suspended or deactivated account.
+```text
+DEACTIVATED
+    ↓
+User-initiated
+
+SUSPENDED
+    ↓
+Admin/platform-controlled
+
+ACTIVE
+    ↓
+Normal account state
+```
+
+A user may reactivate their own DEACTIVATED account.
+
+A user cannot self-reactivate a SUSPENDED account.
+
+Only the platform/Admin resolves a suspension.
 
 ### Account State Enforcement
 
@@ -342,6 +378,12 @@ Clear accessToken cookie
       ↓
 Clear refreshToken cookie
 ```
+The logout endpoint is protected by access-token authentication
+middleware.
+
+The access token authenticates the logout request, while the
+refresh token identifies the refresh session that should be revoked.
+
 Normal logout revokes the current refresh session only. Other active sessions belonging to the same user remain unaffected.
 
 Access tokens are short-lived; refresh credentials should be revoked on logout.
@@ -472,8 +514,8 @@ Examples of auditable events:
 ```text
 LOGIN_SUCCESS
 LOGIN_FAILURE
-ROLE_CHANGED
 USER_SUSPENDED
+USER_UNSUSPENDED
 COURSE_PUBLISHED
 COURSE_ARCHIVED
 ASSESSMENT_SUBMITTED
@@ -799,6 +841,17 @@ Refresh rotated token       → rejected/revoked
 Logout                      → success
 Protected route no token    → 401
 Protected route expired     → 401
+Change password valid              → 200
+
+Change password incorrect old      → rejected
+
+Suspended user login               → rejected
+
+Deactivated user login             → rejected
+
+Suspended user protected API       → 401/422 according to API contract
+
+Deactivated user protected API     → 401/422 according to API contract
 ```
 
 ## 42. Authorization Test Matrix
@@ -908,8 +961,6 @@ This document intentionally does not yet finalize:
 - Exact JWT library configuration
 - Exact cookie domain
 - Exact SameSite deployment value
-- Exact refresh-session schema
-- Exact password-hashing library configuration
 - Exact CSRF implementation
 - Exact security-header configuration
 - Exact cloud secret manager
@@ -919,6 +970,9 @@ This document intentionally does not yet finalize:
 - Complete penetration-testing plan
 
 These will be finalized against current official documentation and the actual deployment environment during implementation.
+The current authentication design has finalized the password hashing
+approach, refresh-session persistence model, refresh-token rotation
+behavior, account-state semantics, and role-authorization boundaries.
 
 ## 49. Complete Authentication Flow
 

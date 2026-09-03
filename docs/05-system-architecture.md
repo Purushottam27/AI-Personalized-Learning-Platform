@@ -118,7 +118,7 @@ Exact contracts belong in `07-api-design.md`.
 ## 7. Module Responsibilities
 
 - **Auth:** signup, login, logout, tokens, password handling.
-- **Users:** profiles, preferences, avatars.
+- **Users:** account information, profiles, preferences, avatars, user-level account management, and administrative user-management operations.
 - **Courses:** metadata, ownership, department, prerequisites, lifecycle.
 - **Lessons:** lesson structure, order, availability.
 - **Resources:** YouTube, files, external references.
@@ -130,7 +130,7 @@ Exact contracts belong in `07-api-design.md`.
 - **Personalization:** learner state, mastery, weaknesses, interventions.
 - **Recommendations:** course, lesson, remediation, prerequisite, next action.
 - **Notifications:** in-app/email notifications and jobs.
-- **Admin:** user management, moderation, platform operations, audit actions.
+- **Admin:** platform-level moderation, platform operations, audit actions, and authorized use of the Users module for user management.
 
 Modules communicate through defined service interfaces and lightweight internal events.
 
@@ -273,6 +273,15 @@ Student enrolled?
   ↓
 Allowed course-level data?
 ```
+
+Account status is checked against the current User record during
+authentication.
+
+Suspended or deactivated users cannot access protected resources even if
+an otherwise valid access token has not yet expired.
+
+User role is treated as authoritative from the current User record for
+authorization decisions.
 
 Role checks alone are insufficient.
 

@@ -88,7 +88,10 @@ The goal is:
 Backend                         🟢 Complete
 Database implementation         🟢 Complete
 User model                      🟢 Complete
-Authentication implementation   🟡 In progress
+Authentication implementation   🟢 Complete
+Authorization foundation           🟢 Complete
+Feature/domain backend modules     ⬜ Not started
+Frontend implementation             ⬜ Not started
 Frontend implementation         ⬜ Not started
 AI integration                  ⬜ Not started
 Personalization implementation  ⬜ Not started
@@ -290,13 +293,21 @@ Continue
 ## Authentication
 
 ```text
+## Authentication
+
+```text
 Signup                         ✅
 Login                          ✅
 Access token                   ✅
 Refresh token                  ✅
+Refresh-token rotation         ✅
 Logout                         ✅
-Protected routes               ⬜
-Role resolution                ⬜
+Authentication middleware      ✅
+Protected routes               ✅
+Current user (/me)             ✅
+Role resolution                ✅
+Role-based authorization       ✅
+Change password                ✅
 ```
 
 ## Student Dashboard
@@ -494,8 +505,8 @@ Implementation should proceed feature by feature.
 Status:
 
 ```text
-Auth APIs                     ⬜
-User APIs                     ⬜
+Auth APIs                     🟢
+User APIs                     🟡
 Course APIs                   ⬜
 Enrollment APIs               ⬜
 Lesson APIs                   ⬜
@@ -522,19 +533,22 @@ Approved security and authentication design exists in `08-security-authenticatio
 Current implementation:
 
 ```text
-Authentication foundation          🟡
+Authentication foundation          ✅
 Signup                             ✅
 Login                              ✅
 Access-token handling              ✅
 Refresh-token handling             ✅
+Refresh-token rotation              ✅
 Logout                             ✅
-Protected routes                   ⬜
-Role-based authorization           ⬜
+Authentication middleware          ✅
+Protected routes                   ✅
+Current user (/me)                 ✅
+Role-based authorization           ✅
 Teacher ownership authorization    ⬜
 Input validation                   ✅
 Rate limiting                      ⬜
-Cookie security                    ⬜
-Sensitive-data protection          ⬜
+Cookie security                    🟡
+Sensitive-data protection          🟡
 File-upload security               ⬜
 Audit/security logging             ⬜
 Security testing                   ⬜
@@ -721,11 +735,10 @@ Frontend architecture
 Testing strategy
 ```
 
-Remaining:
+Next milestone:
 
-```text
-Implementation preparation
-```
+Milestone 1 — Foundation
+
 ### Architecture Audit
 
 Status: ✅ Complete
@@ -750,7 +763,7 @@ Database connection [✅]
         ↓
 User/Profile models [✅]
         ↓
-Authentication [IN PROGRESS / NEXT]
+Authentication [✅]
  ↓
 Environment configuration
  ↓
@@ -774,24 +787,26 @@ Recommended order:
 2. Backend foundation [✅]
 3. Database connection [✅]
 4. User/Profile models [✅]
-5. Authentication & End-to-end authentication verification 
-6. Frontend foundation
-7. Application shell
-8. Student course foundation
-9. Enrollment
-10. Lessons
-11. Assessments
-12. Learning evidence
-13. Mastery
-14. Personalization
-15. Teacher course management
-16. Teacher assessments/question bank
-17. Teacher analytics
-18. Admin foundation
-19. Background processing
-20. Advanced AI
-21. Full testing
-22. Deployment
+5. Authentication & End-to-end authentication verification [✅]
+6. Role-based authorization [✅]
+7. Users and profile APIs [🟡]
+8. Frontend foundation
+9. Application shell
+10. Student course foundation
+11. Enrollment
+12. Lessons
+13. Assessments
+14. Learning evidence
+15. Mastery
+16. Personalization
+17. Teacher course management
+18. Teacher assessments/question bank
+19. Teacher analytics
+20. Admin foundation
+21. Background processing
+22. Advanced AI
+23. Full testing
+24. Deployment
 ```
 
 This is a recommended sequence, not an immutable rule.
@@ -809,14 +824,14 @@ Active milestone:
 Foundation
 
 Active task:
-Implement the foundational User model according to
-06-database-design.md.
+Complete and harden the authentication and authorization foundation.
 
 Current status:
-Database infrastructure is complete and verified.
+User/Profile models and the core authentication flow are implemented and
+verified.
 
 Next:
-User model → Authentication
+Role-based authorization → Users API → Student/Teacher profile APIs
 ```
 
 This section must be updated whenever the active task changes.
@@ -1157,6 +1172,33 @@ Change: Created living project-control document
 Reason: Track implementation state after architecture phase
 Impact: Establishes a single current-status reference
 Status: Active
+
+Date: September 2026
+
+Document: 06-database-design.md / 07-api-design.md /
+08-security-authentication-design.md
+Change: Finalized user account-state semantics and user-management
+boundaries.
+Reason: Align the documentation with the implemented authentication and
+authorization design.
+Impact: DEACTIVATED is user-initiated, SUSPENDED is Admin/platform-controlled,
+Admin cannot change roles, and user-management operations are exposed
+through the Users API rather than duplicated under the Admin API.
+Status: Active
+
+Date: September 2026
+
+Document: 07-api-design.md
+
+Change: Added change-password API and finalized Users API boundaries.
+
+Reason: Complete the authentication foundation and separate user
+management from Admin-specific platform operations.
+
+Impact: Users API handles user account management, while Admin API remains
+focused on platform-level operations.
+
+Status: Active
 ```
 
 ---
@@ -1239,32 +1281,45 @@ What changed?
 # 39. Final Status Snapshot
 
 ```text
-                    PROJECT STATUS
+                         PROJECT STATUS
 
 Planning / Architecture
+
 ████████████████████  COMPLETE
 
-Implementation
-                    NOT STARTED
+Foundation Implementation
+
+████████████████████  COMPLETE
+
+Authentication / Authorization
+
+██████████████░░░░░░  IN PROGRESS
+
+Feature Implementation
+
+░░░░░░░░░░░░░░░░░░░░  NOT STARTED
 
 Testing
-                    NOT STARTED
+
+░░░░░░░░░░░░░░░░░░░░  NOT STARTED
 
 Deployment
-                    NOT STARTED
+
+░░░░░░░░░░░░░░░░░░░░  NOT STARTED
 
 
 CURRENT PHASE:
-Architecture → Implementation Transition
+
+Implementation
 
 CURRENT PRIORITY:
-Foundation
+
+Complete authentication/authorization foundation
 
 NEXT:
-Implementation preparation
-→ Backend foundation
-→ Frontend foundation
-→ Authentication
+
+Users API
+→ Student/Teacher profile APIs
 → First vertical learning slice
 ```
 

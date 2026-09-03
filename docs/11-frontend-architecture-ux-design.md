@@ -115,7 +115,7 @@ useStudentDashboard()
       ↓
 studentService.getDashboard()
       ↓
-GET /api/v1/students/me/dashboard
+GET /api/v1/learning/me/dashboard
       ↓
 Backend
 ```
@@ -187,11 +187,19 @@ Protected areas require authentication.
 The frontend needs to know:
 
 ```text
-Is user authenticated?
-Who is the user?
+Is authentication initialized?
+Is the user authenticated?
+Who is the authenticated user?
 What role does the user have?
-Is authentication still being initialized?
 ```
+
+The frontend authentication state should contain appropriate lightweight user information such as:
+- `_id`
+- `name`
+- `role`
+- `status`
+
+> **Note:** The backend remains authoritative for role and status. The frontend state is purely for UI and navigation.
 
 Conceptually:
 
@@ -209,25 +217,27 @@ Avoid showing a protected page before authentication state is resolved.
 
 # 9. Token Handling
 
-The approved authentication design uses access and refresh tokens.
+The approved authentication design uses short-lived access tokens and refresh tokens.
 
-The frontend should not unnecessarily manipulate tokens directly.
+The frontend should not unnecessarily manipulate authentication tokens directly.
 
-Prefer:
+When authentication uses HttpOnly cookies:
 
 ```text
-API client
+Browser
    ↓
-Authenticated request
+HttpOnly authentication cookies
    ↓
 Backend
 ```
 
-If the backend uses HttpOnly cookies, JavaScript should not attempt to read those cookies.
+If the backend uses HttpOnly cookies, JavaScript should not attempt to read those cookies. The frontend must not read refresh tokens through JavaScript.
 
 ---
 
 # 10. Refresh Flow
+
+The frontend API layer should centralize access-token renewal.
 
 Conceptually:
 
@@ -240,10 +250,31 @@ Access token valid?
  ↓                ↓
 Success       Refresh endpoint
                   ↓
-            New access token
+            Validate refresh session
                   ↓
-            Retry request
+            Rotate refresh token
+                  ↓
+            Issue new access token
+                  ↓
+            Retry original request
 ```
+The refresh endpoint is: POST /api/v1/auth/refresh
+
+The refresh token is handled through the approved authentication cookie mechanism.
+
+The frontend should treat a successful refresh as an internal authentication operation rather than exposing the refresh token to application components.
+
+If refresh fails because the session is invalid, expired, revoked, or the account is no longer active:
+
+Refresh failure
+      ↓
+Clear authenticated frontend state
+      ↓
+Redirect to login or account-state screen
+
+The frontend must avoid infinite refresh loops.
+
+A failed refresh request must not continuously retry itself.
 
 The frontend API layer should centralize this behavior rather than implementing refresh logic inside every component.
 
@@ -290,6 +321,36 @@ Admin
 ```
 
 ---
+
+
+---
+
+# 12A. Account States & Error Handling
+
+The application must handle various account states and errors appropriately:
+- **401 Unauthorized:** Clear auth state and redirect to login.
+- **403 Forbidden:** Display forbidden/unauthorized state UI.
+- **ACTIVE:** Normal account access.
+- **SUSPENDED:** Suspended-account UI should clearly communicate suspension and may display `suspensionReason` returned by the backend. Suspended users must not receive a self-unsuspend UI.
+- **DEACTIVATED:** Deactivated-account UX should support the approved reactivation flow when implemented.
+
+---
+
+# 12B. UI States
+
+Add proper handling for various asynchronous states across the application:
+- **Loading:** Skeleton loaders or spinners.
+- **Success:** Success toasts or confirmation screens.
+- **Empty:** Clear empty states when no data is available.
+- **Error:** Friendly error messages with retry options if applicable.
+- **Processing:** Disabled buttons and processing indicators during submissions.
+- **Unauthorized / Forbidden:** Clear communication of missing permissions without leaking sensitive data.
+
+---
+
+# 12C. Logout UX
+
+The frontend must provide clear Logout UX. When triggered, the frontend must call the backend logout endpoint (`POST /api/v1/auth/logout`), clear local authenticated state, and redirect to the public landing page or login screen.
 
 # 13. Role-Based Frontend Architecture
 
@@ -360,6 +421,21 @@ Every protected API endpoint must still perform backend authentication and autho
 
 ---
 
+# 15A. Backend Authorization Remains Mandatory
+
+Frontend route protection exists for navigation and user experience.
+
+It is not a security boundary.
+
+For example:
+
+```text
+Admin Route
+   ↓
+Frontend checks role
+   ↓
+Admin UI displayed
+```
 # 16. Route Categories
 
 Conceptually:
@@ -1355,6 +1431,22 @@ Review role
 Admin actions must be protected and audited.
 
 ---
+
+
+---
+
+# 65A. Admin User Management UX
+
+Admin User Management UX must cover:
+- **User list:** Showing Name, Email, Role, Status, and Action/View.
+- **Search, Filters, Pagination:** For efficiently navigating users.
+- **User detail:** 
+  - Account Information (Name, Email, Role, Status, Avatar, Joined)
+  - For Student: Student information and appropriate learning overview
+  - For Teacher: Teacher information and appropriate learning overview
+- **Suspend/Unsuspend UI:** Admins may suspend an ACTIVE user or unsuspend a SUSPENDED user.
+
+> **CRITICAL:** Admin UI must NOT contain role-change controls, deactivation controls, or controls to change another user's password, mastery, or learning evidence.
 
 # 66. Admin Course Management
 

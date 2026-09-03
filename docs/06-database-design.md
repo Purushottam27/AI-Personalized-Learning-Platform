@@ -187,8 +187,11 @@ User
 ├── password
 ├── role
 ├── status
+├── suspensionReason
+├── suspendedAt
 ├── avatar
 └── timestamps
+
 ```
 Clarify:
 
@@ -213,6 +216,41 @@ ADMIN
 ```
 
 Public signup may allow Student or Teacher. Admin accounts are controlled and are not self-created through public role selection.
+
+### Account Status Semantics
+
+ACTIVE represents normal account access.
+
+DEACTIVATED represents user-initiated account deactivation.
+
+SUSPENDED represents an Admin/platform-controlled restriction.
+
+The platform must distinguish suspension from deactivation:
+
+```text
+ACTIVE
+  ├── User deactivates → DEACTIVATED
+  └── Admin suspends → SUSPENDED
+
+DEACTIVATED
+  └── User reactivates → ACTIVE
+
+SUSPENDED
+  └── Admin resolves → ACTIVE
+  ```
+
+Admin does not directly deactivate users.
+
+A suspended user cannot self-reactivate.
+
+Suspension metadata is stored as:
+
+suspensionReason
+suspendedAt
+
+No suspendedBy field is required for the current design.
+
+Role changes are not supported as a normal user-management operation.
 
 ## 8. Student Profile
 
@@ -1748,7 +1786,9 @@ This makes the database a foundation for an actual personalized learning system 
 Do NOT place refreshToken directly inside User.
 
 The authentication architecture uses a separate RefreshSession
-persistence model.
+persistence
+RefreshSession stores the server-side state required to validate and
+revoke refresh-token sessions.
 
 RefreshSession
 ├── userId
@@ -1784,6 +1824,9 @@ RefreshSession is maintained separately from User.
 Each session is associated with a User through userId.
 The refresh token contains a unique jti that identifies the
 corresponding persisted refresh session.
+Logout revokes the current session by setting revokedAt.
+Password change revokes other active refresh sessions while preserving
+the current authenticated session according to the authentication flow.
 
 A User may have multiple refresh sessions.
 

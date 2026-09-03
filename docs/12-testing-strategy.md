@@ -277,12 +277,17 @@ Invalid input
 Login success
 Wrong password
 Unknown account
-Token generation
-Access-token expiry
-Refresh-token flow
-Logout
+Inactive account
+Access token generation
+Expired access token
+Refresh token flow
+Refresh rotation
 Invalid refresh token
-Protected route
+Revoked refresh session
+Logout
+Protected endpoints
+/auth/me
+Change-password
 ```
 
 ---
@@ -298,9 +303,10 @@ Malformed token
 Missing token
 Wrong signing secret
 Invalid payload
-Refresh token success
-Refresh token failure
-Token rotation if implemented
+Refresh token JTI verification
+Refresh session lookup
+Token hash verification
+Refresh-token rotation
 ```
 
 Never place real production secrets in tests.
@@ -327,24 +333,78 @@ If HttpOnly cookies are used, JavaScript must not access refresh tokens.
 For protected endpoints test:
 
 ```text
-Unauthenticated
-Student
-Teacher
-Admin
+Unauthenticated → 401
+Authenticated but wrong role → 403
+Correct role → allowed
 ```
 
-Example:
-
-```text
-Teacher course analytics
-
-Student → 403
-Other teacher → 403
-Course owner → allowed
-Admin → allowed according to policy
-```
+Explicitly test:
+- Student cannot access Admin APIs
+- Teacher cannot access Admin APIs
+- Admin can access permitted Admin APIs
+- Frontend hiding a button is NOT considered authorization.
 
 ---
+
+
+---
+
+# 17A. Account Status Testing
+
+Account-status tests must cover:
+- ACTIVE
+- SUSPENDED
+- DEACTIVATED
+
+Critical test:
+1. User is ACTIVE.
+2. User receives a valid access token.
+3. Admin suspends the user.
+4. User sends the previously valid access token.
+5. Backend checks current `User.status`.
+6. Request is rejected.
+
+Also test transitions:
+- ACTIVE → SUSPENDED
+- SUSPENDED → ACTIVE
+- ACTIVE → DEACTIVATED
+
+Verify suspended users cannot self-unsuspend.
+Verify Admin cannot deactivate users.
+Verify Admin cannot change roles.
+
+---
+
+# 17B. Refresh Session Testing
+
+Test:
+- Login creates RefreshSession
+- One user may have multiple refresh sessions
+- Refresh rotates JTI
+- Refresh rotates tokenHash
+- tokenFamily remains the same during rotation
+- Normal refresh updates the existing RefreshSession
+- Revoked session cannot refresh
+- Expired session cannot refresh
+- Token hash mismatch cannot refresh
+- Logout revokes only the current session
+- Other sessions remain active after normal logout
+
+---
+
+# 17C. Password Change Testing
+
+POST `/api/v1/auth/change-password`
+
+Test:
+- Correct old password
+- Incorrect old password
+- Valid new password
+- Successful password change
+- Old password no longer works
+- New password works
+- Current refresh session remains active
+- Other refresh sessions are revoked
 
 # 18. Ownership Testing
 
@@ -1145,24 +1205,26 @@ Unrelated course data
 
 # 56. Admin Testing
 
-Cover:
+Test Admin APIs:
+- `GET /api/v1/users`
+- `GET /api/v1/users/:userId`
+- `PATCH /api/v1/users/:userId`
+- `PATCH /api/v1/users/:userId/status`
 
-```text
-Admin authentication
-Admin authorization
-User management
-Course management
-Audit logging
-Platform analytics
-Administrative restrictions
-```
+Verify all require authentication and ADMIN authorization.
 
-Also verify:
+Test status transitions:
+- ACTIVE → SUSPENDED
+- SUSPENDED → ACTIVE
 
-```text
-Student → cannot access admin API
-Teacher → cannot access admin API
-```
+Verify Admin cannot:
+- change role
+- change another user's password
+- edit mastery
+- edit learning evidence
+- edit student learning data
+- edit teacher course data
+- deactivate users
 
 ---
 
@@ -1206,17 +1268,20 @@ Test user-visible behavior.
 # 59. Frontend Authentication Testing
 
 Test:
+- Authentication initialization
+- Login
+- Logout
+- Refresh
+- Session expiration
+- Protected routes
+- Role-based navigation
+- 401 handling
+- 403 handling
+- Suspended-account UX
+- Deactivated-account UX
+- Admin User Management UI (search, filtering, pagination, user detail, suspend/unsuspend UI)
 
-```text
-Login success
-Login failure
-Session initialization
-Refresh
-Logout
-Expired session
-Protected route
-Role redirect
-```
+Verify that frontend authorization is not treated as backend security.
 
 ---
 

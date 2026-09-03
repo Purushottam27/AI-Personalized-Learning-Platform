@@ -78,8 +78,11 @@ The initial authentication system should support:
 -   refresh token
 -   token renewal
 -   logout
+-   change password
 -   authentication middleware
 -   role-based authorization
+-   protected routes
+-   current-user access
 
 Roles:
 
@@ -87,9 +90,19 @@ Roles:
 -   teacher
 -   admin
 
-The exact token storage, refresh-token rotation, revocation, cookie
-strategy, and security controls will be finalized during the security
-and architecture phases.
+Public signup may create Student or Teacher accounts, but Admin accounts
+must not be created through public role selection.
+
+The authentication system uses a short-lived access token and a longer-lived
+refresh token.
+
+Refresh tokens are rotated on successful refresh and persisted through
+protected refresh-session records so that sessions can be revoked.
+
+Authentication state must also respect the current User account status.
+
+The exact implementation details belong to the Security & Authentication
+document.
 
 ## 5. Student MVP
 
@@ -354,6 +367,21 @@ Admin MVP should initially include:
 -   basic course moderation
 -   platform analytics
 -   basic audit/activity information
+
+Admin user management is performed through the Users API.
+
+The Admin MVP should support:
+
+-   viewing platform users
+-   viewing individual user details
+-   updating explicitly permitted account information
+-   suspending users
+-   unsuspending users
+
+Admin cannot change a user's role.
+
+Admin also cannot directly deactivate a user's account. Account
+deactivation is user-initiated.
 
 The admin system should remain intentionally smaller than the student
 and teacher systems during MVP development.

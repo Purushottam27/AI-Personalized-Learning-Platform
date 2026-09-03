@@ -636,6 +636,39 @@ Audit Logs
 
 Admin may manage platform users according to authorization policy.
 
+The Admin user-management flow includes:
+
+``` text
+Admin Dashboard
+  ↓
+Users
+  ↓
+Search / Filter / Paginate
+  ↓
+User List
+  ↓
+View User
+  ↓
+User Details
+```
+The User Details view may contain:
+
+account information
+Student/Teacher information
+learning overview where available
+administrative actions
+
+Administrative account actions include:
+
+Active → Suspend
+Suspended → Unsuspend
+
+Admin cannot change a user's role.
+
+Admin does not deactivate users.
+
+User deactivation is initiated by the user through their own account.
+
 ### Course Moderation
 
 Admin may review and moderate platform courses according to platform
@@ -847,19 +880,24 @@ Access denied
 Client-side manipulation must never allow:
 
 ``` text
+STUDENT → TEACHER
 STUDENT → ADMIN
+TEACHER → ADMIN
 ```
 
 Roles are controlled server-side.
+
+Admin user-management operations do not provide a role-change operation.
 
 ### Archived Course After Enrollment
 
 Historical records should remain meaningful and progress should not be
 silently destroyed. Exact active-learner handling is a later decision.
 
-### Account Deletion
+### Account Deactivation
 
-Deletion must consider enrollments, assessment attempts, teacher
+User-initiated account deletion is represented as account deactivation
+rather than immediate destructive database deletion.
 analytics, historical records, and privacy requirements. Exact rules
 belong to later security/data design.
 

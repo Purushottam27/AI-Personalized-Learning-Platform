@@ -419,6 +419,7 @@ POST /auth/login
 POST /auth/refresh
 POST /auth/logout
 GET  /auth/me
+POST /auth/change-password
 ```
 
 ---
@@ -593,6 +594,15 @@ Clear accessToken cookie
         ↓
 Clear refreshToken cookie
 
+Authentication:
+Protected endpoint.
+
+The request must contain a valid access token.
+The authentication middleware verifies the access token,checks the current User.status, and attaches the authenticated
+user context to req.user.
+
+The logout service then uses the refresh token cookie to identify and revoke the current RefreshSession.
+
 Normal logout revokes the current refresh session. Logout-all is not part of the current MVP.
 
 Logout should be designed so that refresh credentials cannot simply remain usable forever.
@@ -601,25 +611,38 @@ Logout should be designed so that refresh credentials cannot simply remain usabl
 
 # 21. Current User
 
-```text
 GET /api/v1/auth/me
+
+Returns the authenticated user's current safe account context.
+
+Authentication:
+
+Protected endpoint.
+
+The request passes through authentication middleware before reaching
+the controller.
+
+The authentication middleware:
+
+1. extracts the access token,
+2. verifies the JWT,
+3. identifies the User using the JWT `sub`,
+4. retrieves the current User record,
+5. checks that User.status is ACTIVE,
+6. attaches the selected safe user context to `req.user`.
+
+The `/me` controller returns the authenticated user context from
+`req.user` and does not perform another User query.
+
+Current authenticated context:
+
+```text
+req.user
+├── _id
+├── name
+├── role
+└── status
 ```
-
-Returns authenticated identity and safe account information.
-
-Example:
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "...",
-    "name": "Example User",
-    "role": "STUDENT"
-  }
-}
-```
-
 ---
 
 # 22. User/Profile APIs
@@ -633,15 +656,125 @@ Base:
 Potential endpoints:
 
 ```text
-GET   /users/me
+GET   /users
+GET   /users/:userId
+PATCH /users/:userId
+PATCH /users/:userId/status
+
 PATCH /users/me
-GET   /users/me/profile
-PATCH /users/me/profile
+
 ```
+Student:
+/api/v1/students/me/profile
+
+GET   /students/me/profile
+PATCH /students/me/profile
+
+Teacher:
+/api/v1/teachers/me/profile
+
+GET   /teachers/me/profile
+PATCH /teachers/me/profile
+
 
 Role-specific profile operations may be separated if their business rules differ.
 
 ---
+
+# 22. (A) Admin User Management:
+
+GET   /api/v1/users
+GET   /api/v1/users/:userId
+PATCH /api/v1/users/:userId
+PATCH /api/v1/users/:userId/status
+
+All require: Authentication + ADMIN role
+
+GET /users
+
+Purpose: Returns the paginated list of platform users for the Admin Users dashboard.
+
+Supported:
+
+search
+role
+status
+page
+limit
+sort
+order
+
+The Admin table displays:
+
+Name
+Email
+Role
+Status
+Action
+
+The Action → View operation uses the user's ID to request:
+
+GET /users/:userId
+
+
+GET /users/:userId
+
+Purpose:
+
+Returns the administrative detail of a specific user.
+
+Conceptually includes:
+
+Account Information
+Student/Teacher Information
+Learning Overview
+
+depending on the user's role and available domain data.
+
+Do not say that the endpoint must immediately implement every future learning metric. Those will become available as their respective modules are implemented.
+
+PATCH /users/:userId
+
+Purpose:
+
+Allows Admin to modify explicitly permitted administrative account information.
+
+Explicitly state:
+
+Admin CANNOT change:
+- role
+- password
+- student learning data
+- teacher course data
+- mastery
+- learning evidence
+
+Most importantly:
+
+Role changes are not supported by the Users API.
+
+PATCH /users/:userId/status
+
+This is our finalized Admin status operation.
+
+Admin can:
+
+ACTIVE → SUSPENDED
+SUSPENDED → ACTIVE
+
+Admin does not deactivate users.
+
+Suspension stores:
+
+suspensionReason
+suspendedAt
+
+Suspended users:
+
+cannot access protected APIs
+cannot self-reactivate
+have their refresh sessions revoked
+can regain access when the suspension is resolved by the platform/Admin
 
 # 23. Account Management
 
@@ -651,12 +784,57 @@ Potential endpoints:
 PATCH  /users/me
 DELETE /users/me
 ```
+PATCH /users/me
+
+Updates common User-level account information.
+
+Examples:
+- name
+
+The backend must restrict which User fields may be modified.
+
+Role, status, ownership, and other authoritative fields must not
+be changed through this endpoint by the client.
+
+DELETE /users/me
+
+Represents user-initiated account deactivation.
+
+This operation does not necessarily imply immediate destructive
+database deletion. Historical learning records may need to be
+retained according to the platform's data-retention policy.
 
 Account deletion should follow the privacy/retention policy.
 
 For accounts with historical learning evidence, immediate destructive deletion may not be appropriate.
 
 ---
+
+# 23. (A) Account Status
+
+ACTIVE
+SUSPENDED
+DEACTIVATED
+
+ACTIVE: Normal account access.
+
+DEACTIVATED: User voluntarily deactivated their account.
+
+User → DEACTIVATED
+User → Reactivate → ACTIVE
+
+SUSPENDED: Admin/platform-controlled restriction.
+
+Admin → SUSPENDED
+User → cannot self-reactivate
+Admin resolves → ACTIVE
+
+And:
+
+suspensionReason
+suspendedAt
+
+No suspendedBy.
 
 # 24. Avatar/Profile Media
 
@@ -667,6 +845,14 @@ POST /users/me/avatar
 DELETE /users/me/avatar
 ```
 
+Avatar belongs to User, not StudentProfile or TeacherProfile.
+
+POST /users/me/avatar
+    → upload/replace avatar
+
+DELETE /users/me/avatar
+    → remove current avatar
+    
 Files should be validated and stored using the approved object/file storage mechanism.
 
 ---
@@ -1847,44 +2033,13 @@ Admin operations may include:
 
 ```text
 GET /admin/dashboard
-GET /admin/users
 GET /admin/courses
 GET /admin/audit-logs
 GET /admin/analytics
-PATCH /admin/users/:userId/status
-PATCH /admin/users/:userId/role
 POST /admin/courses/:courseId/moderate
 ```
 
 Exact admin permissions must be explicitly defined.
-
----
-
-# 76. Admin Role Changes
-
-Changing a role is a security-sensitive operation.
-
-Example:
-
-```text
-PATCH /api/v1/admin/users/:userId/role
-```
-
-The operation should:
-
-```text
-Authenticate
-   ↓
-Verify ADMIN
-   ↓
-Validate target
-   ↓
-Change role
-   ↓
-Create AuditLog
-```
-
-Never allow a user to escalate themselves through a normal profile endpoint.
 
 ---
 
@@ -2101,6 +2256,8 @@ They cannot access unrelated teacher courses or unrelated student learning histo
 # 85. Admin Authorization
 
 Admin permissions are platform-level and should be explicitly scoped.
+
+Admin can manage user accounts, but cannot change user roles through the Users/Admin APIs.
 
 Admin actions should be auditable.
 
@@ -2752,6 +2909,9 @@ The following rules are mandatory architectural principles:
 15. Sensitive fields must never be returned accidentally.
 16. Critical state transitions should be idempotent.
 17. Database implementation details should remain behind the API boundary.
+18. Admin cannot change a user's role through normal user-management APIs.
+19. User deactivation is user-initiated.
+20. Admin suspension is platform-controlled.
 
 ---
 
