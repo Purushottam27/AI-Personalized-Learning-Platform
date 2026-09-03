@@ -33,6 +33,14 @@ const userSchema = new mongoose.Schema({
         default: 'ACTIVE',
         // required: true
     },
+    suspensionReason: {
+        type: String,
+        default: null
+    },
+    suspendedAt: {
+        type: Date,
+        default: null
+    },
     avatar: {
         type: String,
         default: null,
