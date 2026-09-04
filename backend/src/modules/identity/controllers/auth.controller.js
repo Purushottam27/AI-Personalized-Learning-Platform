@@ -84,7 +84,7 @@ const currentUser = async(req,res)=>{
 const changePassword = async(req,res)=>{
     const {oldPassword,newPassword} = req.body;
     const userId = req.user?._id
-    const refreshToken = req.cookie?.refreshToken
+    const refreshToken = req.cookies?.refreshToken
 
     await passwordService(oldPassword,newPassword,userId,refreshToken)
 
