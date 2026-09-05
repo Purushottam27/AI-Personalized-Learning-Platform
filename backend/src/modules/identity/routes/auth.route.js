@@ -1,7 +1,7 @@
 import express from 'express'
-import { validateChangedPassword, validateLogin, validateSignup } from '../validations/auth.validation.middleware.js'
+import { validateChangedPassword, validateLogin, validateReactivation, validateSignup } from '../validations/auth.validation.middleware.js'
 import upload from '../../../middleware/upload.middleware.js'
-import { changePassword, currentUser, loginUser, logoutUser, refresh, registerUser } from '../controllers/auth.controller.js'
+import { changePassword, currentUser, loginUser, logoutUser, reactivateUser, refresh, registerUser } from '../controllers/auth.controller.js'
 import { authMiddleware } from '../../../middleware/auth.middleware.js'
 
 const authRouter = express.Router()
@@ -19,6 +19,8 @@ authRouter.post('/signup',upload.single("avatar"),validateSignup,registerUser)
 authRouter.post('/login',validateLogin,loginUser)
 
 authRouter.post('/refresh',refresh)
+
+authRouter.post('/reactivate',validateReactivation,reactivateUser)
 
 authRouter.post('/logout',authMiddleware,logoutUser)
 

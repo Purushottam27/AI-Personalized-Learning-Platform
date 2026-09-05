@@ -50,9 +50,11 @@ const loginService = async({email,password})=>{
         throw new ApiError(400,'INCORRECT_PASSWORD',"Incorrect Password")
     }
 
-    // check the account status and if it is asctive then only generate the access or refresh token
-    if(existedUser.status !== "ACTIVE"){
-        throw new ApiError(422,'ACCOUNT_NOT_ACTIVE',"The account is not active any more")
+    // check the account status and if it is active then only generate the access or refresh token
+    if(existedUser.status == "SUSPENDED"){
+        throw new ApiError(422,'ACCOUNT_SUSPENDED',"The account is suspended, you cannot access it.")
+    }else if(existedUser.status == "DEACTIVATED"){
+        throw new ApiError(422,'ACCOUNT_DEACTIVATED',"The account is currently deactivated")
     }
 
     const jti = randomUUID()
@@ -310,10 +312,68 @@ const passwordService = async(oldPassword,newPassword,userId,refreshToken)=>{
     return 
 }
 
+const reactivateService = async({email,password})=>{
+    const existedUser = await User.findOne({
+       email
+    })
+
+    if(!existedUser){
+        throw new ApiError(400,'ACCOUNT_NOT_FOUND','Account not exist, Signup instead')
+    }
+
+    if(existedUser.status === 'ACTIVE'){
+        throw new ApiError(400,'ACCOUNT_ALREADY_ACTIVE','Account already exist, Login instead')
+    }else if(existedUser.status === 'SUSPENDED'){
+        throw new ApiError(422,'ACCOUNT_SUSPENDED',"The account is suspended, you cannot access it.")
+    }
+
+    // if user status is deactivate then verify the password
+    const isPasswordValid = await existedUser.isPasswordCorrect(password)
+    if(!isPasswordValid){
+        throw new ApiError(400,'INCORRECT_PASSWORD',"Incorrect Password")
+    }
+
+    existedUser.status = 'ACTIVE';
+    await existedUser.save()
+
+    const jti = randomUUID()
+
+    const accessToken = existedUser.generateAccessToken()
+    const refreshToken = existedUser.generateRefreshToken(jti)
+
+    if(!accessToken || !refreshToken){
+        throw new ApiError(400,'TOKEN_NOT_FOUND','Something went wrong while generating tokens')
+    }
+
+    // create refresh session
+    const tokenHash = hashToken(refreshToken)
+
+    const sessionExpiresAt = new Date(
+        Date.now() + 30 * 24 * 60 * 60 * 1000
+    );
+    
+    const refreshSession = await RefreshSession.create({
+        userId:existedUser._id,
+        jti,
+        tokenHash,
+        expiresAt:sessionExpiresAt,
+        tokenFamily: randomUUID()
+    })
+    
+    if(!refreshSession){
+        throw new ApiError(400,'REFRESH_SESSION_ISSUE',"Something went wrong while creating refresh session")
+    }
+
+    const reactivatedUser = existedUser.toObject()
+    delete reactivatedUser.password
+
+    return {reactivatedUser,accessToken,refreshToken}
+}
 export {
     signupService,
     loginService,
     refreshService,
     logoutService,
-    passwordService
+    passwordService,
+    reactivateService
 }

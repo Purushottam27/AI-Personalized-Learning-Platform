@@ -1,4 +1,4 @@
-import { changePasswordSchema, loginSchema, signupSchema } from "./auth.validation.js";
+import { changePasswordSchema, loginSchema, reactivateSchema, signupSchema } from "./auth.validation.js";
 
 const validateSignup = (req,res,next)=>{
     const result = signupSchema.safeParse(req.body);
@@ -22,6 +22,17 @@ const validateLogin = (req,res,next)=>{
     next()
 }
 
+const validateReactivation = (req,res,next)=>{
+    const result = reactivateSchema.safeParse(req.body);
+
+    if(!result.success){
+        return next(result.error)
+    }
+
+    req.body = result.data
+    next()
+}
+
 const validateChangedPassword = (req,res,next)=>{
     const result = changePasswordSchema.safeParse(req.body);
 
@@ -36,5 +47,6 @@ const validateChangedPassword = (req,res,next)=>{
 export {
     validateSignup,
     validateLogin,
-    validateChangedPassword
+    validateChangedPassword,
+    validateReactivation
 }

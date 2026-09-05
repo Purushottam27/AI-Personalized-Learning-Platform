@@ -1,5 +1,5 @@
 import { ApiResponse } from "../../../shared/responses/ApiResponse.js"
-import { loginService, logoutService, passwordService, refreshService, signupService } from "../services/auth.service.js"
+import { loginService, logoutService, passwordService, reactivateService, refreshService, signupService } from "../services/auth.service.js"
 
 const registerUser = async(req,res)=>{
     const {name,email,password} = req.body
@@ -93,11 +93,33 @@ const changePassword = async(req,res)=>{
     )
 }
 
+const reactivateUser = async(req,res)=>{
+    const {email,password} = req.body
+
+    const {reactivatedUser,accessToken,refreshToken} = await reactivateService({
+        email,
+        password
+    })
+    
+    const options = {
+        httpOnly : true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite:'strict'
+    }
+
+    return res.status(200)
+    .cookie('accessToken',accessToken,options).cookie('refreshToken',refreshToken,options)
+    .json(
+        new ApiResponse({reactivatedUser,accessToken,refreshToken},'User account is reactivated')
+    )
+}
+
 export {
     registerUser,
     loginUser,
     refresh,
     logoutUser,
     currentUser,
-    changePassword
+    changePassword,
+    reactivateUser
 }
