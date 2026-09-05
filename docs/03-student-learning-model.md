@@ -105,6 +105,29 @@ Learning information answers:
 
 > How is this user learning?
 
+### Account State and Learning Access
+
+The student's account state affects access to learning without destroying
+historical learning information.
+
+```text
+ACTIVE
+    ↓
+Normal learning access
+
+DEACTIVATED
+    ↓
+Learning paused
+    ↓
+Existing learning progress and history preserved
+
+SUSPENDED
+    ↓
+Learning access restricted
+    ↓
+Existing learning progress and history preserved
+```
+
 ## 4. Learning Profile
 
 The Learning Profile represents the platform's current understanding of

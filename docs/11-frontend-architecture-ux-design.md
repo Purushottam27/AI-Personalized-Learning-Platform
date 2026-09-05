@@ -268,15 +268,30 @@ If refresh fails because the session is invalid, expired, revoked, or the accoun
 
 Refresh failure
       ↓
-Clear authenticated frontend state
+Inspect backend error code
       ↓
-Redirect to login or account-state screen
+ACCOUNT_DEACTIVATED?
+      ├── YES → Clear authenticated frontend state
+      │          ↓
+      │       Show Deactivated Account UI
+      │
+      ACCOUNT_SUSPENDED?
+      ├── YES → Clear authenticated frontend state
+      │          ↓
+      │       Show Suspended Account UI
+      │
+      OTHER AUTH FAILURE
+              ↓
+       Clear authenticated state
+              ↓
+       Redirect to login
+
+The frontend must not determine account state by inspecting human-readable
+error messages. It must use the backend error.code.
 
 The frontend must avoid infinite refresh loops.
 
 A failed refresh request must not continuously retry itself.
-
-The frontend API layer should centralize this behavior rather than implementing refresh logic inside every component.
 
 ---
 
@@ -287,6 +302,7 @@ Initial public authentication pages:
 ```text
 /signup
 /login
+/reactivate
 ```
 
 Potential future pages:
@@ -296,6 +312,8 @@ Potential future pages:
 /reset-password
 /verify-email
 ```
+The /reactivate page is used for DEACTIVATED accounts and is not a normal
+login page.
 
 Only implement features that are included in the current approved scope.
 
@@ -327,12 +345,69 @@ Admin
 
 # 12A. Account States & Error Handling
 
-The application must handle various account states and errors appropriately:
-- **401 Unauthorized:** Clear auth state and redirect to login.
-- **403 Forbidden:** Display forbidden/unauthorized state UI.
-- **ACTIVE:** Normal account access.
-- **SUSPENDED:** Suspended-account UI should clearly communicate suspension and may display `suspensionReason` returned by the backend. Suspended users must not receive a self-unsuspend UI.
-- **DEACTIVATED:** Deactivated-account UX should support the approved reactivation flow when implemented.
+The application must handle account states through backend-provided
+machine-readable error codes.
+
+### ACTIVE
+
+Normal account access.
+
+### SUSPENDED
+
+Backend returns:
+
+```text
+ACCOUNT_SUSPENDED
+```
+
+Frontend behavior:
+
+Clear authenticated state
+        ↓
+Show suspended-account UI
+        ↓
+Display suspension message
+        ↓
+No Reactivate Account action
+
+The frontend may display the suspensionReason when it is returned by an
+authorized backend response.
+
+### DEACTIVATED
+
+Backend returns:
+
+ACCOUNT_DEACTIVATED
+
+Frontend behavior:
+
+Clear authenticated state
+        ↓
+Show deactivated-account UI
+        ↓
+Display:
+"Your account is currently deactivated."
+"Your learning progress has been paused."
+        ↓
+Show [Reactivate Account]
+
+The deactivated-account UI must not provide a normal Login action.
+
+Error-code principle
+
+The frontend must use stable backend error codes for application-state
+decisions.
+
+Example:
+
+ACCOUNT_DEACTIVATED
+    → Deactivated Account UI
+
+ACCOUNT_SUSPENDED
+    → Suspended Account UI
+
+Human-readable error messages are for display and must not be used as the
+primary frontend decision mechanism.
 
 ---
 
@@ -1084,8 +1159,27 @@ Preferences
 Theme
 Account settings
 Logout
-Account deletion
+Account deactivation
 ```
+
+Account deactivation is a user-initiated reversible operation.
+
+When deactivation succeeds:
+
+Account
+  ↓
+DEACTIVATED
+  ↓
+Authentication state cleared
+  ↓
+Deactivated-account UI
+  ↓
+Reactivate Account action
+
+The frontend must not present account deactivation as immediate destructive
+data deletion.
+
+Reactivation is handled through the dedicated reactivation flow.
 
 Sensitive account operations should require backend authorization and appropriate confirmation.
 

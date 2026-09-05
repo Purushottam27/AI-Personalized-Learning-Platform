@@ -420,6 +420,7 @@ POST /auth/refresh
 POST /auth/logout
 GET  /auth/me
 POST /auth/change-password
+POST /auth/reactivate
 ```
 
 ---
@@ -512,17 +513,32 @@ Verify Password
    ↓
 Check User.status
    ↓
-Generate Access Token
-   ↓
-Generate Refresh Token + JTI
-   ↓
-Create RefreshSession
-   ↓
-Store hashed refresh token
-   ↓
-Set authentication cookies
+ACTIVE?
+   ├── YES → Generate authentication session
+   │           ↓
+   │        Generate Access Token
+   │        Generate Refresh Token + JTI
+   │        Create RefreshSession
+   │        Store hashed refresh token
+   │        Set authentication cookies
+   │
+   ├── SUSPENDED
+   │        ↓
+   │     ACCOUNT_SUSPENDED
+   │
+   └── DEACTIVATED
+            ↓
+         ACCOUNT_DEACTIVATED
 ```
 
+A SUSPENDED or DEACTIVATED account must not receive new authentication
+tokens through normal login.
+
+ACCOUNT_DEACTIVATED allows the frontend to present the account
+reactivation flow.
+
+ACCOUNT_SUSPENDED presents a suspended-account state without a
+self-reactivation action.
 ---
 
 # 19. Refresh Token
@@ -658,10 +674,12 @@ Potential endpoints:
 ```text
 GET   /users
 GET   /users/:userId
-PATCH /users/:userId
 PATCH /users/:userId/status
 
 PATCH /users/me
+DELETE /users/me
+PATCH /users/me/avatar
+
 
 ```
 Student:
@@ -685,16 +703,25 @@ Role-specific profile operations may be separated if their business rules differ
 
 GET   /api/v1/users
 GET   /api/v1/users/:userId
-PATCH /api/v1/users/:userId
 PATCH /api/v1/users/:userId/status
 
 All require: Authentication + ADMIN role
 
-GET /users
+Admin cannot:
+
+change a user's role
+change another user's password
+deactivate another user's account
+modify student learning data
+modify teacher course data
+modify mastery
+modify learning evidence
+
+# GET /users
 
 Purpose: Returns the paginated list of platform users for the Admin Users dashboard.
 
-Supported:
+Supported query parameters:
 
 search
 role
@@ -703,6 +730,10 @@ page
 limit
 sort
 order
+
+The current user-management list is intended for Student and Teacher
+accounts. ADMIN accounts are excluded from the normal Users management
+list.
 
 The Admin table displays:
 
@@ -713,11 +744,10 @@ Status
 Action
 
 The Action → View operation uses the user's ID to request:
-
 GET /users/:userId
 
 
-GET /users/:userId
+# GET /users/:userId
 
 Purpose:
 
@@ -733,31 +763,13 @@ depending on the user's role and available domain data.
 
 Do not say that the endpoint must immediately implement every future learning metric. Those will become available as their respective modules are implemented.
 
-PATCH /users/:userId
+# PATCH /users/:userId/status
 
 Purpose:
 
-Allows Admin to modify explicitly permitted administrative account information.
+Allows Admin to suspend or unsuspend a user.
 
-Explicitly state:
-
-Admin CANNOT change:
-- role
-- password
-- student learning data
-- teacher course data
-- mastery
-- learning evidence
-
-Most importantly:
-
-Role changes are not supported by the Users API.
-
-PATCH /users/:userId/status
-
-This is our finalized Admin status operation.
-
-Admin can:
+Supported transitions:
 
 ACTIVE → SUSPENDED
 SUSPENDED → ACTIVE
@@ -778,85 +790,230 @@ can regain access when the suspension is resolved by the platform/Admin
 
 # 23. Account Management
 
-Potential endpoints:
+Current endpoints:
 
 ```text
 PATCH  /users/me
+PATCH  /users/me/avatar
 DELETE /users/me
 ```
-PATCH /users/me
+# PATCH /users/me
 
-Updates common User-level account information.
+Purpose:
+Updates the authenticated user's current account information.
 
-Examples:
+Current supported field:
 - name
 
-The backend must restrict which User fields may be modified.
+Email changes are handled through a separate email-change verification flow and are not part of this simple account update endpoint.
 
-Role, status, ownership, and other authoritative fields must not
-be changed through this endpoint by the client.
+Role and account status cannot be changed through this endpoint.
 
-DELETE /users/me
+# PATCH /users/me/avatar
+
+Purpose:
+
+Uploads or replaces the authenticated user's avatar.
+
+The request uses multipart/form-data and the approved upload infrastructure.
+
+Avatar belongs to User rather than StudentProfile or TeacherProfile.
+
+# DELETE /users/me
+
+Purpose:
 
 Represents user-initiated account deactivation.
 
-This operation does not necessarily imply immediate destructive
-database deletion. Historical learning records may need to be
-retained according to the platform's data-retention policy.
+The operation:
 
-Account deletion should follow the privacy/retention policy.
+User
+  ↓
+status = DEACTIVATED
+  ↓
+Active refresh sessions revoked
 
-For accounts with historical learning evidence, immediate destructive deletion may not be appropriate.
+Account data and historical learning records are preserved.
+
+The user's learning progress is paused while the account remains DEACTIVATED.
+
+A deactivated user cannot authenticate through normal login.
+
+The user can reactivate the account through:
+
+POST /api/v1/auth/reactivate
 
 ---
 
 # 23. (A) Account Status
 
+Account states:
+
+```text
 ACTIVE
 SUSPENDED
 DEACTIVATED
+```
 
 ACTIVE: Normal account access.
 
 DEACTIVATED: User voluntarily deactivated their account.
 
-User → DEACTIVATED
-User → Reactivate → ACTIVE
+Behavior:
+
+User
+  ↓
+DEACTIVATED
+  ↓
+Refresh sessions revoked
+  ↓
+Protected API access rejected
+  ↓
+Normal login rejected
+  ↓
+Learning progress paused
+  ↓
+Historical data preserved
+
+A user may reactivate their own DEACTIVATED account through: POST /api/v1/auth/reactivate
+
+Successful reactivation changes:
+
+DEACTIVATED → ACTIVE and creates a new authentication session.
 
 SUSPENDED: Admin/platform-controlled restriction.
 
-Admin → SUSPENDED
-User → cannot self-reactivate
-Admin resolves → ACTIVE
+Behavior:
 
-And:
+Admin
+  ↓
+SUSPENDED
+  ↓
+Refresh sessions revoked
+  ↓
+Protected API access rejected
+  ↓
+Normal login rejected
+  ↓
+Learning progress paused
+
+A suspended user cannot self-reactivate.
+
+Only the Admin/platform can resolve:
+
+SUSPENDED → ACTIVE
+
+Suspension metadata:
 
 suspensionReason
 suspendedAt
 
 No suspendedBy.
 
+Authentication Error Codes:
+
+ACCOUNT_DEACTIVATED
+    → frontend shows deactivated-account UI
+    → Reactivate Account action available
+
+ACCOUNT_SUSPENDED
+    → frontend shows suspended-account UI
+    → no self-reactivation action
+
+---
+
 # 24. Avatar/Profile Media
 
 Potential operation:
 
 ```text
-POST /users/me/avatar
-DELETE /users/me/avatar
+PATCH /users/me/avatar
 ```
 
-Avatar belongs to User, not StudentProfile or TeacherProfile.
+# PATCH /users/me/avatar
 
-POST /users/me/avatar
-    → upload/replace avatar
+Purpose:
 
-DELETE /users/me/avatar
-    → remove current avatar
-    
-Files should be validated and stored using the approved object/file storage mechanism.
+Upload or replace the authenticated user's avatar.
+
+The request uses multipart/form-data.
+
+Conceptual flow:
+
+Authenticated User
+      ↓
+Multer / upload handling
+      ↓
+Cloudinary / approved file storage
+      ↓
+User.avatar updated
+
+Avatar belongs to User, not StudentProfile or TeacherProile.
+
+A separate avatar-delete operation is not part of the current implemented
+User API.
 
 ---
 
+# 24A. Account Reactivation
+
+```text
+POST /api/v1/auth/reactivate
+```
+# POST /api/v1/auth/reactivate
+
+Purpose:
+
+Reactivate a user-initiated DEACTIVATED account.
+
+Authentication:
+
+Public endpoint
+
+The endpoint does not require an existing access token because account
+deactivation revokes the user's previous authentication sessions.
+
+Request:
+
+{
+  "email": "user@example.com",
+  "password": "********"
+}
+
+Flow:
+
+Email + Password
+      ↓
+Find User
+      ↓
+Check account status
+      ↓
+DEACTIVATED?
+      ↓
+Verify password
+      ↓
+Set status = ACTIVE
+      ↓
+Generate new Access Token
+      ↓
+Generate new Refresh Token + JTI
+      ↓
+Create new RefreshSession
+      ↓
+Set authentication cookies
+
+Possible outcomes:
+
+ACCOUNT_NOT_FOUND
+ACCOUNT_ALREADY_ACTIVE
+ACCOUNT_SUSPENDED
+INCORRECT_PASSWORD
+successful reactivation
+
+A successful reactivation creates a new authentication session. Previously
+revoked refresh sessions are not restored.
+
+---
 # 25. Course APIs
 
 Base:

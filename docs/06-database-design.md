@@ -252,6 +252,36 @@ No suspendedBy field is required for the current design.
 
 Role changes are not supported as a normal user-management operation.
 
+### Authentication Session Behavior
+
+Account-state changes affect authentication sessions:
+
+```text
+ACTIVE
+    ↓
+Normal authentication sessions
+
+User deactivates
+    ↓
+DEACTIVATED
+    ↓
+Active RefreshSession records revoked
+
+Admin suspends
+    ↓
+SUSPENDED
+    ↓
+Active RefreshSession records revoked
+
+DEACTIVATED
+    ↓
+User reactivates
+    ↓
+ACTIVE
+    ↓
+New RefreshSession created
+```
+
 ## 8. Student Profile
 
 Student-specific information belongs conceptually in a Student Profile.

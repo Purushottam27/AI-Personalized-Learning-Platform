@@ -72,23 +72,25 @@ improving learning ability, not simply consuming courses.
 
 The initial authentication system should support:
 
--   signup
--   login
--   access token
--   refresh token
--   token renewal
--   logout
--   change password
--   authentication middleware
--   role-based authorization
--   protected routes
--   current-user access
+- signup
+- login
+- access token
+- refresh token
+- token renewal
+- logout
+- change password
+- account deactivation
+- account reactivation
+- authentication middleware
+- role-based authorization
+- protected routes
+- current-user access
 
 Roles:
 
--   student
--   teacher
--   admin
+- student
+- teacher
+- admin
 
 Public signup may create Student or Teacher accounts, but Admin accounts
 must not be created through public role selection.
@@ -99,7 +101,25 @@ refresh token.
 Refresh tokens are rotated on successful refresh and persisted through
 protected refresh-session records so that sessions can be revoked.
 
-Authentication state must also respect the current User account status.
+Authentication state must respect the current User account status.
+
+Account states are:
+
+- ACTIVE
+- SUSPENDED
+- DEACTIVATED
+
+ACTIVE accounts have normal access.
+
+DEACTIVATED accounts are user-initiated account deactivations. Their
+refresh sessions are revoked, protected API access is denied, and normal
+login does not authenticate them. Their learning progress is preserved and
+paused. A deactivated user may reactivate the account through the dedicated
+reactivation flow.
+
+SUSPENDED accounts are Admin/platform-controlled restrictions. Their
+refresh sessions are revoked and protected API access is denied. Suspended
+users cannot self-reactivate.
 
 The exact implementation details belong to the Security & Authentication
 document.

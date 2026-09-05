@@ -277,7 +277,11 @@ Invalid input
 Login success
 Wrong password
 Unknown account
-Inactive account
+Suspended account
+Deactivated account
+Account reactivation
+Already-active reactivation attempt
+Suspended-account reactivation attempt
 Access token generation
 Expired access token
 Refresh token flow
@@ -288,6 +292,7 @@ Logout
 Protected endpoints
 /auth/me
 Change-password
+Account deactivation
 ```
 
 ---
@@ -356,22 +361,40 @@ Account-status tests must cover:
 - SUSPENDED
 - DEACTIVATED
 
-Critical test:
+Critical protected-request test:
+
 1. User is ACTIVE.
 2. User receives a valid access token.
-3. Admin suspends the user.
+3. Account becomes SUSPENDED.
 4. User sends the previously valid access token.
-5. Backend checks current `User.status`.
-6. Request is rejected.
+5. Backend checks current User.status.
+6. Request is rejected with ACCOUNT_SUSPENDED.
+
+Repeat the same flow for DEACTIVATED:
+
+1. User is ACTIVE.
+2. User receives a valid access token.
+3. User deactivates the account.
+4. User sends the previously valid access token.
+5. Backend checks current User.status.
+6. Request is rejected with ACCOUNT_DEACTIVATED.
 
 Also test transitions:
 - ACTIVE → SUSPENDED
 - SUSPENDED → ACTIVE
 - ACTIVE → DEACTIVATED
+- DEACTIVATED → ACTIVE
 
-Verify suspended users cannot self-unsuspend.
-Verify Admin cannot deactivate users.
-Verify Admin cannot change roles.
+Verify:
+
+Suspended users cannot self-reactivate.
+Deactivated users can reactivate themselves.
+Admin cannot deactivate users.
+Admin cannot change roles.
+Deactivation revokes all active refresh sessions.
+Suspension revokes all active refresh sessions.
+Reactivation creates a new refresh session.
+Previously revoked refresh sessions remain revoked.
 
 ---
 
@@ -389,6 +412,8 @@ Test:
 - Token hash mismatch cannot refresh
 - Logout revokes only the current session
 - Other sessions remain active after normal logout
+- Deactivation revokes all active refresh sessions
+- Reactivation creates a new active RefreshSession rather than restoring revoked sessions
 
 ---
 
@@ -405,6 +430,8 @@ Test:
 - New password works
 - Current refresh session remains active
 - Other refresh sessions are revoked
+- Password change preserves the current refresh session
+- Password change revokes all other refresh sessions
 
 # 18. Ownership Testing
 

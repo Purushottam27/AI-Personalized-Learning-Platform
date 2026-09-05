@@ -89,6 +89,8 @@ The student experience should eventually include:
 -   course-level mastery analysis
 -   overall learning analytics
 -   profile and account settings
+-   account deactivation
+-   account reactivation
 
 ## 5. Teacher Capabilities
 

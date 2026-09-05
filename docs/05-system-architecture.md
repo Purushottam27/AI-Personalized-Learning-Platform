@@ -117,7 +117,7 @@ Exact contracts belong in `07-api-design.md`.
 
 ## 7. Module Responsibilities
 
-- **Auth:** signup, login, logout, tokens, password handling.
+- **Auth:** signup, login, logout, token management, password handling, account reactivation, and authentication-state handling.
 - **Users:** account information, profiles, preferences, avatars, user-level account management, and administrative user-management operations.
 - **Courses:** metadata, ownership, department, prerequisites, lifecycle.
 - **Lessons:** lesson structure, order, availability.
@@ -277,15 +277,31 @@ Allowed course-level data?
 Account status is checked against the current User record during
 authentication.
 
-Suspended or deactivated users cannot access protected resources even if
-an otherwise valid access token has not yet expired.
+The platform distinguishes:
 
-User role is treated as authoritative from the current User record for
-authorization decisions.
+```text
+ACTIVE
+SUSPENDED
+DEACTIVATED
+```
+
+Suspended or deactivated users cannot access protected resources even if an otherwise valid access token has not yet expired.
+
+When an account becomes SUSPENDED or DEACTIVATED, active refresh sessions
+are revoked.
+
+DEACTIVATED users may reactivate their own accounts through the dedicated
+reactivation flow. Reactivation does not reuse revoked authentication
+sessions; it creates a new authentication session.
+
+SUSPENDED users cannot self-reactivate. Only the Admin/platform can resolve
+a suspension.
+
+User role is treated as authoritative from the current User record for authorization decisions.
 
 Role checks alone are insufficient.
 
-Exact token storage, rotation, cookies, revocation, and security controls belong in `11-security.md`.
+Exact token storage, rotation, cookies, revocation, and security controls belong in `08-security-authentication-design.md`.
 
 ## 13. Error and Validation Architecture
 

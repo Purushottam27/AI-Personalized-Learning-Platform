@@ -896,11 +896,119 @@ silently destroyed. Exact active-learner handling is a later decision.
 
 ### Account Deactivation
 
-User-initiated account deletion is represented as account deactivation
-rather than immediate destructive database deletion.
-analytics, historical records, and privacy requirements. Exact rules
-belong to later security/data design.
+Account deactivation is user-initiated and is reversible.
 
+```text
+User Profile
+  ↓
+Deactivate Account
+  ↓
+Confirmation
+  ↓
+DELETE /api/v1/users/me
+  ↓
+Account status → DEACTIVATED
+  ↓
+All active refresh sessions revoked
+  ↓
+Frontend clears authenticated state
+  ↓
+Deactivation screen
+```
+The user's account data and learning history are preserved.
+
+The user's learning progress is paused while the account remains
+DEACTIVATED.
+
+Existing access tokens must not bypass the deactivated account state.
+Protected API requests are rejected after the account status is checked.
+
+Normal login does not authenticate a DEACTIVATED account.
+
+The deactivation screen should communicate:
+
+Your account is currently deactivated.
+
+Your learning progress has been paused.
+Reactivate your account to continue learning.
+
+[ Reactivate Account ]
+
+The deactivation screen does not provide a normal Login action.
+
+### Account Reactivation
+
+A DEACTIVATED account can be reactivated by the account owner.
+```text
+Deactivation Screen
+  ↓
+Reactivate Account
+  ↓
+Enter Email + Password
+  ↓
+POST /api/v1/auth/reactivate
+  ↓
+Verify account exists
+  ↓
+Verify account status
+  ↓
+Verify password
+  ↓
+DEACTIVATED → ACTIVE
+  ↓
+Create new authentication session
+  ↓
+Return to Dashboard
+  ↓
+Learning resumes from preserved progress
+```
+Reactivation does not restore or reuse previously revoked refresh
+sessions. A new refresh session is created.
+
+If the account does not exist:
+
+ACCOUNT_NOT_FOUND
+
+The user should be directed toward the normal account-creation/login
+flow as appropriate.
+
+If the account is already ACTIVE:
+
+ACCOUNT_ALREADY_ACTIVE
+
+The user should be directed to normal login.
+
+If the account is SUSPENDED:
+
+ACCOUNT_SUSPENDED
+
+The user cannot self-reactivate and no reactivation action should be
+presented.
+
+### Account State in Authentication
+
+When login is attempted:
+```text
+ACTIVE
+  ↓
+Normal login
+
+DEACTIVATED
+  ↓
+ACCOUNT_DEACTIVATED
+  ↓
+Show deactivation screen
+  ↓
+[ Reactivate Account ]
+
+SUSPENDED
+  ↓
+ACCOUNT_SUSPENDED
+  ↓
+Show suspension screen
+  ↓
+No reactivation action
+```
 ## 7. User Journey Principles
 
 1.  Every important action has a clear next step.

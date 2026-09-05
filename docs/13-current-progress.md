@@ -85,19 +85,23 @@ The goal is:
 ## Implementation Phase
 
 ```text
-Backend                         🟢 Complete
-Database implementation         🟢 Complete
-User model                      🟢 Complete
-Authentication implementation   🟢 Complete
-Authorization foundation           🟢 Complete
-Feature/domain backend modules     ⬜ Not started
-Frontend implementation             ⬜ Not started
-Frontend implementation         ⬜ Not started
-AI integration                  ⬜ Not started
-Personalization implementation  ⬜ Not started
-Redis/BullMQ implementation     ⬜ Not started
-Testing implementation          ⬜ Not started
-Deployment                      ⬜ Not started
+Backend foundation              🟢 Implemented
+Database foundation             🟢 Implemented
+User model                      🟢 Implemented
+RefreshSession model            🟢 Implemented
+Authentication foundation      🟢 Implemented
+Authorization foundation       🟢 Implemented
+Users API                       🟢 Implemented
+User account management        🟢 Implemented
+Account deactivation           🟢 Implemented
+Account reactivation           🟢 Implemented
+Feature/domain backend modules 🟡 In progress
+Frontend implementation        ⬜ Not started
+AI integration                 ⬜ Not started
+Personalization implementation ⬜ Not started
+Redis/BullMQ implementation    ⬜ Not started
+Automated testing              ⬜ Not started
+Deployment                     ⬜ Not started
 ```
 
 The project has therefore completed its **initial architecture/planning phase** and is ready to transition into implementation after the deployment document and implementation preparation are finalized.
@@ -308,6 +312,8 @@ Current user (/me)             ✅
 Role resolution                ✅
 Role-based authorization       ✅
 Change password                ✅
+Account deactivation           ✅
+Account reactivation           ✅
 ```
 
 ## Student Dashboard
@@ -409,16 +415,34 @@ Teacher profile/settings       ⬜
 # 11. Admin MVP Status
 
 ```text
-Admin authentication           ⬜
+Admin authentication           ✅
 Admin dashboard                ⬜
-User management                ⬜
+User management                🟢
 Course management              ⬜
 Platform analytics             ⬜
 Audit logs                     ⬜
 Moderation                     ⬜
-Administrative controls        ⬜
+Administrative controls        🟢
 Admin settings                 ⬜
 ```
+
+Current implemented Admin user-management capabilities:
+
+List users
+Search users
+Filter users
+Paginate users
+View individual user
+Suspend user
+Unsuspend user
+
+Admin cannot:
+
+Change user role
+Deactivate another user's account
+Change another user's password
+Modify learning evidence
+Modify mastery
 
 Admin scope should remain limited to genuine platform-management requirements.
 
@@ -506,7 +530,7 @@ Status:
 
 ```text
 Auth APIs                     🟢
-User APIs                     🟡
+User APIs                     🟢
 Course APIs                   ⬜
 Enrollment APIs               ⬜
 Lesson APIs                   ⬜
@@ -516,13 +540,32 @@ Learning APIs                 ⬜
 Personalization APIs          ⬜
 Analytics APIs                ⬜
 Teacher APIs                  ⬜
-Admin APIs                    ⬜
+Admin APIs                    🟡
 Notification APIs             ⬜
 ```
 
 Not every documented endpoint needs to be implemented on day one.
 
 Endpoints should be implemented according to the active feature slice.
+
+Current implemented Auth APIs:
+
+POST /auth/signup
+POST /auth/login
+POST /auth/refresh
+POST /auth/logout
+GET  /auth/me
+POST /auth/change-password
+POST /auth/reactivate
+
+Current implemented User APIs:
+
+GET    /users
+GET    /users/:userId
+PATCH  /users/:userId/status
+PATCH  /users/me
+PATCH  /users/me/avatar
+DELETE /users/me
 
 ---
 
@@ -538,18 +581,21 @@ Signup                             ✅
 Login                              ✅
 Access-token handling              ✅
 Refresh-token handling             ✅
-Refresh-token rotation              ✅
+Refresh-token rotation             ✅
 Logout                             ✅
 Authentication middleware          ✅
 Protected routes                   ✅
 Current user (/me)                 ✅
 Role-based authorization           ✅
+Password change                    ✅
+Account deactivation               ✅
+Account reactivation               ✅
 Teacher ownership authorization    ⬜
 Input validation                   ✅
 Rate limiting                      ⬜
 Cookie security                    🟡
 Sensitive-data protection          🟡
-File-upload security               ⬜
+File-upload security               🟡
 Audit/security logging             ⬜
 Security testing                   ⬜
 ```
@@ -569,6 +615,42 @@ Lesson access
 Assessment permissions
 Administrative permissions
 ```
+### Account-State Security Behavior
+
+Implemented account states:
+
+```text
+ACTIVE
+SUSPENDED
+DEACTIVATED
+```
+Implemented behavior:
+
+User deactivation
+    ↓
+DEACTIVATED
+    ↓
+Refresh sessions revoked
+
+Admin suspension
+    ↓
+SUSPENDED
+    ↓
+Refresh sessions revoked
+
+DEACTIVATED
+    ↓
+Normal login rejected
+    ↓
+Reactivate endpoint
+    ↓
+ACTIVE
+    ↓
+New authentication session
+
+Old access tokens cannot bypass SUSPENDED or DEACTIVATED status because
+protected requests check the current User record.
+---
 
 # 16. AI & Personalization Engine Status
 
@@ -789,7 +871,7 @@ Recommended order:
 4. User/Profile models [✅]
 5. Authentication & End-to-end authentication verification [✅]
 6. Role-based authorization [✅]
-7. Users and profile APIs [🟡]
+7. Users and account-management APIs [🟢]
 8. Frontend foundation
 9. Application shell
 10. Student course foundation
@@ -819,19 +901,28 @@ Dependencies may change the exact order.
 
 At the beginning of implementation:
 
-```text
-Active milestone:
-Foundation
+Current milestone:
 
-Active task:
-Complete and harden the authentication and authorization foundation.
+```text
+Milestone 1 — Foundation
+```
+
+Current completed implementation slice:
+
+Authentication
+Authorization
+Users API
+User account management
+Account deactivation
+Account reactivation
 
 Current status:
-User/Profile models and the core authentication flow are implemented and
-verified.
+Implemented and manually verified through API testing.
 
 Next:
-Role-based authorization → Users API → Student/Teacher profile APIs
+Complete documentation synchronization
+        ↓
+Proceed to the next approved backend feature slice
 ```
 
 This section must be updated whenever the active task changes.

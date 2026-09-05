@@ -200,25 +200,46 @@ The authentication architecture uses:
 - refresh-token rotation,
 - refresh-token revocation.
 
-Refresh sessions should not be represented as a single refresh-token field directly inside the `User` document.
-
-Instead, the future authentication implementation should use a separate refresh-session model/collection.
-
-Conceptually:
-
-User
- |
- +---- RefreshSession
- |
- +---- RefreshSession
- |
- +---- RefreshSession
+Refresh sessions are stored separately from the User document.
 
 One user may have multiple refresh sessions, for example:
 
 - laptop,
 - mobile device,
 - another browser/device.
+
+The implemented RefreshSession model contains:
+
+```text
+RefreshSession
+├── userId
+├── jti
+├── tokenHash
+├── expiresAt
+├── revokedAt
+├── tokenFamily
+└── timestamps
+```
+
+Refresh-session records support:
+
+token validation,
+expiration,
+rotation,
+revocation,
+multiple concurrent user sessions.
+
+The raw refresh token is not stored in the database. A protected hash
+representation is stored instead.
+
+Refresh-token rotation updates the existing RefreshSession for the
+current session.
+
+Account suspension and account deactivation revoke active refresh
+sessions.
+
+Account reactivation creates a new RefreshSession rather than restoring
+previously revoked sessions.
 
 ## Future RefreshSession Model
 
@@ -284,6 +305,12 @@ Instead, account status is checked when accessing protected resources.
 
 This avoids unnecessary additional state and complexity.
 
+For a DEACTIVATED account, the frontend may present the approved
+reactivation flow after receiving `ACCOUNT_DEACTIVATED`.
+
+For a SUSPENDED account, the frontend presents the suspended-account state
+without a self-reactivation action.
+
 ---
 
 # 9. Refresh Behavior After Suspension/Deactivation
@@ -308,9 +335,35 @@ ACTIVE?
  ├── YES → rotate and issue new access token
  └── NO  → reject
 
-When an account is suspended or deactivated, its active refresh sessions should be revoked so that future refresh operations cannot continue the session.
+When an account is suspended or deactivated:
+
+User status changes
+        ↓
+All active RefreshSession records revoked
+        ↓
+Future refresh requests rejected
 
 Existing access tokens are separately protected by checking the current User status during protected requests.
+
+### Reactivation
+
+A DEACTIVATED user may use the dedicated reactivation flow:
+
+POST /auth/reactivate
+        ↓
+Verify account
+        ↓
+Verify password
+        ↓
+DEACTIVATED → ACTIVE
+        ↓
+Create new RefreshSession
+        ↓
+Issue new authentication credentials
+
+Previously revoked refresh sessions remain revoked.
+
+SUSPENDED users cannot use the reactivation flow.
 
 ---
 
@@ -452,7 +505,11 @@ to:
 | Refresh-session revocation on suspension/deactivation | Approved for MVP |
 | Progressive recommendation scheduling | Deferred |
 | Advanced personalization signals | Deferred |
-
+| Account deactivation | Implemented for MVP |
+| Account reactivation | Implemented for MVP |
+| Self-reactivation of suspended accounts | Not allowed |
+| New authentication session after reactivation | Implemented for MVP |
+| Learning progress preservation during deactivation | Approved for MVP |
 ---
 
 # 16. Guiding Principle

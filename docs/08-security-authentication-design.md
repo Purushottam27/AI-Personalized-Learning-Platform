@@ -273,6 +273,10 @@ DEACTIVATED
 Account-state ownership:
 
 ```text
+ACTIVE
+    ↓
+Normal account state
+
 DEACTIVATED
     ↓
 User-initiated
@@ -280,11 +284,8 @@ User-initiated
 SUSPENDED
     ↓
 Admin/platform-controlled
-
-ACTIVE
-    ↓
-Normal account state
 ```
+A user may deactivate their own account.
 
 A user may reactivate their own DEACTIVATED account.
 
@@ -303,41 +304,70 @@ Verify access token
  ↓
 Identify User
  ↓
+Retrieve current User state
+ ↓
 Check User.status
  ↓
 ACTIVE?
  ├── YES → continue
  └── NO → reject
 ```
-
-### Refresh behavior
-
-Refresh request:
-
-```text
-Refresh credential
- ↓
-Validate refresh session
- ↓
-Find User
- ↓
-Check User.status
- ↓
-ACTIVE?
- ├── YES → rotate and issue new access token
- └── NO → reject
-```
+This prevents an otherwise valid old access token from bypassing a
+SUSPENDED or DEACTIVATED account state.
 
 ### Suspension / Deactivation
 
 When an account becomes SUSPENDED or DEACTIVATED:
 
-- revoke active refresh sessions
-- reject future refresh attempts
-- reject protected API requests even when an old access token is
-  otherwise cryptographically valid
+Revoke active refresh sessions.
+Reject future refresh attempts.
+Reject protected API requests even when an old access token is otherwise cryptographically valid.
+Do not introduce an access-token blacklist for MVP.
 
-Do NOT introduce an access-token blacklist for MVP.
+### Login behaviour
+
+Normal login must not authenticate SUSPENDED or DEACTIVATED accounts.
+
+ACTIVE
+    ↓
+Normal login
+
+SUSPENDED
+    ↓
+ACCOUNT_SUSPENDED
+
+DEACTIVATED
+    ↓
+ACCOUNT_DEACTIVATED
+
+The frontend uses these error codes to determine the appropriate account
+state UI.
+
+### Reactivation
+
+Only DEACTIVATED accounts may use the self-reactivation flow.
+
+POST /auth/reactivate
+        ↓
+Find User by email
+        ↓
+Check account status
+        ↓
+DEACTIVATED?
+        ↓
+Verify password
+        ↓
+DEACTIVATED → ACTIVE
+        ↓
+Generate new authentication credentials
+        ↓
+Create new RefreshSession
+        ↓
+Set authentication cookies
+
+Reactivation does not restore previously revoked RefreshSession records.
+
+SUSPENDED accounts cannot use this flow.
 
 ### RefreshSession
 
@@ -354,10 +384,11 @@ RefreshSession
 
 One User can have multiple RefreshSession records.
 
-Refresh-session persistence has been finalized for the current
-authentication implementation.
+When an account is suspended or deactivated, its active RefreshSession
+records are revoked.
 
-RefreshSession is maintained separately from User. One User may have multiple RefreshSession records. The refresh token contains a unique jti that identifies the corresponding persisted session.
+When a DEACTIVATED user successfully reactivates, a new RefreshSession
+record is created.
 
 ## 16. Logout and Session Management
 
@@ -383,6 +414,15 @@ middleware.
 
 The access token authenticates the logout request, while the
 refresh token identifies the refresh session that should be revoked.
+
+Password change, account deactivation, and account suspension may revoke
+additional refresh sessions according to their security requirements.
+
+Account deactivation and account suspension revoke all active refresh
+sessions for the affected user.
+
+Account reactivation creates a new refresh session rather than restoring
+previously revoked sessions.
 
 Normal logout revokes the current refresh session only. Other active sessions belonging to the same user remain unaffected.
 
