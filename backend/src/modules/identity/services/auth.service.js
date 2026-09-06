@@ -6,7 +6,7 @@ import { User } from "../models/user.model.js"
 import { randomUUID } from "crypto";
 import jwt from 'jsonwebtoken'
 
-const signupService = async({name,email,password,avatarLocalPath})=>{
+const signupService = async({name,email,password,role,avatarLocalPath})=>{
     const existedUser = await User.findOne({
        email
     })
@@ -25,6 +25,7 @@ const signupService = async({name,email,password,avatarLocalPath})=>{
         name:name,
         email:email,
         password:password,
+        role:role,
         avatar: (uploadAvatar !== null) ? uploadAvatar.secure_url : null  
         // uploadAvatar?.secure_url ?? null these is nullish coalescing operator which means if the secure url is null or undefined then use null otherwise use the secure url.
     })

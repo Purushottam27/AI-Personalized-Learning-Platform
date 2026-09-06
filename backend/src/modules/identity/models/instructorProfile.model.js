@@ -1,19 +1,3 @@
-// {
-//   "_id": "68aa12c5e4b7a12345678950",
-//   "userId": "68aa0f91e4b7a12345678941",
-//   "professionalTitle": "Senior Mathematics Instructor",
-//   "department": "Computer Science and Mathematics",
-//   "subjectAreas": [
-//     "Mathematics",
-//     "Discrete Mathematics",
-//     "Data Structures",
-//     "Algorithms"
-//   ],
-//   "bio": "Experienced educator focused on helping students understand mathematical and computer science concepts through practical examples and interactive learning.",
-//   "createdAt": "2026-08-18T09:15:00.000Z",
-//   "updatedAt": "2026-08-23T14:20:00.000Z"
-// }
-
 import mongoose from "mongoose";
 
 const instructorProfileSchema = new mongoose.Schema(
@@ -33,7 +17,6 @@ const instructorProfileSchema = new mongoose.Schema(
     expertiseAreas: [
       {
         type: String,
-        required: true,
       },
     ],
     bio: {
