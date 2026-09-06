@@ -2,13 +2,14 @@ import { ApiResponse } from "../../../shared/responses/ApiResponse.js"
 import { loginService, logoutService, passwordService, reactivateService, refreshService, signupService } from "../services/auth.service.js"
 
 const registerUser = async(req,res)=>{
-    const {name,email,password} = req.body
+    const {name,email,password,role} = req.body
     const avatarLocalPath = req.file?.path
 
     const user = await signupService({
         name,
         email,
         password,
+        role,
         avatarLocalPath
     })
 

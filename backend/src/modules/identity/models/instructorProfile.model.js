@@ -16,24 +16,21 @@
 
 import mongoose from "mongoose";
 
-const teacherProfileSchema = new mongoose.Schema(
+const instructorProfileSchema = new mongoose.Schema(
   {
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
       unique: true,
+      index: true
     },
-
     professionalTitle: {
       type: String,
-      required: true,
+      trim: true,
+      default: null
     },
-    department: {
-      type: String,
-      required: true,
-    },
-    subjectAreas: [
+    expertiseAreas: [
       {
         type: String,
         required: true,
@@ -41,13 +38,29 @@ const teacherProfileSchema = new mongoose.Schema(
     ],
     bio: {
       type: String,
-      required: true,
+      trim:true,
+      default:null
     },
+    experienceYears:{
+      type: Number,
+      min:0,
+      default:null
+    },
+    organization:{
+      type: String,
+      trim: true,
+      default:null
+    },
+    socialLinks:{
+      type: Map,
+      of: String,
+      default: {}
+    }
   },
   { timestamps: true },
 );
 
-export const TeacherProfile = mongoose.model(
-  "TeacherProfile",
-  teacherProfileSchema,
+export const InstructorProfile = mongoose.model(
+  "InstructorProfile",
+  instructorProfileSchema,
 );

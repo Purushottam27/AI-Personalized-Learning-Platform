@@ -1,12 +1,12 @@
 import { User } from "../../identity/models/user.model.js";
 import { ApiError } from '../../../shared/errors/ApiError.js';
-import { StudentProfile } from "../../identity/models/studentProfile.model.js";
-import { TeacherProfile } from "../../identity/models/teacherProfile.model.js";
+import { LearnerProfile } from "../../identity/models/learnerProfile.model.js";
+import { InstructorProfile } from "../../identity/models/instructorProfile.model.js";
 import { RefreshSession } from "../../identity/models/refreshSession.model.js";
 import { uploadOnCloudinary } from "../../../shared/utils/cloudinary.js";
 
 // whitelist of safe user fields to return in responses
-const SAFE_USER_FIELDS = '_id name email role status avatar suspensionReason suspendedAt createdAt updatedAt';
+const SAFE_USER_FIELDS = '_id name email role status avatar emailVerified suspensionReason suspendedAt createdAt updatedAt';
 
 
 const getUsersService = async (queryData) => {
@@ -79,10 +79,10 @@ const getUserByIdService = async (userId) => {
     // then we have to check that wether user is a student or a teacher as both have different profile data
     let profile = null;
 
-    if (user.role === 'STUDENT') {
-        profile = await StudentProfile.findOne({ userId: user._id }).lean();
-    } else if (user.role === 'TEACHER') {
-        profile = await TeacherProfile.findOne({ userId: user._id }).lean();
+    if (user.role === 'LEARNER') {
+        profile = await LearnerProfile.findOne({ userId: user._id }).lean();
+    } else if (user.role === 'INSTRUCTOR') {
+        profile = await InstructorProfile.findOne({ userId: user._id }).lean();
     }
 
     return {
@@ -107,9 +107,9 @@ const updateUserStatusService = async (userId, statusData) => {
 
     // ACTIVE → SUSPENDED
     if (status === 'SUSPENDED' && user.status === 'ACTIVE') {
-        // if (!suspensionReason) {
-        //     throw new ApiError(400, 'VALIDATION_ERROR', 'Suspension reason is required when suspending a user');
-        // }
+        if (!suspensionReason) {
+            throw new ApiError(400, 'VALIDATION_ERROR', 'Suspension reason is required when suspending a user');
+        }
 
         user.status = 'SUSPENDED';
         user.suspensionReason = suspensionReason;

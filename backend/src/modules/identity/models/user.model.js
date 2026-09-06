@@ -19,19 +19,22 @@ const userSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: true,
+        default:null
     },
     role: {
         type: String,
-        enum: ['STUDENT', 'TEACHER', 'ADMIN'],
-        default: 'STUDENT',
-        // required: true
+        enum: ['LEARNER', 'INSTRUCTOR', 'ADMIN'],
+        required: true
     },
     status: {
         type: String,
         enum: ['ACTIVE', 'SUSPENDED', 'DEACTIVATED'],
         default: 'ACTIVE',
         // required: true
+    },
+    emailVerified:{
+        type:Boolean,
+        default:false
     },
     suspensionReason: {
         type: String,

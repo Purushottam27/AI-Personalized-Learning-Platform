@@ -4,7 +4,7 @@ const getUsersQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
   search: z.string().trim().optional(),
-  role: z.enum(['STUDENT', 'TEACHER']).optional(),
+  role: z.enum(['LEARNER','INSTRUCTOR']).optional(),
   status: z.enum(['ACTIVE', 'SUSPENDED', 'DEACTIVATED']).optional(),
   sort: z.string().optional().default('createdAt'),
   order: z.enum(['asc', 'desc']).optional().default('desc')
