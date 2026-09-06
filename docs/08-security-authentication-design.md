@@ -1,157 +1,223 @@
-# AI Based Personalized Learning Platform — Security & Authentication Design
+**# AI Based Personalized Learning Platform — Security & Authentication Design**
 
-## 1. Purpose
+**## 1. Purpose**
 
-This document defines the security and authentication architecture for the AI Based Personalized Learning Platform. It translates the approved Product Requirements, MVP Scope, Student Learning Model, User Journeys, System Architecture, Database Design, and API Design into concrete security and authentication rules.
+This document defines the security and authentication architecture for the AI Based Personalized Learning Platform. It translates the approved Product Requirements, MVP Scope, Learner Learning Model, User Journeys, System Architecture, Database Design, and API Design into concrete security and authentication rules.
 
 The goal is not merely to add JWT. The goal is to ensure that only the right user can access the right resource for the right operation under the right conditions, while preventing manipulation of authoritative learning state.
 
-## 2. Security Goals
+**## 2. Security Goals**
 
-The platform must protect user accounts, authentication credentials, access and refresh credentials, course ownership, enrollment information, assessment integrity, learning evidence, topic mastery, personalization state, teacher analytics, admin operations, uploaded resources, AI credentials and learner context, database/Redis credentials, and internal application information.
+The platform must protect user accounts, authentication credentials, access and refresh credentials, course ownership, enrollment information, assessment integrity, learning evidence, topic mastery, personalization state, instructor analytics, admin operations, uploaded resources, AI credentials and learner context, database/Redis credentials, and internal application information.
 
 Core goals:
 
-```text
+\`\`\`text
+
 Confidentiality + Integrity + Availability + Accountability
-```
 
-## 3. Core Security Principle
+\`\`\`
 
-> **Never trust the client with authoritative state.**
+**## 3. Core Security Principle**
+
+\> **\*\*Never trust the client with authoritative state.\*\***
 
 The frontend may request actions such as submitting an assessment, enrolling in a course, opening a lesson, or viewing mastery. It must never decide its own score, mastery, unlocked lessons, role, ownership, or enrollment state. The backend is authoritative.
 
-## 4. Threat Model
+**## 4. Threat Model**
 
 Assume attackers can inspect frontend code, modify requests, call APIs directly, replay requests, send malformed input, attempt privilege escalation, steal credentials, brute-force authentication, upload malicious files, manipulate assessment timing, access other users' data, inject malicious input, abuse AI endpoints, or exploit insecure configuration.
 
-```text
+\`\`\`text
+
 Frontend validation ≠ Security
+
 Backend validation = Security boundary
-```
 
-## 5. Authentication vs Authorization
+\`\`\`
 
-**Authentication** answers: "Who are you?"
+**## 5. Authentication vs Authorization**
 
-**Authorization** answers: "What are you allowed to do?"
+**\*\*Authentication\*\*** answers: "Who are you?"
+
+**\*\*Authorization\*\*** answers: "What are you allowed to do?"
 
 A valid login does not grant access to every resource.
 
-## 6. Authentication Architecture
+**## 6. Authentication Architecture**
 
 Recommended MVP:
 
-```text
-Login
-  ↓
-Verify credentials
-  ↓
-User identity
-  ├── Access Token  → short-lived API authorization
-  └── Refresh Token → protected token renewal
-```
+\`\`\`text
 
-## 7. JWT Strategy
+Login
+
+  ↓
+
+Verify credentials
+
+  ↓
+
+User identity
+
+  ├── Access Token  → short-lived API authorization
+
+  └── Refresh Token → protected token renewal
+
+\`\`\`
+
+**## 7. JWT Strategy**
 
 Use two conceptual credentials:
 
-- Access token: short-lived, minimal claims, used for API authorization.
-- Refresh token: longer-lived, more sensitive, protected and revocable/rotatable.
+\- Access token: short-lived, minimal claims, used for API authorization.
+
+\- Refresh token: longer-lived, more sensitive, protected and revocable/rotatable.
 
 Access-token payload:
 
-```json
+\`\`\`json
+
 {
-  "sub": "userId",
-  "role": "STUDENT",
+
+  "sub": "userId",
+
+  "role": "LEARNER",
+
 }
-```
+
+\`\`\`
+
 Refresh-token payload:
 
-```json
+\`\`\`json
+
 {
-  "sub": "userId",
-  "jti": "refresh-token-id"
+
+  "sub": "userId",
+
+  "jti": "refresh-token-id"
+
 }
-```
+
+\`\`\`
 
 Do not put passwords, password hashes, refresh tokens, private profile information, learning history, or large recommendation/analytics data into JWTs.
 
-## 8. Refresh Token Rotation
+**## 8. Refresh Token Rotation**
 
 Recommended flow:
 
-```text
+\`\`\`text
+
 Refresh Token A
-      ↓
+
+      ↓
+
 Verify JWT
-      ↓
+
+      ↓
+
 Find RefreshSession using userId + jti
-      ↓
+
+      ↓
+
 Compare SHA-256 token hash
-      ↓
+
+      ↓
+
 Generate Refresh Token B
-      ↓
+
+      ↓
+
 Generate new JTI
-      ↓
+
+      ↓
+
 Update SAME RefreshSession
-      ↓
+
+      ↓
+
 Issue new Access Token
-```
 
-jti        → changed
-tokenHash  → changed
+\`\`\`
+
+jti        → changed
+
+tokenHash  → changed
+
 tokenFamily → unchanged
-expiresAt   → unchanged
-revokedAt   → remains null
 
-Reuse of an already-rotated refresh token should be treated as suspicious and can invalidate the affected token family/session.
+expiresAt   → unchanged
+
+revokedAt   → remains null
+
+Reuse of an already-rotated refresh token should be treated as suspicious.
+The affected refresh session/token family may be invalidated as part of
+future concurrency/reuse hardening; the MVP must at minimum reject the
+reused token.
 
 If refresh sessions are persisted, store a protected representation such as a hash rather than raw long-lived credentials.
 
-## 9. Browser Credential Strategy
+**## 9. Browser Credential Strategy**
 
 Recommended MVP:
 
-```text
-Access Token  → Authorization: Bearer <token>
+\`\`\`text
+
+Access Token  → Authorization: Bearer \<token>
+
 Refresh Token → HttpOnly + Secure + appropriate SameSite cookie
-```
 
-`HttpOnly` reduces JavaScript access to the refresh credential. `Secure` requires HTTPS in production. `SameSite` helps control cross-site cookie behavior. Exact values depend on deployment.
+\`\`\`
 
-## 10. Password Security
+\`HttpOnly\` reduces JavaScript access to the refresh credential. \`Secure\` requires HTTPS in production. \`SameSite\` helps control cross-site cookie behavior. Exact values depend on deployment.
+
+**## 10. Password Security**
 
 Passwords must never be stored in plaintext.
 
-```text
+\`\`\`text
+
 Password
-   ↓
+
+   ↓
+
 Modern password hashing algorithm
-   ↓
+
+   ↓
+
 Password hash
-   ↓
+
+   ↓
+
 Database
-```
+
+\`\`\`
 
 The current MVP implementation uses bcryptjs with a cost factor
+
 of 12. Password hashing is performed by the User model before
+
 persistence. Plaintext passwords are never stored.
 
-## 11. Signup and Public Roles
+**## 11. Signup and Public Roles**
 
-Signup validates name, email, password, and role. The backend normalizes appropriate fields, validates uniqueness,
-hashes the password, creates the User record, and returns a safe
-response. Role-specific profile creation/onboarding is handled
-according to the approved user/profile flow.
+Public signup creates a permanent User account for either a Learner or an
+Instructor.
+
+The signup request validates:
+
+- `name`: required string, trimmed
+- `email`: required string, trimmed, lowercased, valid email format
+- `password`: required string, minimum 8 characters
+- `role`: required enum of `LEARNER` or `INSTRUCTOR`
 
 Public signup may support:
 
 ```text
-STUDENT
-TEACHER
+LEARNER
+INSTRUCTOR
 ```
 
 but never:
@@ -160,131 +226,225 @@ but never:
 ADMIN
 ```
 
-Admin accounts must be created or managed through controlled mechanisms.
+Admin accounts are provisioned separately.
 
-## 12. Authentication Middleware
+Normal signup flow:
 
 ```text
-Request
+Signup
   ↓
-Extract access token
+Create User
   ↓
-Verify signature
+Login / authenticated session
   ↓
-Verify expiration
+Role-specific onboarding
   ↓
-Identify user
+LearnerProfile / InstructorProfile
   ↓
-Check account state if needed
-  ↓
-Attach authenticated context
-  ↓
-next()
+Dashboard
 ```
+
+Avatar is optional and is handled through the approved multipart upload
+infrastructure. The User model owns the avatar field.
+
+**## 12. Authentication Middleware**
+
+\`\`\`text
+
+Request
+
+  ↓
+
+Extract access token
+
+  ↓
+
+Verify signature
+
+  ↓
+
+Verify expiration
+
+  ↓
+
+Identify user
+
+  ↓
+
+Check account state if needed
+
+  ↓
+
+Attach authenticated context
+
+  ↓
+
+next()
+
+\`\`\`
 
 The MVP authentication middleware:
 
-- accepts the access token from the authentication cookie or
-  Authorization: Bearer <token> header,
-- verifies the JWT signature and expiration,
-- uses the JWT `sub` to identify the User,
-- retrieves the current User state,
-- checks User.status,
-- attaches the required safe User context to req.user,
-- allows the request to continue.
+\- accepts the access token from the authentication cookie or
+
+  Authorization: Bearer \<token> header,
+
+\- verifies the JWT signature and expiration,
+
+\- uses the JWT \`sub\` to identify the User,
+
+\- retrieves the current User state,
+
+\- checks User.status,
+
+\- attaches the required safe User context to req.user,
+
+\- allows the request to continue.
 
 req.user
-├── _id
+
+├── \_id
+
 ├── name
+
 ├── role
+
 └── status
 
 Authentication middleware should remain focused and not contain large business rules.
 
-## 13. Authorization Architecture
+**## 13. Authorization Architecture**
 
 Roles:
 
-```text
-STUDENT
-TEACHER
+\`\`\`text
+
+LEARNER
+
+INSTRUCTOR
+
 ADMIN
-```
+
+\`\`\`
 
 Authorization is layered:
 
-```text
+\`\`\`text
+
 Authentication
-   ↓
+
+   ↓
+
 Role authorization
-   ↓
+
+   ↓
+
 Resource ownership
-   ↓
+
+   ↓
+
 Relationship authorization
-   ↓
+
+   ↓
+
 Business rules
-   ↓
+
+   ↓
+
 Operation
-```
 
-Example teacher edit:
+\`\`\`
 
-```text
+Example instructor edit:
+
+\`\`\`text
+
 Authenticated?
-  ↓
-Teacher?
-  ↓
+
+  ↓
+
+Instructor?
+
+  ↓
+
 Owns course?
-  ↓
+
+  ↓
+
 Lesson belongs to course?
-  ↓
+
+  ↓
+
 Allowed
-```
+
+\`\`\`
 
 Role alone is not sufficient.
 
-## 14. Resource and Relationship Authorization
+**## 14. Resource and Relationship Authorization**
 
-A teacher may edit only their own courses. A teacher may view only course-relevant information about students enrolled in their course.
+A instructor may edit only their own courses. A instructor may view only course-relevant information about learners enrolled in their course.
 
 Example:
 
-```text
-Teacher
-  ↓
+\`\`\`text
+
+Instructor
+
+  ↓
+
 Own Course
-  ↓
-Student Enrollment
-  ↓
-Course-Relevant Student Data
-```
 
-A student's platform-wide history must not become visible merely because a teacher has the TEACHER role.
+  ↓
 
-## 15. Account State
+Learner Enrollment
+
+  ↓
+
+Course-Relevant Learner Data
+
+\`\`\`
+
+A learner's platform-wide history must not become visible merely because a instructor has the INSTRUCTOR role.
+
+**## 15. Account State**
 
 Final account states:
 
-```text
+\`\`\`text
+
 ACTIVE
+
 SUSPENDED
+
 DEACTIVATED
-```
+
+\`\`\`
+
 Account-state ownership:
 
-```text
+\`\`\`text
+
 ACTIVE
-    ↓
+
+    ↓
+
 Normal account state
 
 DEACTIVATED
-    ↓
+
+    ↓
+
 User-initiated
 
 SUSPENDED
-    ↓
+
+    ↓
+
 Admin/platform-controlled
-```
+
+\`\`\`
+
 A user may deactivate their own account.
 
 A user may reactivate their own DEACTIVATED account.
@@ -293,871 +453,1424 @@ A user cannot self-reactivate a SUSPENDED account.
 
 Only the platform/Admin resolves a suspension.
 
-### Account State Enforcement
+**### Account State Enforcement**
 
 Protected request:
 
-```text
+\`\`\`text
+
 Request
- ↓
+
+ ↓
+
 Verify access token
- ↓
+
+ ↓
+
 Identify User
- ↓
+
+ ↓
+
 Retrieve current User state
- ↓
+
+ ↓
+
 Check User.status
- ↓
+
+ ↓
+
 ACTIVE?
- ├── YES → continue
- └── NO → reject
-```
+
+ ├── YES → continue
+
+ └── NO → reject
+
+\`\`\`
+
 This prevents an otherwise valid old access token from bypassing a
+
 SUSPENDED or DEACTIVATED account state.
 
-### Suspension / Deactivation
+**### Suspension / Deactivation**
 
 When an account becomes SUSPENDED or DEACTIVATED:
 
 Revoke active refresh sessions.
+
 Reject future refresh attempts.
+
 Reject protected API requests even when an old access token is otherwise cryptographically valid.
+
 Do not introduce an access-token blacklist for MVP.
 
-### Login behaviour
+**### Login behaviour**
 
 Normal login must not authenticate SUSPENDED or DEACTIVATED accounts.
 
 ACTIVE
-    ↓
+
+    ↓
+
 Normal login
 
 SUSPENDED
-    ↓
-ACCOUNT_SUSPENDED
+
+    ↓
+
+ACCOUNT\_SUSPENDED
 
 DEACTIVATED
-    ↓
-ACCOUNT_DEACTIVATED
+
+    ↓
+
+ACCOUNT\_DEACTIVATED
 
 The frontend uses these error codes to determine the appropriate account
+
 state UI.
 
-### Reactivation
+**### Reactivation**
 
 Only DEACTIVATED accounts may use the self-reactivation flow.
 
 POST /auth/reactivate
-        ↓
+
+        ↓
+
 Find User by email
-        ↓
+
+        ↓
+
 Check account status
-        ↓
+
+        ↓
+
 DEACTIVATED?
-        ↓
+
+        ↓
+
 Verify password
-        ↓
+
+        ↓
+
 DEACTIVATED → ACTIVE
-        ↓
+
+        ↓
+
 Generate new authentication credentials
-        ↓
+
+        ↓
+
 Create new RefreshSession
-        ↓
+
+        ↓
+
 Set authentication cookies
 
 Reactivation does not restore previously revoked RefreshSession records.
 
 SUSPENDED accounts cannot use this flow.
 
-### RefreshSession
+**### RefreshSession**
 
 Refresh-session persistence is separate from User.
 
 RefreshSession
+
 ├── userId
+
 ├── jti
+
 ├── tokenHash
+
 ├── expiresAt
+
 ├── revokedAt
+
 ├── tokenFamily
+
 └── timestamps
 
 One User can have multiple RefreshSession records.
 
 When an account is suspended or deactivated, its active RefreshSession
+
 records are revoked.
 
 When a DEACTIVATED user successfully reactivates, a new RefreshSession
+
 record is created.
 
-## 16. Logout and Session Management
+**## 15A. Google Authentication and Temporary Setup Security**
+
+Google authentication is a separate authentication method from local
+password authentication.
+
+New Google users follow:
 
 ```text
-POST /auth/logout
-      ↓
-Read refreshToken cookie
-      ↓
-Verify refresh JWT
-      ↓
-Extract sub + jti
-      ↓
-Find RefreshSession
-      ↓
-Set revokedAt = current time
-      ↓
-Clear accessToken cookie
-      ↓
-Clear refreshToken cookie
+Google Authentication
+        ↓
+Google Callback
+        ↓
+OAuthSetupSession
+        ↓
+Select platform role
+        ↓
+Role-specific onboarding
+        ↓
+Complete setup
+        ↓
+Create User
+        ↓
+Create LearnerProfile / InstructorProfile
+        ↓
+Create AuthIdentity
+        ↓
+Create RefreshSession
+        ↓
+Issue application authentication credentials
 ```
+
+The temporary `OAuthSetupSession` is server-side, short-lived, and is not a
+permanent user account.
+
+A secure temporary httpOnly cookie can identify the setup session. Do not put
+the temporary identity payload, provider tokens, or sensitive onboarding
+data into a URL.
+
+Final Google endpoints:
+
+```text
+GET   /api/v1/auth/google
+GET   /api/v1/auth/google/callback
+POST  /api/v1/auth/google/setup/role
+PATCH /api/v1/auth/google/setup/onboarding
+POST  /api/v1/auth/google/setup/complete
+```
+
+The temporary setup session should be invalidated/removed after successful
+completion or expiration.
+
+For an existing Google-linked account:
+
+```text
+Google identity
+      ↓
+AuthIdentity
+      ↓
+User
+      ↓
+Check User.status
+      ↓
+Issue application session if ACTIVE
+```
+
+A matching Google email must not automatically merge or link an existing
+password account. If the email belongs to an existing account but no
+`AuthIdentity` link exists, the user must authenticate through the existing
+account method. Account linking is a future authenticated Settings workflow.
+
+Google authentication must never bypass `SUSPENDED` or `DEACTIVATED` state.
+
+A Google-only User may have no local password. The application never receives
+the user's Google password.
+
+Google provider credentials/tokens are not the application's API access or
+refresh tokens.
+
+**## 16. Logout and Session Management**
+
+\`\`\`text
+
+POST /auth/logout
+
+      ↓
+
+Read refreshToken cookie
+
+      ↓
+
+Verify refresh JWT
+
+      ↓
+
+Extract sub + jti
+
+      ↓
+
+Find RefreshSession
+
+      ↓
+
+Set revokedAt = current time
+
+      ↓
+
+Clear accessToken cookie
+
+      ↓
+
+Clear refreshToken cookie
+
+\`\`\`
+
 The logout endpoint is protected by access-token authentication
+
 middleware.
 
 The access token authenticates the logout request, while the
+
 refresh token identifies the refresh session that should be revoked.
 
 Password change, account deactivation, and account suspension may revoke
+
 additional refresh sessions according to their security requirements.
 
 Account deactivation and account suspension revoke all active refresh
+
 sessions for the affected user.
 
 Account reactivation creates a new refresh session rather than restoring
+
 previously revoked sessions.
 
 Normal logout revokes the current refresh session only. Other active sessions belonging to the same user remain unaffected.
 
 Access tokens are short-lived; refresh credentials should be revoked on logout.
 
-A future `logout-all` operation may invalidate all refresh sessions after a security incident or password change.
+A future \`logout-all\` operation may invalidate all refresh sessions after a security incident or password change.
 
-## 17. JWT Secret and Environment Security
+**## 17. JWT Secret and Environment Security**
 
 Never hard-code signing secrets:
 
-```js
-const JWT_SECRET = "my-secret"; // WRONG
-```
+\`\`\`js
+
+const JWT\_SECRET = "my-secret"; // WRONG
+
+\`\`\`
 
 Use environment configuration or a production secret manager.
 
 Typical sensitive configuration includes:
 
-```text
-MONGODB_URI
-JWT_ACCESS_SECRET / signing key
-JWT_REFRESH_SECRET / signing key
-REDIS_URL
-AI_PROVIDER_KEY
+\`\`\`text
+
+MONGODB\_URI
+
+JWT\_ACCESS\_SECRET / signing key
+
+JWT\_REFRESH\_SECRET / signing key
+
+REDIS\_URL
+
+AI\_PROVIDER\_KEY
+
 STORAGE credentials
+
 EMAIL credentials
-```
 
-Never commit real `.env` files. Use `.env.example` with placeholders.
+\`\`\`
 
-## 18. Secret Rotation
+Never commit real \`.env\` files. Use \`.env.example\` with placeholders.
+
+**## 18. Secret Rotation**
 
 Production secrets must be rotatable. A secret manager is preferred for mature deployments. JWT key rotation requires planned support for multiple keys during transition if necessary.
 
-## 19. CORS and CSRF
+**## 19. CORS and CSRF**
 
 CORS should explicitly allow trusted frontend origins. Avoid wildcard origins when credentials/cookies are involved.
 
 Cookie-based authentication requires CSRF consideration. Mitigations can include:
 
-```text
+\`\`\`text
+
 SameSite cookies
+
 Origin/Referer validation where appropriate
+
 CSRF tokens where required
-```
+
+\`\`\`
 
 The final implementation must test the chosen deployment architecture.
 
-## 20. XSS and Security Headers
+**## 20. XSS and Security Headers**
 
-Avoid unsafe HTML injection. Validate and sanitize rich HTML if rich content is supported. Teacher-provided lesson content is untrusted if arbitrary HTML is permitted.
+Avoid unsafe HTML injection. Validate and sanitize rich HTML if rich content is supported. Instructor-provided lesson content is untrusted if arbitrary HTML is permitted.
 
 Production should use appropriate headers, commonly including:
 
-```text
+\`\`\`text
+
 Content-Security-Policy
+
 X-Content-Type-Options
+
 Referrer-Policy
+
 Permissions-Policy
+
 HSTS
-```
+
+\`\`\`
 
 Exact settings must be tested with the frontend.
 
-## 21. NoSQL Injection and Query Security
+**## 21. NoSQL Injection and Query Security**
 
-Never blindly pass user-supplied objects into MongoDB queries. Do not allow clients to inject operators such as `$ne`, `$gt`, `$where`, or arbitrary field paths.
+Never blindly pass user-supplied objects into MongoDB queries. Do not allow clients to inject operators such as \`$ne\`, \`$gt\`, \`$where\`, or arbitrary field paths.
 
 Use schema validation and explicit allowlisted query construction.
 
 Allowed filters should be explicit, for example:
 
-```text
-department
-category
-difficulty
-status
-```
+\`\`\`text
 
-## 22. Object-Level Authorization / IDOR
+domain
+
+category
+
+difficulty
+
+status
+
+\`\`\`
+
+**## 22. Object-Level Authorization / IDOR**
 
 Changing an ID must never grant access.
 
 For example:
 
-```text
-GET /api/v1/attempts/ATTEMPT_B
-```
+\`\`\`text
 
-must verify that the attempt belongs to the authenticated student or that an authorized teacher/admin relationship exists.
+GET /api/v1/attempts/ATTEMPT\_B
+
+\`\`\`
+
+must verify that the attempt belongs to the authenticated learner or that an authorized instructor/admin relationship exists.
 
 Object IDs are not an authorization mechanism.
 
-## 23. Student and Teacher Data Minimization
+**## 23. Learner and Instructor Data Minimization**
 
-Student responses must not expose internal teacher notes, admin metadata, other students, security state, or unnecessary internal analytics.
+Learner responses must not expose internal instructor notes, admin metadata, other learners, security state, or unnecessary internal analytics.
 
-Teacher responses should focus on:
+Instructor responses should focus on:
 
-```text
+\`\`\`text
+
 Enrollment
+
 Course progress
+
 Course assessment results
+
 Course topic mastery
+
 Course-relevant strengths/weaknesses
-```
+
+\`\`\`
 
 Use DTOs/projections instead of blindly returning database documents.
 
-## 24. Admin Security and Audit Logging
+**## 24. Admin Security and Audit Logging**
 
 Sensitive admin operations must follow:
 
-```text
+\`\`\`text
+
 Authenticate
-   ↓
+
+   ↓
+
 Authorize
-   ↓
+
+   ↓
+
 Validate
-   ↓
+
+   ↓
+
 Execute
-   ↓
+
+   ↓
+
 Audit
-```
+
+\`\`\`
 
 Examples of auditable events:
 
-```text
-LOGIN_SUCCESS
-LOGIN_FAILURE
-USER_SUSPENDED
-USER_UNSUSPENDED
-COURSE_PUBLISHED
-COURSE_ARCHIVED
-ASSESSMENT_SUBMITTED
-REFRESH_TOKEN_REUSE_DETECTED
-ADMIN_ACTION
-```
+\`\`\`text
+
+LOGIN\_SUCCESS
+
+LOGIN\_FAILURE
+
+USER\_SUSPENDED
+
+USER\_UNSUSPENDED
+
+COURSE\_PUBLISHED
+
+COURSE\_ARCHIVED
+
+ASSESSMENT\_SUBMITTED
+
+REFRESH\_TOKEN\_REUSE\_DETECTED
+
+ADMIN\_ACTION
+
+\`\`\`
 
 Never log passwords, JWTs, refresh tokens, or API keys.
 
-## 25. Rate Limiting and Brute-Force Protection
+**## 25. Rate Limiting and Brute-Force Protection**
 
 Protect especially:
 
-```text
+\`\`\`text
+
 /signup
+
 /login
+
 /refresh
+
 password-related endpoints
+
 AI-triggering endpoints
+
 bulk imports
+
 admin-sensitive APIs
-```
+
+\`\`\`
 
 Redis can support distributed rate limiting. Authentication protection can combine IP-based limits, account-aware throttling, and progressive delays.
 
 Avoid overly specific authentication errors that enable account enumeration.
 
-## 26. Request Size and File Upload Security
+**## 26. Request Size and File Upload Security**
 
 Apply limits to JSON bodies, URL-encoded bodies, multipart uploads, individual files, and bulk imports.
 
-Teacher resources such as PDF, PPT/PPTX, DOC/DOCX, and images should be validated by:
+Instructor resources such as PDF, PPT/PPTX, DOC/DOCX, and images should be validated by:
 
-```text
+\`\`\`text
+
 Extension
+
 MIME type
+
 File signature where appropriate
+
 File size
+
 Storage policy
-```
+
+\`\`\`
 
 Never execute uploaded files. Production can add antivirus scanning, content inspection, isolated processing, and controlled storage.
 
-## 27. Question Import Security
+**## 27. Question Import Security**
 
 Uploaded Excel/PDF question files are untrusted input:
 
-```text
+\`\`\`text
+
 Upload
-  ↓
+
+  ↓
+
 File validation
-  ↓
+
+  ↓
+
 Safe parsing
-  ↓
+
+  ↓
+
 Schema validation
-  ↓
+
+  ↓
+
 Preview
-  ↓
-Teacher approval
-  ↓
+
+  ↓
+
+Instructor approval
+
+  ↓
+
 Database
-```
+
+\`\`\`
 
 Arbitrary file content must never become executable code.
 
-## 28. Assessment Security
+**## 28. Assessment Security**
 
 The backend is authoritative for:
 
-```text
+\`\`\`text
+
 Attempt ownership
+
 Question selection
+
 Correct answers
+
 Marks
+
 Timer
+
 Submission state
+
 Attempt count
+
 Final score
-```
+
+\`\`\`
 
 When an assessment starts, return questions/options but do not expose answer keys prematurely.
 
 If a question bank has 30 questions and an attempt contains 10, the server selects the 10 questions.
 
-## 29. Assessment Attempt Integrity
+**## 29. Assessment Attempt Integrity**
 
 An attempt should contain at least:
 
-```text
-studentId
+\`\`\`text
+
+learnerId
+
 assessmentId
+
 startedAt
+
 status
-```
+
+\`\`\`
 
 The backend prevents:
 
-```text
-Second final submission
-Expired attempt modification
-Another student accessing attempt
-Changing assessment configuration mid-attempt
-```
+\`\`\`text
 
-## 30. Timer Security
+Second final submission
+
+Expired attempt modification
+
+Another learner accessing attempt
+
+Changing assessment configuration mid-attempt
+
+\`\`\`
+
+**## 30. Timer Security**
 
 The browser timer is only a display mechanism. The server is authoritative:
 
-```text
+\`\`\`text
+
 server startedAt + server timeLimit
-```
+
+\`\`\`
 
 At submission, server time determines whether the attempt is still valid. Expired attempts can be auto-submitted according to the assessment rules.
 
-## 31. Score and Mastery Security
+**## 31. Score and Mastery Security**
 
 Score is calculated server-side:
 
-```text
+\`\`\`text
+
 Responses
-   ↓
+
+   ↓
+
 Correct Answers
-   ↓
+
+   ↓
+
 Marks
-   ↓
+
+   ↓
+
 Score
-```
+
+\`\`\`
 
 Never accept a client-supplied authoritative score.
 
-Mastery is also derived from trusted evidence. A student cannot send:
+Mastery is also derived from trusted evidence. A learner cannot send:
 
-```json
+\`\`\`json
+
 {"masteryScore":95}
-```
+
+\`\`\`
 
 and change the learning model.
 
-## 32. Learning Evidence Security
+**## 32. Learning Evidence Security**
 
 Learning evidence should be generated by trusted domain operations such as:
 
-```text
+\`\`\`text
+
 Assessment submission
+
 Lesson completion
+
 Practice completion
+
 Intervention completion
+
 Diagnostic result
-```
 
-Do not provide a generic endpoint that lets students fabricate arbitrary learning evidence.
+\`\`\`
 
-## 33. AI Security Boundary
+Do not provide a generic endpoint that lets learners fabricate arbitrary learning evidence.
+
+**## 33. AI Security Boundary**
 
 Preferred architecture:
 
-```text
+\`\`\`text
+
 Database
-   ↓
+
+   ↓
+
 Personalization Service
-   ↓
+
+   ↓
+
 Minimal Relevant Context
-   ↓
+
+   ↓
+
 AI
-   ↓
+
+   ↓
+
 Validated Output
-   ↓
+
+   ↓
+
 Application Decision
-```
+
+\`\`\`
 
 The frontend must never hold private AI provider keys or directly control authoritative personalization state.
 
 AI should receive only relevant context, not authentication data or unrelated learner information.
 
-External/teacher content must be treated as untrusted data and should not automatically become AI instructions.
+External/instructor content must be treated as untrusted data and should not automatically become AI instructions.
 
 AI output must be schema-validated before persistence or use.
 
 Example:
 
-```json
+\`\`\`json
+
 {
-  "recommendationType": "TOPIC_REVIEW",
-  "targetTopicId": "...",
-  "reason": "...",
-  "priority": "HIGH"
+
+  "recommendationType": "TOPIC\_REVIEW",
+
+  "targetTopicId": "...",
+
+  "reason": "...",
+
+  "priority": "HIGH"
+
 }
-```
+
+\`\`\`
 
 AI suggestions do not directly set mastery or other authoritative state.
 
-## 34. Redis Security
+**## 34. Redis Security**
 
 Redis is infrastructure and must never be exposed directly to the frontend.
 
 Use authentication, private networking, and TLS where required. Redis can support caching, queues, rate limiting, and temporary state, but permanent learning history remains in the authoritative database.
 
-## 35. MongoDB Security
+**## 35. MongoDB Security**
 
 Production MongoDB should use:
 
-```text
+\`\`\`text
+
 Authenticated connection
+
 Least-privilege database user
+
 Network restrictions
+
 TLS
+
 Secure connection string
-```
+
+\`\`\`
 
 Do not run the application with a full cluster administrator account.
 
-## 36. Backup and Recovery
+**## 36. Backup and Recovery**
 
 Production should eventually provide:
 
-```text
+\`\`\`text
+
 Automated backups
+
 Retention policy
+
 Restore testing
+
 Disaster recovery
-```
+
+\`\`\`
 
 A backup is not proven until restoration has been tested.
 
-## 37. Error Security
+**## 37. Error Security**
 
 Production responses must not expose:
 
-```text
+\`\`\`text
+
 Stack traces
+
 Database queries
+
 Filesystem paths
+
 JWT internals
+
 Provider credentials
-```
+
+\`\`\`
 
 Example:
 
-```json
+\`\`\`json
+
 {
-  "success": false,
-  "error": {
-    "code": "INTERNAL_SERVER_ERROR",
-    "message": "Something went wrong"
-  }
+
+  "success": false,
+
+  "error": {
+
+    "code": "INTERNAL\_SERVER\_ERROR",
+
+    "message": "Something went wrong"
+
+  }
+
 }
-```
+
+\`\`\`
 
 Detailed diagnostics belong in secure server logs.
 
-## 38. Security Testing Strategy
+**## 38. Security Testing Strategy**
 
 Every protected endpoint should test authentication, authorization, input validation, resource ownership, state transitions, and failure handling.
 
-### Authentication tests
+**### Authentication tests**
 
-```text
-No token             → 401
-Expired token        → 401
-Malformed token      → 401
-Invalid signature    → 401
-```
+\`\`\`text
 
-### Authorization tests
+No token             → 401
 
-```text
-Wrong role           → denied
-Wrong owner          → denied
-Wrong student        → denied
-Wrong course         → denied
-```
+Expired token        → 401
 
-### State tests
+Malformed token      → 401
 
-```text
+Invalid signature    → 401
+
+\`\`\`
+
+**### Authorization tests**
+
+\`\`\`text
+
+Wrong role           → denied
+
+Wrong owner          → denied
+
+Wrong learner        → denied
+
+Wrong course         → denied
+
+\`\`\`
+
+**### State tests**
+
+\`\`\`text
+
 Already submitted
-Already enrolled
-Archived course
-Suspended user
-Expired attempt
-```
 
-## 39. IDOR and Privilege Escalation Tests
+Already enrolled
+
+Archived course
+
+Suspended user
+
+Expired attempt
+
+\`\`\`
+
+**## 39. IDOR and Privilege Escalation Tests**
 
 Test that User A cannot access User B resources simply by changing IDs.
 
 Test that:
 
-```text
-Student → cannot become Teacher
-Student → cannot become Admin
-Teacher → cannot become Admin
-Teacher → cannot modify another teacher's course
-Teacher → cannot access unrelated student data
-```
+\`\`\`text
 
-## 40. Assessment Abuse Tests
+Learner → cannot become Instructor
+
+Learner → cannot become Admin
+
+Instructor → cannot become Admin
+
+Instructor → cannot modify another instructor's course
+
+Instructor → cannot access unrelated learner data
+
+\`\`\`
+
+**## 40. Assessment Abuse Tests**
 
 Test:
 
-```text
+\`\`\`text
+
 Submit twice
+
 Submit after timeout
-Submit another student's attempt
+
+Submit another learner's attempt
+
 Modify question ID
+
 Modify marks
+
 Modify score
+
 Skip validation
+
 Replay submission
-```
 
-## 41. Authentication Test Matrix
+\`\`\`
 
-```text
-Signup valid                 → 201
-Signup duplicate email      → 409
-Signup admin role           → rejected
-Login valid                 → 200
-Login invalid               → 401
-Refresh valid               → 200
-Refresh invalid             → 401
-Refresh rotated token       → rejected/revoked
-Logout                      → success
-Protected route no token    → 401
-Protected route expired     → 401
-Change password valid              → 200
+**## 41. Authentication Test Matrix**
 
-Change password incorrect old      → rejected
+\`\`\`text
 
-Suspended user login               → rejected
+Signup valid                 → 201
 
-Deactivated user login             → rejected
+Signup duplicate email      → 409
 
-Suspended user protected API       → 401/422 according to API contract
+Signup admin role           → rejected
 
-Deactivated user protected API     → 401/422 according to API contract
-```
+Login valid                 → 200
 
-## 42. Authorization Test Matrix
+Login invalid               → 401
 
-```text
-Student → own profile               → allowed
-Student → other profile             → denied
-Student → enrolled course           → allowed
-Student → locked lesson             → denied
-Teacher → own course                → allowed
-Teacher → another teacher course    → denied
-Teacher → own course students       → allowed
-Teacher → unrelated student         → denied
-Admin → authorized admin operation  → allowed
-Student → admin operation           → denied
-```
+Refresh valid               → 200
 
-## 43. Dependency and Git Security
+Refresh invalid             → 401
+
+Refresh rotated token       → rejected/revoked
+
+Logout                      → success
+
+Protected route no token    → 401
+
+Protected route expired     → 401
+
+Change password valid              → 200
+
+Change password incorrect old      → rejected
+
+Suspended user login               → rejected
+
+Deactivated user login             → rejected
+
+Suspended user protected API       → 401/422 according to API contract
+
+Deactivated user protected API     → 401/422 according to API contract
+
+\`\`\`
+
+**## 42. Authorization Test Matrix**
+
+\`\`\`text
+
+Learner → own profile               → allowed
+
+Learner → other profile             → denied
+
+Learner → enrolled course           → allowed
+
+Learner → locked lesson             → denied
+
+Instructor → own course                → allowed
+
+Instructor → another instructor course    → denied
+
+Instructor → own course learners       → allowed
+
+Instructor → unrelated learner         → denied
+
+Admin → authorized admin operation  → allowed
+
+Learner → admin operation           → denied
+
+\`\`\`
+
+**## 43. Dependency and Git Security**
 
 Keep dependencies updated, use lockfiles, review advisories, remove unused packages, avoid unmaintained packages, and add dependency scanning in CI when practical.
 
 Never commit:
 
-```text
+\`\`\`text
+
 .env
+
 Private keys
+
 JWT secrets
+
 API keys
+
 Database credentials
+
 Storage credentials
-```
+
+\`\`\`
 
 If a secret is accidentally committed, rotate the credential; deleting the file alone is insufficient.
 
-## 44. Account Deletion and Teacher Deactivation
+**## 44. Account Deletion and Instructor Deactivation**
 
-Account deletion must respect privacy requirements, historical learning evidence, audit requirements, course ownership, teacher content, and enrollment history.
+Account deletion must respect privacy requirements, historical learning evidence, audit requirements, course ownership, instructor content, and enrollment history.
 
-Teacher deactivation must preserve coherent historical course/student data. The business policy must later define whether affected courses remain published, become archived, or are transferred.
+Instructor deactivation must preserve coherent historical course/learner data. The business policy must later define whether affected courses remain published, become archived, or are transferred.
 
-## 45. MVP Security Checklist
+**## 45. MVP Security Checklist**
 
-```text
+\`\`\`text
+
 [ ] Secure password hashing
-[ ] JWT access authentication
-[ ] Refresh token mechanism
-[ ] Protected refresh credential
-[ ] Authentication middleware
-[ ] RBAC
-[ ] Resource ownership checks
-[ ] Enrollment authorization
-[ ] Assessment ownership/integrity
-[ ] Server-side scoring
-[ ] Server-side timer validation
-[ ] Input validation
-[ ] Authentication rate limiting
-[ ] Secure CORS
-[ ] Security headers
-[ ] Environment-based secrets
-[ ] No sensitive data in responses
-[ ] No secrets in Git
-[ ] Basic audit logging
-[ ] Security-focused API tests
-```
 
-## 46. Post-MVP Security Improvements
+[ ] JWT access authentication
+
+[ ] Refresh token mechanism
+
+[ ] Protected refresh credential
+
+[ ] Authentication middleware
+
+[ ] RBAC
+
+[ ] Resource ownership checks
+
+[ ] Enrollment authorization
+
+[ ] Assessment ownership/integrity
+
+[ ] Server-side scoring
+
+[ ] Server-side timer validation
+
+[ ] Input validation
+
+[ ] Authentication rate limiting
+
+[ ] Secure CORS
+
+[ ] Security headers
+
+[ ] Environment-based secrets
+
+[ ] No sensitive data in responses
+
+[ ] No secrets in Git
+
+[ ] Basic audit logging
+
+[ ] Security-focused API tests
+
+\`\`\`
+
+**## 46. Post-MVP Security Improvements**
 
 Later improvements may include:
 
-```text
+\`\`\`text
+
 MFA
+
 Advanced session management
+
 Device/session dashboard
+
 Advanced anomaly detection
+
 Dedicated secret manager
+
 Advanced file scanning
+
 WAF
+
 SIEM integration
+
 Advanced audit analytics
+
 Automated dependency scanning
+
 Penetration testing
+
 Formal threat modeling
-```
+
+\`\`\`
 
 These should not block the initial MVP unless deployment conditions require them.
 
-## 47. Security Documentation Rule
+**## 47. Security Documentation Rule**
 
 If implementation changes a security-sensitive architectural decision, update this document before allowing code and documentation to drift.
 
 Examples:
 
-```text
-JWT strategy changes
-Refresh-token storage changes
-Cookie strategy changes
-Role changes
-Admin permission changes
-Assessment security changes
-AI data-boundary changes
-```
+\`\`\`text
 
-## 48. Scope Boundary
+JWT strategy changes
+
+Refresh-token storage changes
+
+Cookie strategy changes
+
+Role changes
+
+Admin permission changes
+
+Assessment security changes
+
+AI data-boundary changes
+
+\`\`\`
+
+**## 48. Scope Boundary**
 
 This document intentionally does not yet finalize:
 
-- Exact JWT library configuration
-- Exact cookie domain
-- Exact SameSite deployment value
-- Exact CSRF implementation
-- Exact security-header configuration
-- Exact cloud secret manager
-- Exact storage provider
-- Exact production firewall/network rules
-- MFA implementation
-- Complete penetration-testing plan
+\- Exact JWT library configuration
+
+\- Exact cookie domain
+
+\- Exact SameSite deployment value
+
+\- Exact CSRF implementation
+
+\- Exact security-header configuration
+
+\- Exact cloud secret manager
+
+\- Exact storage provider
+
+\- Exact production firewall/network rules
+
+\- MFA implementation
+
+\- Complete penetration-testing plan
 
 These will be finalized against current official documentation and the actual deployment environment during implementation.
+
+Email verification is intentionally deferred from the current authentication MVP. The normal signup flow currently creates the account with `emailVerified = false`; Google-authenticated verified email may establish `emailVerified = true` for the application.
+
 The current authentication design has finalized the password hashing
+
 approach, refresh-session persistence model, refresh-token rotation
+
 behavior, account-state semantics, and role-authorization boundaries.
 
-## 49. Complete Authentication Flow
+**## 49. Complete Authentication Flow**
 
-```text
+\`\`\`text
+
 SIGNUP
-  ↓
+
+  ↓
+
 Validate Input
-  ↓
+
+  ↓
+
 Hash Password
-  ↓
+
+  ↓
+
 Create User
-  ↓
+
+  ↓
+
 Create Profile
-  ↓
+
+  ↓
+
 LOGIN
-  ↓
+
+  ↓
+
 Verify Password Hash
-  ↓
+
+  ↓
+
 Check Account
-  ↓
+
+  ↓
+
 Access Token + Refresh Token
-  ↓
+
+  ↓
+
 Protected API Calls
-  ↓
+
+  ↓
+
 Access Token Expired
-  ↓
+
+  ↓
+
 POST /auth/refresh
-  ↓
+
+  ↓
+
 Verify + Rotate Refresh
-  ↓
+
+  ↓
+
 New Access Token
-```
 
-## 50. Complete Authorization Flow
+\`\`\`
 
-```text
+**## 50. Complete Authorization Flow**
+
+\`\`\`text
+
 Request
-  ↓
+
+  ↓
+
 Access Token
-  ↓
+
+  ↓
+
 Authenticate
-  ↓
+
+  ↓
+
 Identify User
-  ↓
+
+  ↓
+
 Role Check
-  ↓
+
+  ↓
+
 Resource Lookup
-  ↓
+
+  ↓
+
 Ownership / Relationship Check
-  ↓
+
+  ↓
+
 Business Rule Check
-  ↓
+
+  ↓
+
 Allowed?
- ┌───────┴────────┐
-YES               NO
- ↓                 ↓
-Execute           403/404
-```
 
-## 51. Complete Assessment Security Flow
+ ┌───────┴────────┐
 
-```text
+YES               NO
+
+ ↓                 ↓
+
+Execute           403/404
+
+\`\`\`
+
+**## 51. Complete Assessment Security Flow**
+
+\`\`\`text
+
 Start Attempt
-      ↓
-Verify Student
-      ↓
+
+      ↓
+
+Verify Learner
+
+      ↓
+
 Verify Enrollment
-      ↓
+
+      ↓
+
 Verify Assessment Access
-      ↓
+
+      ↓
+
 Check Attempt Eligibility
-      ↓
+
+      ↓
+
 Select Questions Server-Side
-      ↓
+
+      ↓
+
 Create Attempt
-      ↓
+
+      ↓
+
 Server Timer
-      ↓
-Student Answers
-      ↓
+
+      ↓
+
+Learner Answers
+
+      ↓
+
 Submit
-      ↓
+
+      ↓
+
 Lock Attempt
-      ↓
+
+      ↓
+
 Server Scoring
-      ↓
+
+      ↓
+
 Learning Evidence
-      ↓
+
+      ↓
+
 Mastery Update
-      ↓
+
+      ↓
+
 Progression Decision
-      ↓
+
+      ↓
+
 Personalization
-```
 
-## 52. Complete Security Architecture
+\`\`\`
 
-```text
-                         FRONTEND
-                            │
-                         HTTPS
-                            │
-                            ▼
-                       API SERVER
-                            │
-            ┌───────────────┼────────────────┐
-            │               │                │
-            ▼               ▼                ▼
-      Authentication   Authorization    Validation
-            │               │                │
-            └───────────────┼────────────────┘
-                            ▼
-                      Business Services
-                            │
-        ┌───────────────────┼───────────────────┐
-        ▼                   ▼                   ▼
-     MongoDB              Redis             AI/Storage
-        │                   │                   │
-        └───────────────────┼───────────────────┘
-                            ▼
-                       Audit / Logs
-```
+**## 52. Complete Security Architecture**
 
-## 53. Final Security Principle
+\`\`\`text
+
+                         FRONTEND
+
+                            │
+
+                         HTTPS
+
+                            │
+
+                            ▼
+
+                       API SERVER
+
+                            │
+
+            ┌───────────────┼────────────────┐
+
+            │               │                │
+
+            ▼               ▼                ▼
+
+      Authentication   Authorization    Validation
+
+            │               │                │
+
+            └───────────────┼────────────────┘
+
+                            ▼
+
+                      Business Services
+
+                            │
+
+        ┌───────────────────┼───────────────────┐
+
+        ▼                   ▼                   ▼
+
+     MongoDB              Redis             AI/Storage
+
+        │                   │                   │
+
+        └───────────────────┼───────────────────┘
+
+                            ▼
+
+                       Audit / Logs
+
+\`\`\`
+
+**## 53. Final Security Principle**
 
 The platform follows:
 
-```text
-IDENTITY
-   ↓
-AUTHENTICATION
-   ↓
-AUTHORIZATION
-   ↓
-RESOURCE OWNERSHIP
-   ↓
-BUSINESS RULES
-   ↓
-AUTHORITATIVE STATE
-   ↓
-LEARNING EVIDENCE
-   ↓
-PERSONALIZATION
-```
+\`\`\`text
 
-> **AI, frontend code, and client requests may suggest or request actions, but the backend remains the final authority over security-sensitive and learning-critical state.**
+IDENTITY
+
+   ↓
+
+AUTHENTICATION
+
+   ↓
+
+AUTHORIZATION
+
+   ↓
+
+RESOURCE OWNERSHIP
+
+   ↓
+
+BUSINESS RULES
+
+   ↓
+
+AUTHORITATIVE STATE
+
+   ↓
+
+LEARNING EVIDENCE
+
+   ↓
+
+PERSONALIZATION
+
+\`\`\`
+
+\> **\*\*AI, frontend code, and client requests may suggest or request actions, but the backend remains the final authority over security-sensitive and learning-critical state.\*\***
 
 This is the foundation for a secure, reliable, explainable, and scalable personalized learning platform.

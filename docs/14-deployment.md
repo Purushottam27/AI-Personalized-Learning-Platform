@@ -1,7 +1,7 @@
 # AI Based Personalized Learning Platform — Deployment Design
 
 > **Document Type:** Deployment & Production Operations Design  
-> **Status:** Initial approved deployment plan  
+> **Status:** Finalized MVP deployment architecture  
 > **Purpose:** Define how the platform moves from local development to testing, staging, and production without introducing unnecessary infrastructure complexity.
 
 ---
@@ -38,6 +38,18 @@ The goal is:
 
 > **Deploy the MVP reliably with the simplest architecture that satisfies the project's requirements, while keeping a clear path toward future scaling.**
 
+This document complements:
+
+- `05-system-architecture.md` — application architecture
+- `06-database-design.md` — durable data architecture
+- `07-api-design.md` — API contracts
+- `08-security-authentication.md` — security and authentication
+- `09-ai-personalization-engine.md` — AI/personalization architecture
+- `10-background-processing-design.md` — queues and workers
+- `11-frontend-architecture-ux.md` — frontend architecture
+- `12-testing-strategy.md` — testing
+- `15-future-implementation.md` — deferred capabilities
+
 ---
 
 # 2. Deployment Philosophy
@@ -73,11 +85,13 @@ Custom infrastructure orchestration
 
 These may become appropriate later if real requirements justify them.
 
+The project should demonstrate engineering judgment rather than infrastructure quantity.
+
 ---
 
 # 3. Deployment Environments
 
-The platform should distinguish:
+The platform distinguishes:
 
 ```text
 Local
@@ -136,7 +150,7 @@ Real course content
 
 # 4. Environment Isolation
 
-Each environment should have separate configuration.
+Each environment must have separate configuration.
 
 At minimum:
 
@@ -147,7 +161,9 @@ STAGING
 PRODUCTION
 ```
 
-Do not accidentally connect local/test code to production databases.
+Production data must never be mixed with test data.
+
+At minimum, production must use a separate database and separate secrets from all non-production environments.
 
 ---
 
@@ -163,24 +179,20 @@ Recommended initial architecture:
                         │
              ┌──────────┴──────────┐
              ▼                     ▼
-        React Frontend        Backend API
+       React Frontend        Backend API
                                    │
-                ┌──────────────────┼──────────────────┐
-                ▼                  ▼                  ▼
-             MongoDB             Redis             AI Provider
-                │                  │
-                │                  ▼
-                │              BullMQ
-                │                  │
-                │                  ▼
-                │              Worker(s)
-                │
-                └──────────────────┐
-                                   ▼
-                            Application Data
+                 ┌─────────────────┼─────────────────┐
+                 ▼                 ▼                 ▼
+              MongoDB            Redis          AI Provider
+                                    │
+                                    ▼
+                                  BullMQ
+                                    │
+                                    ▼
+                                  Worker(s)
 ```
 
-Optional supporting services:
+Supporting services may include:
 
 ```text
 Object/File Storage
@@ -189,6 +201,8 @@ Monitoring
 Logging
 Error Tracking
 ```
+
+The frontend, backend, and workers may be deployed independently while remaining part of the same modular monolith.
 
 ---
 
@@ -205,16 +219,16 @@ The production system contains:
 6. AI provider
 7. File/object storage where required
 8. Notification/email provider where required
-9. Monitoring/logging
+9. Monitoring/logging/error tracking
 ```
 
-The frontend, backend, and workers may be deployed independently even though the application remains a modular monolith.
+Not every supporting service needs to be introduced on day one if the corresponding feature is not yet implemented.
 
 ---
 
 # 7. Frontend Deployment
 
-The React application is built into static production assets.
+The React/Vite application is built into static production assets.
 
 Conceptually:
 
@@ -230,7 +244,7 @@ CDN / static hosting
 Browser
 ```
 
-The frontend should not contain:
+The frontend must never contain:
 
 ```text
 Database credentials
@@ -254,6 +268,8 @@ PUBLIC_APP_NAME
 PUBLIC_ENVIRONMENT
 ```
 
+For Vite, actual environment variable names should follow the project's chosen `VITE_` public-variable convention.
+
 Never expose:
 
 ```text
@@ -265,25 +281,25 @@ Private storage credentials
 Email provider secret
 ```
 
-Anything embedded in frontend JavaScript should be considered visible to users.
+Anything embedded in frontend JavaScript must be considered visible to users.
 
 ---
 
 # 9. Backend Deployment
 
-The backend is a Node.js/Express application.
+The backend is a Node.js/Express ES-module application.
 
 Conceptually:
 
 ```text
 Source
- ↓
+  ↓
 Install dependencies
- ↓
-Test
- ↓
+  ↓
+Lint / Test
+  ↓
 Build if applicable
- ↓
+  ↓
 Start API server
 ```
 
@@ -295,7 +311,7 @@ This allows multiple API instances later without redesigning the application.
 
 # 10. Backend Statelessness
 
-Avoid storing authoritative session state only inside application memory.
+Avoid storing authoritative state only inside application memory.
 
 Do not rely on:
 
@@ -312,7 +328,7 @@ MongoDB
 Redis where appropriate
 ```
 
-This makes horizontal scaling possible later.
+The approved authentication architecture uses durable refresh-session state in MongoDB and an HttpOnly refresh-token cookie; application memory must not be the source of truth for authentication sessions.
 
 ---
 
@@ -325,14 +341,12 @@ Architecture:
 ```text
 Backend API
     ↓
-Redis Queue
+Redis / BullMQ
     ↓
 Worker
     ↓
 Job Processing
 ```
-
-This prevents expensive background work from blocking API requests.
 
 Examples:
 
@@ -344,6 +358,8 @@ Question-file processing
 Notifications
 Analytics jobs
 ```
+
+Workers should reuse application/domain services rather than duplicate business rules.
 
 ---
 
@@ -363,7 +379,9 @@ API × N
 Worker × N
 ```
 
-Scale workers independently according to queue demand.
+Scale workers independently according to measured queue demand, job duration, database capacity, and external-service limits.
+
+AI workers may need different concurrency from deterministic learning workers.
 
 ---
 
@@ -398,6 +416,8 @@ Production
 
 At minimum, production data must never be mixed with test data.
 
+Production credentials must not be reused by non-production environments.
+
 ---
 
 # 15. MongoDB Connection Security
@@ -420,7 +440,7 @@ Do not hard-code the connection string.
 
 Indexes defined in the database design must be deliberately created and verified.
 
-Examples may include indexes supporting:
+Examples may support:
 
 ```text
 User lookup
@@ -439,6 +459,8 @@ Do not create indexes blindly.
 
 Measure query patterns and maintain only useful indexes.
 
+Index changes should be tested in staging before production rollout.
+
 ---
 
 # 17. Redis Deployment
@@ -455,9 +477,17 @@ Configured with appropriate memory limits
 Monitored
 ```
 
-Redis must not become the authoritative long-term storage for learning records.
+Redis must not become authoritative long-term storage for:
 
-MongoDB remains the persistent source of truth for application data.
+```text
+Learning Evidence
+Assessment Results
+Mastery
+Enrollment
+User Identity
+```
+
+MongoDB remains the durable source of truth for application data.
 
 ---
 
@@ -469,13 +499,13 @@ Conceptually:
 
 ```text
 API
- ↓
+  ↓
 Queue
- ↓
+  ↓
 Redis
- ↓
+  ↓
 Worker
- ↓
+  ↓
 Database / AI / Notification
 ```
 
@@ -489,7 +519,7 @@ Idempotency
 Graceful shutdown
 ```
 
-as defined in document `10`.
+as defined in `10-background-processing-design.md`.
 
 ---
 
@@ -511,7 +541,7 @@ AI Provider
 
 The rest of the application should not directly depend on provider-specific APIs everywhere.
 
-This makes future provider changes easier.
+The exact LLM provider/model remains an implementation decision and is not hard-coded by this document.
 
 ---
 
@@ -557,11 +587,13 @@ Logging
 
 according to the AI architecture.
 
+AI failure must not unnecessarily prevent the core learning workflow.
+
 ---
 
 # 22. File and Resource Storage
 
-If teachers upload:
+If instructors upload:
 
 ```text
 PDF
@@ -577,15 +609,15 @@ Conceptually:
 
 ```text
 Browser
- ↓
+  ↓
 Backend authorization
- ↓
+  ↓
 Object storage
- ↓
+  ↓
 Metadata in MongoDB
 ```
 
-MongoDB stores metadata such as:
+MongoDB may store metadata such as:
 
 ```text
 file name
@@ -593,9 +625,11 @@ resource type
 storage reference
 course
 lesson
-teacher
+instructor
 createdAt
 ```
+
+The exact storage provider is not finalized here.
 
 ---
 
@@ -617,19 +651,21 @@ Access control
 
 Do not trust only the file extension.
 
+These requirements must remain consistent with `08-security-authentication.md`.
+
 ---
 
 # 24. YouTube Resources
 
-If teacher-created lessons reference YouTube content:
+If instructor-created lessons reference YouTube content:
 
 ```text
 Store approved video metadata/reference
-       ↓
+        ↓
 Frontend embeds or opens approved content
 ```
 
-Do not download/re-host third-party copyrighted videos unless the applicable rights permit it.
+Do not download or re-host third-party copyrighted videos unless the applicable rights permit it.
 
 The platform should respect the provider's embedding and usage rules.
 
@@ -645,7 +681,7 @@ HTTPS
 Valid TLS certificate
 ```
 
-Example architecture:
+Example:
 
 ```text
 app.example.com
@@ -657,7 +693,7 @@ api.example.com
 Backend API
 ```
 
-The exact domain naming can be finalized later.
+The exact domain naming can be finalized during deployment.
 
 ---
 
@@ -679,11 +715,15 @@ Access-Control-Allow-Origin: *
 
 for authenticated application APIs unless there is a deliberate security reason.
 
+Allowed origins should be environment-specific.
+
 ---
 
 # 27. Cookie Configuration
 
-If refresh tokens are stored in cookies, production configuration should consider:
+The approved authentication architecture uses an HttpOnly refresh-token cookie.
+
+Production configuration should consider:
 
 ```text
 HttpOnly
@@ -693,6 +733,8 @@ Appropriate domain/path
 ```
 
 The exact `SameSite` strategy depends on the final frontend/API domain architecture.
+
+Cookie settings must be tested in the actual staging environment because browser cookie behavior depends on the final origin arrangement.
 
 ---
 
@@ -706,7 +748,14 @@ Short-lived access token
 Secure refresh-token strategy
 Token expiration
 Refresh-token validation
-Logout/revocation strategy where implemented
+Refresh-session revocation/rotation
+```
+
+The current architecture uses:
+
+```text
+Access token → short-lived JWT
+Refresh token → JWT + durable RefreshSession
 ```
 
 Never reuse development secrets in production.
@@ -720,22 +769,17 @@ Typical backend configuration categories:
 ```text
 NODE_ENV
 PORT
-
 MONGODB_URI
-
 REDIS_URL
-
 JWT_ACCESS_SECRET
+JWT_ACCESS_EXPIRY
 JWT_REFRESH_SECRET
-
+JWT_REFRESH_EXPIRY
 AI_PROVIDER_KEY
-
 FRONTEND_URL
-
 CORS_ORIGINS
-
-STORAGE credentials
-EMAIL credentials
+Storage credentials
+Email credentials
 ```
 
 Exact names are implementation details and should be finalized in the project environment template.
@@ -788,7 +832,7 @@ or:
 Dedicated secret manager
 ```
 
-Never in:
+Never store secrets in:
 
 ```text
 Git repository
@@ -798,6 +842,8 @@ Logs
 Screenshots
 Documentation
 ```
+
+Secrets should be rotated according to operational requirements, especially after accidental exposure.
 
 ---
 
@@ -827,6 +873,8 @@ Tests
    ↓
 Build
    ↓
+Security checks
+   ↓
 Review
    ↓
 Merge
@@ -846,17 +894,19 @@ At minimum:
 
 ```text
 Install dependencies
- ↓
+  ↓
 Lint
- ↓
+  ↓
 Type check where applicable
- ↓
+  ↓
 Unit tests
- ↓
-Integration tests
- ↓
+  ↓
+Integration/API tests
+  ↓
 Build
 ```
+
+Security checks should be added where practical.
 
 E2E tests should run according to their cost and environment requirements.
 
@@ -882,25 +932,27 @@ Background jobs process
 Health checks pass
 ```
 
+Staging should use non-production credentials and data.
+
 ---
 
 # 35. Production Deployment Strategy
 
-For MVP:
+For the MVP:
 
 ```text
 Build
- ↓
+  ↓
 Deploy
- ↓
+  ↓
 Health check
- ↓
+  ↓
 Smoke test
- ↓
+  ↓
 Observe
 ```
 
-As the platform matures, use safer strategies such as:
+As the platform matures, safer strategies such as:
 
 ```text
 Rolling deployment
@@ -908,7 +960,7 @@ Blue/green
 Canary
 ```
 
-where supported and justified.
+may be introduced where supported and justified.
 
 ---
 
@@ -920,17 +972,19 @@ Before a schema/index change:
 
 ```text
 Understand impact
- ↓
+  ↓
 Test on staging
- ↓
+  ↓
 Backup where appropriate
- ↓
+  ↓
 Apply change
- ↓
+  ↓
 Verify
 ```
 
 Avoid destructive production schema changes without a rollback/data-recovery plan.
+
+Prefer additive and backward-compatible changes where practical.
 
 ---
 
@@ -988,6 +1042,8 @@ Required dependencies
 
 Do not make a basic liveness endpoint unnecessarily dependent on every external service.
 
+The exact route can be finalized during implementation.
+
 ---
 
 # 39. Worker Health
@@ -1002,6 +1058,8 @@ Failure count
 ```
 
 Monitoring should detect when workers stop processing jobs.
+
+Queue depth and stalled jobs should also be monitored.
 
 ---
 
@@ -1033,6 +1091,8 @@ JWT secret
 AI API key
 database password
 ```
+
+Logs should be filtered for unnecessary sensitive learner information.
 
 ---
 
@@ -1075,6 +1135,8 @@ AI usage/cost
 Storage usage
 ```
 
+Monitoring should distinguish operational failures from expected domain-level errors.
+
 ---
 
 # 43. Application Metrics
@@ -1093,7 +1155,7 @@ API request rate
 Error rate
 ```
 
-Learning analytics and operational metrics should remain conceptually separate.
+Learning analytics and operational infrastructure metrics should remain conceptually separate.
 
 ---
 
@@ -1108,6 +1170,7 @@ Completed jobs
 Failed jobs
 Delayed jobs
 Processing latency
+Stalled jobs
 ```
 
 A growing queue can indicate:
@@ -1164,11 +1227,11 @@ Periodically verify:
 
 ```text
 Backup exists
- ↓
+  ↓
 Restore can be performed
- ↓
+  ↓
 Application can connect
- ↓
+  ↓
 Critical data is intact
 ```
 
@@ -1194,6 +1257,17 @@ Security incident
 
 Each critical failure should have a documented response.
 
+The recovery priority should protect:
+
+```text
+User identity
+Learning data
+Assessment results
+Course/content data
+```
+
+before optional enrichment services.
+
 ---
 
 # 49. Redis Failure Strategy
@@ -1204,9 +1278,8 @@ Redis may support:
 Queues
 Caching
 Temporary state
+Rate limiting
 ```
-
-The exact behavior depends on the feature.
 
 Critical persistent learning records must not exist only in Redis.
 
@@ -1216,7 +1289,7 @@ After Redis recovery:
 Queue/worker state
 ```
 
-must follow the background-processing recovery policy.
+must follow the background-processing recovery and reconciliation policy in `10-background-processing-design.md`.
 
 ---
 
@@ -1251,10 +1324,10 @@ Notification failure should generally not roll back successful learning operatio
 Example:
 
 ```text
-Student completes assessment
- ↓
+Learner completes assessment
+  ↓
 Result saved
- ↓
+  ↓
 Notification fails
 ```
 
@@ -1273,17 +1346,17 @@ If a deployment introduces a severe regression:
 
 ```text
 Detect
- ↓
+  ↓
 Stop further rollout
- ↓
+  ↓
 Rollback application version
- ↓
+  ↓
 Verify health
- ↓
+  ↓
 Investigate
- ↓
+  ↓
 Fix
- ↓
+  ↓
 Retest
 ```
 
@@ -1304,7 +1377,7 @@ Build timestamp
 Environment
 ```
 
-This makes production debugging much easier.
+This makes production debugging and rollback much easier.
 
 ---
 
@@ -1324,7 +1397,7 @@ Recovery plan
 
 must exist before production execution.
 
-Prefer additive changes first.
+Prefer additive, backward-compatible changes first.
 
 ---
 
@@ -1359,6 +1432,8 @@ Redis
 → managed scaling
 ```
 
+Scaling decisions should be driven by measured bottlenecks.
+
 ---
 
 # 56. What Should Trigger Scaling?
@@ -1392,11 +1467,13 @@ Because the backend should be stateless where practical:
               /    |    \
              ▼     ▼     ▼
            API   API    API
-             \     |    /
+             \     |     /
               Shared DB/Redis
 ```
 
 This should be possible without rewriting the application architecture.
+
+The MongoDB-backed refresh-session design and shared Redis/BullMQ infrastructure support this model.
 
 ---
 
@@ -1482,7 +1559,7 @@ Before production:
 [ ] Error responses sanitized
 [ ] Logging does not expose secrets
 [ ] Admin routes protected
-[ ] Teacher ownership enforced
+[ ] Instructor ownership enforced
 [ ] Security tests passing
 ```
 
@@ -1497,9 +1574,10 @@ Before production:
 [ ] MongoDB URI configured
 [ ] Redis configured
 [ ] JWT secrets configured
+[ ] JWT expiries configured
 [ ] AI provider configured
 [ ] Storage configured
-[ ] Notification provider configured
+[ ] Notification provider configured where required
 [ ] CORS configured
 [ ] Logging configured
 [ ] Monitoring configured
@@ -1513,29 +1591,31 @@ After deployment:
 
 ```text
 Open website
- ↓
+  ↓
 Login
- ↓
+  ↓
 Check dashboard
- ↓
+  ↓
 Call API
- ↓
-Check database
- ↓
+  ↓
+Check database connectivity
+  ↓
 Open course
- ↓
+  ↓
 Perform safe learning action
- ↓
+  ↓
 Submit test assessment if appropriate
- ↓
+  ↓
 Check background job
- ↓
+  ↓
 Check logs
 ```
 
 Production smoke tests must avoid corrupting real learning data.
 
 Use a dedicated test account where appropriate.
+
+Do not perform destructive tests against production.
 
 ---
 
@@ -1583,7 +1663,7 @@ Do not immediately modify multiple systems without understanding the failure.
 
 # 66. Production Data Protection
 
-Never use production student data casually for:
+Never use production learner data casually for:
 
 ```text
 Local debugging
@@ -1602,11 +1682,13 @@ Authorize
 Audit
 ```
 
+Production data should not be copied into development environments without an approved sanitization process.
+
 ---
 
 # 67. AI Data Privacy
 
-Only send the minimum required student context to the AI provider.
+Only send the minimum required learner context to the AI provider.
 
 Avoid sending:
 
@@ -1614,11 +1696,13 @@ Avoid sending:
 Passwords
 Tokens
 Unnecessary personal information
-Private teacher information
-Unrelated student records
+Private instructor information
+Unrelated learner records
 ```
 
-AI prompts should use purpose-specific context.
+AI prompts should use purpose-specific context and approved learning content where grounding is required.
+
+This remains consistent with `09-ai-personalization-engine.md` and `08-security-authentication.md`.
 
 ---
 
@@ -1628,17 +1712,19 @@ Whenever deployment architecture changes:
 
 ```text
 Change deployment
- ↓
+  ↓
 Update 14
- ↓
+  ↓
 Update 13
- ↓
+  ↓
 Update environment documentation
- ↓
+  ↓
 Update CI/CD configuration
 ```
 
 Do not allow production infrastructure to drift away from documentation.
+
+`13-current-progress.md` is the living implementation/progress document; this deployment document remains the architectural reference.
 
 ---
 
@@ -1678,33 +1764,65 @@ Deployment is considered ready when:
 
 ```text
 Build succeeds
+
 +
+
 Tests pass
+
 +
+
 Environment variables documented
+
 +
+
 Secrets securely configured
+
 +
+
 Frontend deployed
+
 +
+
 Backend deployed
+
 +
+
 Worker deployed
+
 +
+
 Database connected
+
 +
+
 Redis connected
+
 +
+
 Health checks pass
+
 +
+
 Monitoring works
+
 +
+
 Logs work
+
 +
+
 Backups configured
+
 +
+
+Restore/recovery path understood
+
++
+
 Rollback strategy exists
+
 +
+
 Smoke tests pass
 ```
 
@@ -1722,26 +1840,23 @@ The recommended first production architecture is intentionally simple:
                            │
               ┌────────────┴────────────┐
               ▼                         ▼
-       React Frontend              Node/Express API
-                                         │
-                           ┌─────────────┼─────────────┐
-                           ▼             ▼             ▼
-                       MongoDB        Redis        AI Provider
-                                         │
-                                         ▼
-                                      BullMQ
-                                         │
-                                         ▼
-                                      Worker
-                                         │
-                           ┌─────────────┼─────────────┐
-                           ▼             ▼             ▼
-                        MongoDB          AI       Notifications
-```
+       React Frontend             Node/Express API
+                                          │
+                           ┌──────────────┼──────────────┐
+                           ▼              ▼              ▼
+                       MongoDB         Redis        AI Provider
+                                          │
+                                          ▼
+                                        BullMQ
+                                          │
+                                          ▼
+                                        Worker
+                                          │
+                           ┌──────────────┼──────────────┐
+                           ▼              ▼              ▼
+                        MongoDB           AI       Notifications
 
 Optional:
-
-```text
 Object Storage
 Monitoring
 Error Tracking
@@ -1756,13 +1871,13 @@ The architecture can evolve:
 
 ```text
 MVP
- ↓
+  ↓
 Measure
- ↓
+  ↓
 Optimize
- ↓
+  ↓
 Scale
- ↓
+  ↓
 Separate bottlenecks
 ```
 
@@ -1859,30 +1974,30 @@ Next Iteration
                            USERS
                              │
                              ▼
-                    ┌─────────────────┐
-                    │  HTTPS / DOMAIN │
-                    └────────┬────────┘
+                      HTTPS / DOMAIN
                              │
-                   ┌─────────┴─────────┐
-                   ▼                   ▼
-             React Frontend       Express API
-                                       │
-             ┌─────────────────────────┼──────────────────────────┐
-             │                         │                          │
-             ▼                         ▼                          ▼
-          MongoDB                   Redis                     AI Service
-             │                         │                          │
-             │                         ▼                          ▼
-             │                     BullMQ                    AI Provider
-             │                         │
-             │                         ▼
-             │                       Worker
-             │                         │
-             └─────────────────────────┼──────────────────────────┐
-                                       │                          │
-                                       ▼                          ▼
-                                  Notifications              Analytics
+                    ┌────────┴────────┐
+                    ▼                 ▼
+              React Frontend      Express API
+                                      │
+           ┌──────────────────────────┼──────────────────────────┐
+           │                          │                          │
+           ▼                          ▼                          ▼
+        MongoDB                     Redis                    AI Service
+           │                          │                          │
+           │                          ▼                          ▼
+           │                        BullMQ                 AI Provider
+           │                          │
+           │                          ▼
+           │                        Worker
+           │                          │
+           └──────────────────────────┼──────────────────────────┐
+                                      │                          │
+                                      ▼                          ▼
+                                Notifications              Analytics
 ```
+
+This remains one modular application/domain architecture with separate runtime processes for API and workers.
 
 ---
 
@@ -1910,7 +2025,7 @@ AI Assistance
 
 # 77. Final Documentation Set
 
-After this document, the planned documentation set is:
+The planned documentation set is:
 
 ```text
 docs/
@@ -1922,13 +2037,14 @@ docs/
 ├── 05-system-architecture.md
 ├── 06-database-design.md
 ├── 07-api-design.md
-├── 08-security-authentication-design.md
-├── 09-ai-personalization-engine-design.md
+├── 08-security-authentication.md
+├── 09-ai-personalization-engine.md
 ├── 10-background-processing-design.md
-├── 11-frontend-architecture-ux-design.md
+├── 11-frontend-architecture-ux.md
 ├── 12-testing-strategy.md
 ├── 13-current-progress.md
-└── 14-deployment.md
+├── 14-deployment.md
+└── 15-future-implementation.md
 ```
 
 These documents form the project's initial planning foundation.
@@ -1937,7 +2053,7 @@ These documents form the project's initial planning foundation.
 
 # 78. Transition to Implementation
 
-After `14` is reviewed and approved:
+After the documentation set is reviewed and approved:
 
 ```text
 PLANNING PHASE

@@ -4,7 +4,7 @@
 
 This document defines the asynchronous and background-processing architecture of the AI Based Personalized Learning Platform.
 
-The platform contains operations that should not block a user's HTTP request, including:
+The platform contains operations that should not unnecessarily block user-facing HTTP requests, including:
 
 - personalization recalculation
 - recommendation generation
@@ -19,39 +19,43 @@ The platform contains operations that should not block a user's HTTP request, in
 
 The goal is to keep the application responsive while making background work reliable, observable, retryable, and scalable.
 
+This document defines background-processing architecture and behavior. Detailed API definitions belong to `07-api-design.md`; security requirements belong to `08-security-authentication.md`; testing requirements belong to `12-testing-strategy.md`; deferred infrastructure decisions belong to `15-future-implementation.md`.
+
 ---
 
-## 2. Core Principle
+# 2. Core Principle
 
-> **A user-facing request should perform only the work required to return a correct response; expensive, slow, retryable, or independent work should be processed asynchronously.**
+> **A user-facing request should perform only the work required to return a correct authoritative response; expensive, slow, retryable, external-service-dependent, or independent work should be processed asynchronously.**
 
 Example:
 
 ```text
-Student submits quiz
-       ↓
+Student submits assessment
+        ↓
 API validates + scores attempt
-       ↓
-Save authoritative result
-       ↓
+        ↓
+Persist authoritative result
+        ↓
+Persist learning evidence
+        ↓
+Queue downstream work
+        ↓
 Return response
-       ↓
-Publish background job
-       ↓
-Update mastery
-       ↓
-Generate recommendation
-       ↓
-Generate AI explanation if required
+        ↓
+Workers update personalization
+        ↓
+Optional AI enhancement
+        ↓
+Update analytics / notifications
 ```
 
-The student should not have to wait for every downstream operation.
+The learner should not have to wait for every downstream operation.
 
 ---
 
-## 3. Recommended Technology
+# 3. Recommended MVP Technology
 
-The MVP architecture uses:
+The approved background-processing foundation is:
 
 ```text
 Node.js
@@ -75,23 +79,25 @@ Express API
            │
      ┌─────┴─────┐
      ▼           ▼
- Workers       Scheduled Jobs
+ Workers    Scheduled Jobs
 ```
 
 Redis provides the infrastructure used by BullMQ for queue state and coordination.
 
+MongoDB remains the durable source of truth for application data.
+
 ---
 
-## 4. Redis and BullMQ Responsibilities
+# 4. Redis and BullMQ Responsibilities
 
 Redis may support:
 
-- queue infrastructure
+- BullMQ queue infrastructure
 - temporary/cache data
 - rate limiting
 - short-lived processing state
 
-BullMQ provides:
+BullMQ provides the queue/job lifecycle:
 
 ```text
 Create Job
@@ -107,47 +113,50 @@ Complete / Retry / Fail
 
 Redis must not become the authoritative source of:
 
-- assessment results
-- learning evidence
-- mastery
-- enrollment
-- course ownership
-- user identity
+```text
+Assessment Results
+Learning Evidence
+Mastery
+Enrollment
+Course Ownership
+User Identity
+```
 
-MongoDB remains the durable source of truth for application data.
+Those remain durable application state in MongoDB.
 
 ---
 
-## 5. API and Worker Separation
+# 5. API and Worker Separation
 
 The API process primarily handles:
 
 ```text
 HTTP requests
-validation
-authorization
-synchronous business transactions
-response formatting
+Validation
+Authorization
+Synchronous business transactions
+Response formatting
 ```
 
 Workers handle:
 
 ```text
-long-running jobs
-retryable jobs
+Long-running jobs
+Retryable jobs
 AI processing
-large parsing
-notifications
-analytics aggregation
+Large parsing
+Notifications
+Analytics aggregation
+Other expensive background work
 ```
 
-This separation improves reliability and scaling.
+The API and workers remain part of the same modular-monolith application architecture. They are separate execution processes, not separate microservices.
 
 ---
 
-## 6. Synchronous vs Asynchronous Work
+# 6. Synchronous vs Asynchronous Work
 
-### Synchronous
+## 6.1 Synchronous
 
 Use synchronous processing when the request cannot be meaningfully completed without the result and the operation is reasonably fast.
 
@@ -162,9 +171,16 @@ Start assessment
 Submit assessment
 ```
 
-### Asynchronous
+## 6.2 Asynchronous
 
-Use background processing when work is slow, retryable, independent after the core transaction, external-service dependent, or resource intensive.
+Use background processing when work is:
+
+- slow
+- retryable
+- independent after the core transaction
+- external-service dependent
+- resource intensive
+- suitable for eventual consistency
 
 Examples:
 
@@ -176,11 +192,14 @@ Parse large PDF
 Parse Excel question bank
 Generate analytics aggregate
 Process uploaded resource
+Scheduled maintenance
 ```
+
+The distinction is based on transaction requirements, not simply on whether an operation is technically capable of running in the background.
 
 ---
 
-## 7. Critical Transaction Principle
+# 7. Critical Transaction Principle
 
 Authoritative data must be persisted before downstream background work is relied upon.
 
@@ -189,22 +208,26 @@ Preferred:
 ```text
 Submit Assessment
        ↓
-Validate attempt
+Validate Attempt
        ↓
-Calculate score
+Calculate Score
        ↓
-Persist result
+Persist Result
        ↓
-Commit successful transaction
+Persist Learning Evidence
        ↓
-Queue personalization job
+Queue Downstream Work
+       ↓
+Return Response
 ```
 
-Never make the student's authoritative result depend on a worker successfully running.
+The student's authoritative result must never depend on a worker successfully running.
+
+If queue publishing fails after the authoritative transaction succeeds, the system should have a recovery/reconciliation path rather than undoing the student's result.
 
 ---
 
-## 8. Background Job Categories
+# 8. Background Job Categories
 
 Initial logical queues:
 
@@ -214,32 +237,35 @@ personalization
 ai
 notifications
 imports
-analytics
-maintenance
 ```
 
-The MVP may combine low-volume categories when practical and split them later as workload grows.
+Analytics and maintenance may initially share an appropriate low-priority queue when workload is small.
+
+Queues should be split further only when actual workload, isolation, reliability, or scaling requirements justify it.
 
 ---
 
-## 9. Learning Jobs
+# 9. Learning Jobs
 
-Potential jobs:
+Potential jobs include:
 
 ```text
 process-learning-event
+update-learning-state
 update-course-progress
 update-topic-mastery
 finalize-assessment-state
 ```
 
-These jobs transform learning evidence into updated learning state.
+These jobs transform persisted learning evidence into updated derived learning state.
+
+Authoritative assessment scoring remains part of the synchronous assessment workflow.
 
 ---
 
-## 10. Personalization Jobs
+# 10. Personalization Jobs
 
-Potential jobs:
+Potential jobs include:
 
 ```text
 recalculate-personalization
@@ -248,13 +274,15 @@ refresh-next-best-action
 evaluate-intervention
 ```
 
-These jobs should be driven by learning evidence.
+These jobs should be driven by learning evidence and the current learner state.
+
+They should follow the personalization rules defined in `09-ai-personalization-engine.md`.
 
 ---
 
-## 11. AI Jobs
+# 11. AI Jobs
 
-Potential jobs:
+Potential jobs include:
 
 ```text
 generate-personalized-explanation
@@ -265,11 +293,13 @@ generate-recommendation-explanation
 
 AI work should normally be asynchronous because external providers may be slow or temporarily unavailable.
 
+AI workers must not become a dependency for authoritative learning transactions.
+
 ---
 
-## 12. Notification Jobs
+# 12. Notification Jobs
 
-Potential jobs:
+Potential jobs include:
 
 ```text
 send-course-notification
@@ -280,11 +310,13 @@ send-teacher-alert
 
 Notification failure should generally not invalidate the learning transaction.
 
+Notifications should be treated as downstream side effects.
+
 ---
 
-## 13. Import Jobs
+# 13. Import Jobs
 
-Potential jobs:
+Potential jobs include:
 
 ```text
 parse-question-file
@@ -295,11 +327,13 @@ process-resource-file
 
 Large files should not be parsed inside normal HTTP requests when processing may take significant time.
 
+The import workflow should validate the file, process it asynchronously, and provide the frontend with a job/import status.
+
 ---
 
-## 14. Analytics and Maintenance Jobs
+# 14. Analytics and Maintenance Jobs
 
-Analytics:
+Analytics jobs may include:
 
 ```text
 update-course-analytics
@@ -308,7 +342,7 @@ aggregate-topic-performance
 aggregate-teacher-course-metrics
 ```
 
-Maintenance:
+Maintenance jobs may include:
 
 ```text
 cleanup-expired-data
@@ -317,11 +351,11 @@ remove-failed-temporary-files
 reconcile-stale-state
 ```
 
-These can usually tolerate eventual consistency.
+These operations can usually tolerate eventual consistency.
 
 ---
 
-## 15. Job Payload Design
+# 15. Job Payload Design
 
 Job payloads should be:
 
@@ -342,13 +376,15 @@ Prefer:
 }
 ```
 
-Avoid sending entire MongoDB documents or the entire learner history.
+Avoid sending entire MongoDB documents or entire learner histories.
 
-Workers should retrieve current authoritative data.
+Workers should load current authoritative data from the appropriate application services/repositories.
+
+Payloads should not contain secrets, raw authentication tokens, or unnecessary personal information.
 
 ---
 
-## 16. Job Lifecycle
+# 16. Job Lifecycle
 
 Conceptually:
 
@@ -379,14 +415,14 @@ After retries are exhausted:
 ```text
 FAILED
    ↓
-FAILED-JOB REVIEW / DEAD-LETTER HANDLING
+Failed-job review / recovery handling
 ```
 
 Exact BullMQ states and APIs must follow the installed version's official documentation.
 
 ---
 
-## 17. Idempotency
+# 17. Idempotency
 
 A job may execute more than once because of:
 
@@ -417,9 +453,11 @@ Recalculate mastery
 Persist calculated state
 ```
 
+The preferred design is to derive current state from durable evidence rather than applying irreversible increments repeatedly.
+
 ---
 
-## 18. Event IDs and Deduplication
+# 18. Event IDs and Deduplication
 
 Learning events should have unique identifiers.
 
@@ -431,7 +469,7 @@ EVT_123
 
 A worker can use the identifier to prevent incorrect duplicate processing.
 
-For bursts of events, some recalculation jobs may be coalesced:
+For bursts of events, recalculation jobs may sometimes be coalesced:
 
 ```text
 5 learning events
@@ -439,11 +477,13 @@ For bursts of events, some recalculation jobs may be coalesced:
 1 latest-state recalculation
 ```
 
-only when correctness is preserved.
+This is acceptable only when correctness is preserved and the final derived state reflects all relevant evidence.
+
+Job deduplication should be used where practical, but correctness must not depend solely on queue-level deduplication.
 
 ---
 
-## 19. Retry Strategy
+# 19. Retry Strategy
 
 Retry failures that may be temporary:
 
@@ -461,15 +501,16 @@ Invalid input
 Invalid file
 Unauthorized operation
 Broken business rule
+Malformed domain data
 ```
 
 Retries should have bounded attempts and appropriate backoff.
 
 ---
 
-## 20. Exponential Backoff
+# 20. Exponential Backoff
 
-Temporary external failures should generally use increasing delays:
+Temporary failures should generally use increasing delays:
 
 ```text
 Attempt 1 → short delay
@@ -477,11 +518,11 @@ Attempt 2 → longer delay
 Attempt 3 → longer delay
 ```
 
-Exact BullMQ retry/backoff configuration should follow current official documentation.
+Exact BullMQ retry and backoff configuration will be finalized during implementation according to the installed version's official documentation.
 
 ---
 
-## 21. Failed Jobs
+# 21. Failed Jobs
 
 Failed jobs must remain observable.
 
@@ -492,29 +533,32 @@ Inspect failure
 Understand error
 Retry manually when safe
 Remove permanently invalid job
+Reconcile missing downstream state when possible
 ```
 
-Do not silently discard failed jobs.
+Failed jobs must not be silently discarded.
 
 ---
 
-## 22. Worker Failure and Recovery
+# 22. Worker Failure and Recovery
 
 If a worker crashes:
 
 ```text
 Worker crashes
       ↓
-Job remains recoverable
+Job remains recoverable according to queue state
       ↓
 Another worker can process it
 ```
 
 Handlers must remain idempotent because recovery can result in reprocessing.
 
+The application should not assume that a job executes exactly once.
+
 ---
 
-## 23. Graceful Shutdown
+# 23. Graceful Shutdown
 
 Workers should:
 
@@ -523,7 +567,7 @@ Receive shutdown signal
        ↓
 Stop accepting new work
        ↓
-Finish safe active jobs
+Finish or safely release active jobs
        ↓
 Close worker
        ↓
@@ -536,7 +580,7 @@ Exact implementation should follow Node.js and BullMQ lifecycle guidance.
 
 ---
 
-## 24. Worker Concurrency
+# 24. Worker Concurrency
 
 Workers may process multiple jobs concurrently.
 
@@ -544,21 +588,22 @@ Concurrency must consider:
 
 ```text
 CPU
-memory
-database load
-external API limits
+Memory
+Database load
+External API limits
 AI provider limits
+Queue priority
 ```
 
 More concurrency is not automatically better.
 
-AI workers may require separate concurrency limits.
+AI workers may require lower or independently configured concurrency because external provider limits and latency can dominate processing.
 
 ---
 
-## 25. AI Worker Isolation
+# 25. AI Worker Isolation
 
-Recommended:
+Recommended logical separation:
 
 ```text
 Learning Worker
@@ -572,14 +617,21 @@ External AI calls
 
 This prevents slow AI requests from blocking core learning processing.
 
-AI workers should respect provider rate limits, timeouts, retries, and fallback behavior.
+AI workers should respect:
+
+```text
+Provider rate limits
+Timeouts
+Retries
+Fallback behavior
+Output validation
+```
 
 ---
 
-## 26. Personalization Processing Flow
+# 26. Personalization Processing Flow
 
-The authoritative assessment result and learning evidence must be
-persisted before downstream personalization work is queued.
+The authoritative assessment result and learning evidence must be persisted before downstream personalization work is queued.
 
 ```text
 Assessment Submitted
@@ -592,7 +644,7 @@ Persist Assessment Result
        ↓
 Persist Learning Evidence
        ↓
-Queue Personalization Job
+Queue Personalization Work
        ↓
 Return Assessment Response
        ↓
@@ -602,18 +654,22 @@ Load Current Learning State
        ↓
 Recalculate Mastery
        ↓
-Detect Weakness
+Detect Weakness / Strength
        ↓
 Generate Candidate Actions
+       ↓
+Select Next Best Action
        ↓
 Persist / Update Recommendation
        ↓
 Optional AI Enhancement
 ```
 
+Critical learning state that must be immediately authoritative should be updated synchronously where practical, while expensive enrichment can remain asynchronous.
+
 ---
 
-## 27. AI Enhancement Flow
+# 27. AI Enhancement Flow
 
 ```text
 Recommendation Candidate
@@ -622,73 +678,79 @@ AI enhancement required?
        ↓
 Retrieve approved context
        ↓
-AI worker
+AI Worker
        ↓
 Validate structured output
        ↓
 Persist enhancement
+       ↓
+Serve enhanced recommendation
 ```
 
 AI enhances a valid recommendation; it does not directly modify authoritative learning state.
 
+If AI fails, the deterministic recommendation remains usable.
+
 ---
 
-## 28. Assessment Submission
+# 28. Assessment Submission
 
-Synchronous:
+The assessment request should perform the authoritative work synchronously:
 
 ```text
 Authenticate
-   ↓
+    ↓
 Authorize
-   ↓
-Validate attempt
-   ↓
-Validate submission
-   ↓
-Score
-   ↓
-Persist result
-   ↓
-Create learning evidence
-   ↓
-Queue downstream jobs
-   ↓
-Return response
+    ↓
+Validate Attempt
+    ↓
+Validate Submission
+    ↓
+Calculate Score
+    ↓
+Persist Result
+    ↓
+Persist Learning Evidence
+    ↓
+Queue Downstream Jobs
+    ↓
+Return Response
 ```
 
-Asynchronous:
+Background work may then:
 
 ```text
 Update mastery
-Update weaknesses
+Update weaknesses/strengths
 Generate recommendation
 Generate AI explanation
 Update analytics
 Send notification if required
 ```
 
+Duplicate assessment submissions must be controlled by the assessment/attempt domain and not delegated to background jobs.
+
 ---
 
-## 29. Enrollment Processing
+# 29. Enrollment Processing
 
-Synchronous:
+Enrollment is primarily synchronous:
 
 ```text
-Validate student
-   ↓
+Validate learner
+    ↓
 Validate course
-   ↓
+    ↓
 Check eligibility
-   ↓
+    ↓
 Check prerequisites
-   ↓
+    ↓
 Create enrollment
-   ↓
+    ↓
 Return enrollment
 ```
 
-Asynchronous:
+Downstream work may include:
 
 ```text
 Teacher notification
@@ -696,14 +758,16 @@ Analytics update
 Recommendation refresh
 ```
 
-Enrollment should not fail because a notification provider is unavailable.
+Enrollment should not fail because a notification provider or optional analytics worker is unavailable.
 
 ---
 
-## 30. Question Import Processing
+# 30. Question Import Processing
+
+The recommended workflow is:
 
 ```text
-Teacher uploads Excel/PDF
+Instructor uploads Excel/PDF
         ↓
 Authenticate + authorize
         ↓
@@ -711,9 +775,9 @@ Validate file type/size
         ↓
 Store safely
         ↓
-Create import job
+Create import record/job
         ↓
-Return job ID
+Return job/import identifier
         ↓
 Worker parses
         ↓
@@ -721,32 +785,46 @@ Validate rows
         ↓
 Normalize data
         ↓
-Generate preview
+Generate preview/result
         ↓
-Teacher reviews
+Instructor reviews
         ↓
-Teacher approves
+Instructor approves
         ↓
 Persist questions
 ```
 
-Imported questions should not automatically become live assessment content without validation and teacher approval.
+Imported questions should not automatically become live assessment content without validation and instructor approval.
+
+File-processing security requirements remain governed by `08-security-authentication.md`.
 
 ---
 
-## 31. Job Status for Long Operations
+# 31. Job Status for Long Operations
 
-For long-running work:
+For long-running work, the API should return an identifier rather than hold the HTTP connection open.
+
+Conceptually:
+
+```http
+POST /imports
+```
+
+returns:
 
 ```text
-POST /imports
-      ↓
-jobId
-      ↓
+jobId / importId
+```
+
+Then:
+
+```http
 GET /imports/:jobId
 ```
 
-Possible status values:
+can provide status.
+
+Possible application-level statuses:
 
 ```text
 QUEUED
@@ -755,29 +833,41 @@ COMPLETED
 FAILED
 ```
 
-This is preferable to holding an HTTP connection open.
+Exact API contracts belong to `07-api-design.md`.
 
 ---
 
-## 32. Outbox Reliability Problem
+# 32. Outbox Reliability Problem
 
-There is a possible failure:
+There is a possible failure window:
 
 ```text
 Database transaction succeeds
-      ↓
+       ↓
 Application crashes
-      ↓
+       ↓
 Queue job was never created
 ```
 
-For MVP, controlled queue publishing plus reconciliation may be sufficient.
+Therefore, queue publication must have a recovery strategy.
 
-For higher reliability, an outbox pattern can be introduced.
+For the MVP:
+
+```text
+Reliable queue publishing
++
+Reconciliation
+```
+
+may be sufficient.
+
+For higher reliability, an outbox pattern can be introduced later.
 
 ---
 
-## 33. Outbox Pattern
+# 33. Outbox Pattern
+
+Conceptually:
 
 ```text
 Database Transaction
@@ -786,7 +876,7 @@ Database Transaction
           ↓
 Transaction commits
           ↓
-Outbox publisher
+Outbox Publisher
           ↓
 Queue
           ↓
@@ -795,19 +885,11 @@ Worker
 
 This reduces the chance of losing an event between database persistence and queue publication.
 
-Recommended approach:
-
-```text
-MVP:
-Simple reliable queue publishing + reconciliation
-
-Later:
-Outbox pattern when event reliability requirements justify it
-```
+The outbox pattern is a future reliability enhancement unless implementation requirements justify introducing it earlier.
 
 ---
 
-## 34. Reconciliation
+# 34. Reconciliation
 
 A reconciliation job can detect inconsistent downstream state.
 
@@ -817,50 +899,46 @@ Example:
 Assessment result exists
 BUT
 personalization update missing
-        ↓
+       ↓
 Requeue processing
 ```
 
-This provides an additional reliability mechanism.
+Other examples may include:
+
+```text
+Persisted evidence without derived-state update
+Completed import without expected processing result
+Missing analytics update
+Stale recommendation after important learning evidence
+```
+
+Reconciliation should be safe and idempotent.
 
 ---
 
-## 35. Eventual Consistency
+# 35. Eventual Consistency
 
 Background processing creates short periods of eventual consistency.
 
 Example:
 
 ```text
-Student submits assessment
-      ↓
+Learner submits assessment
+       ↓
 Score immediately visible
-      ↓
+       ↓
 Mastery recalculation
-      ↓
-Recommendation updates shortly afterward
+       ↓
+Recommendation update
 ```
 
-The frontend should communicate processing state without pretending that an unavailable recommendation already exists.
+The frontend should communicate processing state when appropriate without pretending that a recommendation is already available.
+
+Authoritative assessment results should not be hidden behind eventual-consistency delays.
 
 ---
 
-## 36. Background Processing and Redis
-
-Redis can support:
-
-```text
-BullMQ
-Rate limiting
-Caching
-Temporary processing state
-```
-
-Redis should not replace MongoDB as the durable source of learning state.
-
----
-
-## 37. Background Processing and AI Data Security
+# 36. Background Processing and AI Data Security
 
 AI jobs should preferably contain references:
 
@@ -888,11 +966,11 @@ Construct controlled context
 Send to AI
 ```
 
-AI output must be parsed and validated before persistence.
+AI output must be parsed and validated before persistence or presentation.
 
 ---
 
-## 38. Worker Service Boundaries
+# 37. Worker Service Boundaries
 
 Workers should invoke existing application/domain services rather than duplicating business logic.
 
@@ -901,7 +979,7 @@ Preferred:
 ```text
 Controller
    ↓
-Application/Domain Service
+Application / Domain Service
 ```
 
 and:
@@ -909,19 +987,22 @@ and:
 ```text
 Worker
    ↓
-Same Application/Domain Service
+Same Application / Domain Service
 ```
 
-This keeps business rules consistent.
+This keeps business rules consistent across synchronous and asynchronous flows.
+
+Workers should coordinate jobs, not become an alternative location for scattered business logic.
 
 ---
 
-## 39. Suggested Project Organization
+# 38. Suggested Project Organization
 
-The exact modular-monolith structure will be finalized during implementation, but conceptually:
+The exact project structure will be finalized during implementation, but a logical organization may look like:
 
 ```text
 src/
+
 ├── modules/
 │   ├── learning/
 │   ├── personalization/
@@ -934,72 +1015,85 @@ src/
 │   └── producers/
 │
 ├── queues/
-│   ├── learning.queue
-│   ├── personalization.queue
-│   ├── ai.queue
-│   ├── notifications.queue
-│   └── imports.queue
+│   ├── learning.queue.js
+│   ├── personalization.queue.js
+│   ├── ai.queue.js
+│   ├── notifications.queue.js
+│   └── imports.queue.js
 │
 └── workers/
-    ├── learning.worker
-    ├── personalization.worker
-    ├── ai.worker
-    ├── notifications.worker
-    └── imports.worker
+    ├── learning.worker.js
+    ├── personalization.worker.js
+    ├── ai.worker.js
+    ├── notifications.worker.js
+    └── imports.worker.js
 ```
 
 This is a logical guide, not a requirement to create every file immediately.
 
+The existing modular-monolith conventions remain the source of truth for actual module placement.
+
 ---
 
-## 40. Modular Monolith Compatibility
+# 39. Modular Monolith Compatibility
 
 Background workers do not require microservices.
 
 The initial architecture remains a modular monolith:
 
 ```text
-                    APPLICATION
-                         │
-       ┌─────────────────┼─────────────────┐
-       │                 │                 │
-   Auth Module      Learning Module   Course Module
-       │                 │                 │
-       └─────────────────┼─────────────────┘
-                         │
-                    Queue Layer
-                         │
-               ┌─────────┼─────────┐
-               ▼         ▼         ▼
-             Worker    Worker    Worker
+                 APPLICATION
+                      │
+       ┌──────────────┼──────────────┐
+       │              │              │
+   Auth Module   Learning Module  Course Module
+       │              │              │
+       └──────────────┼──────────────┘
+                      │
+                 Queue Layer
+                      │
+            ┌─────────┼─────────┐
+            ▼         ▼         ▼
+          Worker    Worker    Worker
 ```
 
-Microservices can be considered only when actual scale or organizational requirements justify them.
+Workers may run as separate Node.js processes while sharing the same application modules and infrastructure.
+
+Microservices should be considered only when actual scale or organizational requirements justify them.
 
 ---
 
-## 41. Queue Isolation and Scaling
+# 40. Queue Isolation and Scaling
 
-API and workers can scale independently:
+API and workers can scale independently.
+
+Conceptually:
 
 ```text
-API:
-3 instances
-
-AI workers:
-5 instances
-
-Import workers:
-2 instances
+API instances
+      ↓
+Redis / BullMQ
+      ↓
+Worker pools
 ```
 
-One overloaded queue should not prevent critical learning operations from running.
+For example:
 
-Critical queues should eventually be isolated operationally if workload requires it.
+```text
+API workers
+AI workers
+Import workers
+```
+
+may have different concurrency requirements.
+
+One overloaded queue should not unnecessarily prevent critical learning work from running.
+
+Dedicated queue/worker pools can be introduced when real workload requires stronger isolation.
 
 ---
 
-## 42. Critical vs Non-Critical Jobs
+# 41. Critical vs Non-Critical Jobs
 
 ### Critical
 
@@ -1023,36 +1117,38 @@ Analytics aggregation
 Notifications
 ```
 
-This classification helps allocate worker resources.
+This classification helps prioritize worker resources and failure handling.
+
+A critical background job may be required for eventual consistency of derived learning state, but the original authoritative transaction must still be durable independently.
 
 ---
 
-## 43. Observability
+# 42. Observability
 
 Background processing should record:
 
 ```text
-job name
-job ID
-queue
-attempt number
-duration
-status
-error
-created time
-started time
-completed time
+Job name
+Job ID
+Queue
+Attempt number
+Duration
+Status
+Error
+Created time
+Started time
+Completed time
 ```
 
-Use correlation IDs to connect:
+Correlation IDs should connect:
 
 ```text
 HTTP Request
-   ↓
-Assessment
-   ↓
+    ↓
+Assessment / Domain Operation
+    ↓
 Learning Event
-   ↓
+    ↓
 Background Job
 ```
 
@@ -1065,13 +1161,23 @@ EVT_789
 JOB_111
 ```
 
-Never log passwords, tokens, API keys, or unnecessary sensitive learner information.
+Never log:
+
+```text
+Passwords
+Authentication tokens
+API keys
+Secrets
+Unnecessary sensitive learner information
+```
+
+Logs should support debugging without becoming a source of sensitive-data leakage.
 
 ---
 
-## 44. Metrics
+# 43. Metrics
 
-Useful metrics include:
+Useful background-processing metrics include:
 
 ```text
 Queue depth
@@ -1086,31 +1192,33 @@ Import processing time
 Stalled jobs
 ```
 
-These help identify bottlenecks.
+These metrics help identify bottlenecks and reliability problems.
 
 ---
 
-## 45. Security
+# 44. Security
 
-Workers must still validate job payloads.
+Workers must validate job payloads even when jobs originate from trusted application code.
 
 Protect:
 
 ```text
 Redis
 MongoDB
-temporary files
+Temporary files
 AI credentials
-external service credentials
+External service credentials
 ```
 
 Workers should use least-privilege access where practical.
 
+Background workers are part of the application security boundary and must not be treated as inherently trusted simply because they are internal processes.
+
 ---
 
-## 46. Anti-Patterns
+# 45. Anti-Patterns
 
-### Unmanaged background promises
+## 45.1 Unmanaged Background Promises
 
 Avoid:
 
@@ -1122,34 +1230,43 @@ app.post("/assessment", async (req, res) => {
 });
 ```
 
-There is no durable retry, observability, or reliable recovery.
+The unawaited operation has no durable retry, observability, or reliable recovery mechanism.
 
-### Giant worker
+Use a queue instead.
+
+## 45.2 Giant Worker
 
 Do not put all business logic directly into workers.
 
-### AI for authoritative decisions
+Workers should call application/domain services.
+
+## 45.3 AI for Authoritative Decisions
 
 Do not use AI for:
 
 ```text
-score
-unlock
-authorization
-eligibility
+Score
+Unlock
+Authorization
+Eligibility
+Official mastery state
 ```
 
-### Infinite retries
+## 45.4 Infinite Retries
 
 Every retryable job needs bounded attempts.
 
-### Giant generic queue
+## 45.5 Giant Generic Queue
 
 Avoid turning one `background` queue into an unstructured collection of unrelated jobs.
 
+## 45.6 Large Job Payloads
+
+Do not serialize entire database documents into queue messages.
+
 ---
 
-## 47. Local Development
+# 46. Local Development
 
 Local development should support:
 
@@ -1174,7 +1291,7 @@ Exact scripts will be defined during implementation.
 
 ---
 
-## 48. Production Process Model
+# 47. Production Process Model
 
 Production may run API and workers separately:
 
@@ -1183,7 +1300,7 @@ Production may run API and workers separately:
                     │
              ┌──────┴──────┐
              ▼             ▼
-          API #1         API #2
+          API #1          API #2
              │             │
              └──────┬──────┘
                     │
@@ -1194,18 +1311,18 @@ Production may run API and workers separately:
        Worker #1 Worker #2 Worker #3
 ```
 
-This allows independent scaling.
+This allows API and worker capacity to scale independently.
 
 ---
 
-## 49. Graceful Deployment
+# 48. Graceful Deployment
 
 Deployment should account for active workers:
 
 ```text
 Stop accepting new work
        ↓
-Finish/recover active jobs
+Finish or safely release active jobs
        ↓
 Deploy
        ↓
@@ -1214,11 +1331,11 @@ Restart workers
 Resume processing
 ```
 
-Queue-backed architecture makes this safer than unmanaged promises.
+Queue-backed processing is safer than unmanaged background promises because unfinished work remains represented by durable queue state.
 
 ---
 
-## 50. Testing Background Jobs
+# 49. Testing Background Jobs
 
 Each worker should be testable independently.
 
@@ -1226,11 +1343,11 @@ Test:
 
 ```text
 Valid job
-   ↓
+    ↓
 Expected result
 ```
 
-Also:
+Also test:
 
 ```text
 Invalid payload
@@ -1242,11 +1359,20 @@ Timeout
 Worker restart
 ```
 
-Idempotency should be explicitly tested.
+Idempotency must be explicitly tested.
+
+Testing should also verify that:
+
+```text
+Authoritative transaction succeeds
+even when downstream worker processing fails
+```
+
+The detailed testing strategy belongs to `12-testing-strategy.md`.
 
 ---
 
-## 51. MVP Queue Strategy
+# 50. MVP Queue Strategy
 
 Start with a small number of queues:
 
@@ -1260,11 +1386,11 @@ imports
 
 Analytics and maintenance may initially share an appropriate low-priority queue if operationally simpler.
 
-Split queues further only when real workload requires it.
+Split queues further only when real workload, priority, isolation, or reliability requirements justify it.
 
 ---
 
-## 52. MVP Background Jobs
+# 51. MVP Background Jobs
 
 Initial important jobs:
 
@@ -1280,11 +1406,13 @@ update-course-analytics
 
 Not every future background job needs to exist on day one.
 
+Assessment scoring itself remains synchronous and authoritative.
+
 ---
 
-## 53. Failure Policies
+# 52. Failure Policies
 
-Every job should define:
+Every background job should define:
 
 ```text
 Trigger
@@ -1299,7 +1427,7 @@ Priority
 Observability
 ```
 
-Example:
+Examples:
 
 ### Recommendation
 
@@ -1313,7 +1441,7 @@ User transaction affected: no
 
 ```text
 Retry: limited
-Fallback: deterministic explanation
+Fallback: deterministic recommendation/explanation
 User transaction affected: no
 ```
 
@@ -1333,12 +1461,12 @@ Must not depend on worker
 
 ---
 
-## 54. End-to-End Personalization Example
+# 53. End-to-End Personalization Example
 
 ```text
-Student submits DBMS quiz
+Learner submits DBMS assessment
           ↓
-API scores quiz
+API scores assessment
           ↓
 Result persisted
           ↓
@@ -1352,7 +1480,7 @@ Worker updates mastery
           ↓
 Normalization = 52%
           ↓
-Queue: generate-recommendation
+Queue / processing: generate-recommendation
           ↓
 Recommendation:
 Review Normalization
@@ -1361,19 +1489,23 @@ Optional AI job
           ↓
 AI generates explanation
           ↓
-Validated
+Output validated
           ↓
 Dashboard displays recommendation
 ```
 
+The AI explanation is an enhancement; the recommendation decision remains governed by deterministic personalization logic.
+
 ---
 
-## 55. End-to-End Failure Example
+# 54. End-to-End Failure Example
 
 ```text
 Assessment submitted
        ↓
 Result saved
+       ↓
+Learning evidence saved
        ↓
 Personalization job
        ↓
@@ -1385,14 +1517,14 @@ Still unavailable
        ↓
 Deterministic recommendation
        ↓
-Student continues learning
+Learner continues learning
 ```
 
 The core learning workflow remains available.
 
 ---
 
-## 56. Background Processing Checklist
+# 55. Background Processing Checklist
 
 ```text
 [ ] Redis configured
@@ -1413,11 +1545,14 @@ The core learning workflow remains available.
 [ ] Import job
 [ ] Basic monitoring
 [ ] Idempotency tests
+[ ] Reconciliation path
 ```
+
+These are implementation checkpoints, not a requirement to implement every capability before the surrounding MVP domain is ready.
 
 ---
 
-## 57. Future Enhancements
+# 56. Future Enhancements
 
 Later versions may introduce:
 
@@ -1435,11 +1570,11 @@ Priority scheduling
 Workflow orchestration
 ```
 
-These should be introduced only when justified by actual workload and reliability requirements.
+These should be introduced only when justified by actual workload, reliability requirements, or operational needs.
 
 ---
 
-## 58. Scope Boundary
+# 57. Scope Boundary
 
 This document does not yet finalize:
 
@@ -1456,7 +1591,7 @@ These will be finalized during implementation and deployment using current offic
 
 ---
 
-## 59. Final Architecture Principle
+# 58. Final Architecture Principle
 
 The final background-processing philosophy is:
 
@@ -1469,57 +1604,13 @@ QUEUE
         ↓
 RELIABLE WORKER
         ↓
-RETRY / FALLBACK
+RETRY / FALLBACK / RECOVERY
         ↓
-UPDATED APPLICATION STATE
+UPDATED DERIVED STATE
 ```
 
 The most important rule is:
 
-> **Never make the student's core learning transaction depend unnecessarily on slow or failure-prone asynchronous work. Persist the authoritative result first, then process enrichment, personalization, AI, analytics, and notifications in reliable background jobs.**
+> **Never make the learner's core learning transaction depend unnecessarily on slow or failure-prone asynchronous work. Persist the authoritative result first, then process enrichment, personalization, AI, analytics, and notifications through reliable background jobs.**
 
-
----
-
-# 60. Personalization Intervention Jobs and Escalation
-
-Background processing supports the intervention policy defined in `09-ai-personalization-engine-design.md`.
-
-Personalization workers may process jobs such as:
-
-```text
-recalculate-personalization
-generate-recommendations
-refresh-next-best-action
-evaluate-intervention
-```
-
-The worker must not blindly generate the same intervention repeatedly.
-
-Conceptually:
-
-```text
-Learning Evidence
-      ↓
-Evaluate Current Intervention
-      ↓
-Improved?
-   /       \
- YES       NO
-  ↓         ↓
-Continue   Escalate
-           ↓
-      Generate next
-      appropriate action
-```
-
-Important rules:
-
-- hard prerequisite constraints are evaluated before ordinary recommendations
-- the most specific useful intervention should be preferred
-- repeated failed interventions should trigger escalation or alternative remediation
-- assessment jobs should measure improvement rather than simply repeat an identical quiz
-- recommendation generation should remain deterministic at the decision level, with AI used only for permitted enhancement
-- recommendation/intervention outcomes should be recorded so future personalization can evaluate effectiveness
-
-The worker should use the same personalization/application services as synchronous application flows rather than duplicating intervention-selection logic.
+Background processing should improve responsiveness and scalability without weakening the authority, consistency, security, or explainability of the learning platform.

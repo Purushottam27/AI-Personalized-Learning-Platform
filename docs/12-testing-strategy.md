@@ -7,35 +7,54 @@ This document defines the testing strategy for the AI Based Personalized Learnin
 The objective is not simply to prove that individual functions work. The objective is to ensure:
 
 - correctness
+
 - security
+
 - reliability
+
 - learning integrity
+
 - personalization quality
+
 - user experience
+
 - maintainability
+
 - production readiness
 
 The strategy protects the platform's most important behaviors:
 
 ```text
+
 Authentication
+
 Authorization
+
 Course progression
+
 Prerequisites
+
 Assessments
+
 Mastery
+
 Personalization
-Teacher controls
+
+Instructor controls
+
 Admin controls
+
 Background processing
+
 AI-assisted functionality
+
 ```
 
 ---
 
 ## 2. Testing Philosophy
 
-> **Test business-critical behavior at the lowest practical level, then verify complete user journeys through integration and end-to-end tests.**
+\> **\*\*Test business-critical behavior at the lowest practical level, then verify complete user journeys through integration and end-to-end tests.\*\***
 
 We should not depend only on manual testing or only on unit tests.
 
@@ -46,13 +65,21 @@ The project uses multiple testing layers.
 ## 3. Testing Pyramid
 
 ```text
-                 E2E Tests
-                /         \
-               /           \
-        Integration Tests
-          /             \
-         /               \
-      Unit Tests + Component Tests
+
+                 E2E Tests
+
+                /         \\
+
+               /           \\
+
+        Integration Tests
+
+          /             \\
+
+         /               \\
+
+      Unit Tests + Component Tests
+
 ```
 
 The largest number of tests should be fast unit/component tests.
@@ -68,17 +95,29 @@ A smaller number of end-to-end tests verify critical user journeys.
 The project will use:
 
 ```text
-1. Static analysis
-2. Unit tests
-3. Component tests
-4. Integration tests
-5. API tests
-6. Background-job tests
-7. AI/personalization evaluation
-8. End-to-end tests
-9. Security tests
-10. Performance tests
-11. Regression tests
+
+1\. Static analysis
+
+2\. Unit tests
+
+3\. Component tests
+
+4\. Integration tests
+
+5\. API tests
+
+6\. Background-job tests
+
+7\. AI/personalization evaluation
+
+8\. End-to-end tests
+
+9\. Security tests
+
+10\. Performance tests
+
+11\. Regression tests
+
 ```
 
 Not every feature needs every testing layer equally.
@@ -90,11 +129,17 @@ Not every feature needs every testing layer equally.
 Before runtime tests:
 
 ```text
+
 Lint
+
 Type checking
+
 Build
+
 Formatting validation
+
 Dependency checks
+
 ```
 
 Static analysis should run automatically before merging code.
@@ -106,13 +151,21 @@ Static analysis should run automatically before merging code.
 Recommended:
 
 ```text
+
 Local
-   ↓
+
+   ↓
+
 Test
-   ↓
+
+   ↓
+
 Staging
-   ↓
+
+   ↓
+
 Production
+
 ```
 
 Automated tests must never accidentally modify production data.
@@ -124,9 +177,13 @@ Automated tests must never accidentally modify production data.
 Automated tests should use isolated infrastructure:
 
 ```text
+
 Test MongoDB database
+
 Test Redis instance
+
 Test environment variables
+
 ```
 
 Do not run destructive automated tests against production.
@@ -138,28 +195,47 @@ Do not run destructive automated tests against production.
 Create controlled factories/fixtures for:
 
 ```text
-Student
-Teacher
+
+Learner
+
+Instructor
+
 Admin
+
 Course
+
 Lesson
+
 Resource
+
 Question
+
 Assessment
+
 Enrollment
+
 Learning event
+
 Mastery record
+
 Recommendation
+
 Notification
+
 ```
 
 Prefer factories such as:
 
 ```text
+
 createStudent()
+
 createTeacher()
+
 createCourse()
+
 createAssessment()
+
 ```
 
 over duplicated large JSON objects.
@@ -173,15 +249,21 @@ Each test should be independent.
 Bad:
 
 ```text
+
 Test A creates user
+
 Test B assumes user exists
+
 ```
 
 Preferred:
 
 ```text
+
 Test A → creates its own data
+
 Test B → creates its own data
+
 ```
 
 ---
@@ -191,10 +273,15 @@ Test B → creates its own data
 At minimum:
 
 ```text
-Student
-Teacher
+
+Learner
+
+Instructor
+
 Admin
+
 Unauthenticated user
+
 ```
 
 Role-specific tests must verify both allowed and denied behavior.
@@ -208,18 +295,31 @@ Unit tests verify isolated business logic.
 Important candidates:
 
 ```text
+
 Password validation
+
 Token utilities
+
 Score calculation
+
 Mastery calculation
+
 Prerequisite evaluation
+
 Progress calculation
+
 Recommendation ranking
+
 Question selection
+
 Timer calculations
+
 Streak calculation
+
 Analytics calculations
+
 Input normalization
+
 ```
 
 Tests should be fast and deterministic.
@@ -231,15 +331,25 @@ Tests should be fast and deterministic.
 Integration tests verify multiple application layers together:
 
 ```text
+
 Route
- ↓
+
+ ↓
+
 Middleware
- ↓
+
+ ↓
+
 Controller
- ↓
+
+ ↓
+
 Service
- ↓
+
+ ↓
+
 Database
+
 ```
 
 They should use a controlled test database.
@@ -251,15 +361,25 @@ They should use a controlled test database.
 Verify:
 
 ```text
+
 HTTP method
+
 URL
+
 Authentication requirement
+
 Authorization
+
 Request body
+
 Validation
+
 Status code
+
 Response shape
+
 Error shape
+
 ```
 
 This protects the contract between backend and frontend.
@@ -271,29 +391,83 @@ This protects the contract between backend and frontend.
 Test:
 
 ```text
+
 Signup success
+
 Duplicate email
+
 Invalid input
+
 Login success
+
 Wrong password
+
 Unknown account
+
 Suspended account
+
 Deactivated account
+
 Account reactivation
+
 Already-active reactivation attempt
+
 Suspended-account reactivation attempt
+
 Access token generation
+
 Expired access token
+
 Refresh token flow
+
 Refresh rotation
+
 Invalid refresh token
+
 Revoked refresh session
+
 Logout
+
 Protected endpoints
+
 /auth/me
+
 Change-password
+
 Account deactivation
+
 ```
+
+---
+
+# 14A. Signup Role and Google Authentication Testing
+
+Public signup must allow only the roles `LEARNER` and `INSTRUCTOR`.
+
+Test:
+
+```text
+Valid LEARNER signup
+Valid INSTRUCTOR signup
+ADMIN role rejected during public signup
+Invalid role rejected
+Duplicate email
+Google-only account has no password
+Google existing-account flow
+Google new-account setup
+Google setup role selection
+Google setup onboarding progress
+Google setup completion
+Google setup session expiry
+Google unlinked-password-account behavior
+Suspended/deactivated account cannot bypass status through Google
+```
+
+For a new Google account, verify that a permanent `User` is created only after the approved role and onboarding setup are completed.
+
+For an existing Google-linked account, verify authentication resolves through `AuthIdentity` to the correct `User` and then applies the current account status.
+
+For an existing password account with the same Google email but no Google link, verify that the system does not automatically merge the accounts.
 
 ---
 
@@ -302,16 +476,27 @@ Account deactivation
 Test:
 
 ```text
+
 Valid access token
+
 Expired access token
+
 Malformed token
+
 Missing token
+
 Wrong signing secret
+
 Invalid payload
+
 Refresh token JTI verification
+
 Refresh session lookup
+
 Token hash verification
+
 Refresh-token rotation
+
 ```
 
 Never place real production secrets in tests.
@@ -323,10 +508,15 @@ Never place real production secrets in tests.
 Verify:
 
 ```text
+
 Passwords are never returned
+
 Tokens are not leaked
+
 Sensitive cookies use correct flags
+
 Protected APIs reject unauthenticated requests
+
 ```
 
 If HttpOnly cookies are used, JavaScript must not access refresh tokens.
@@ -338,99 +528,155 @@ If HttpOnly cookies are used, JavaScript must not access refresh tokens.
 For protected endpoints test:
 
 ```text
+
 Unauthenticated → 401
+
 Authenticated but wrong role → 403
+
 Correct role → allowed
+
 ```
 
 Explicitly test:
-- Student cannot access Admin APIs
-- Teacher cannot access Admin APIs
+
+- Learner cannot access Admin APIs
+
+- Instructor cannot access Admin APIs
+
 - Admin can access permitted Admin APIs
+
 - Frontend hiding a button is NOT considered authorization.
 
 ---
 
 
+
 ---
 
-# 17A. Account Status Testing
+# 17A. Account Status Testing**
 
 Account-status tests must cover:
+
 - ACTIVE
+
 - SUSPENDED
+
 - DEACTIVATED
 
 Critical protected-request test:
 
-1. User is ACTIVE.
-2. User receives a valid access token.
-3. Account becomes SUSPENDED.
-4. User sends the previously valid access token.
-5. Backend checks current User.status.
-6. Request is rejected with ACCOUNT_SUSPENDED.
+1\. User is ACTIVE.
+
+2\. User receives a valid access token.
+
+3\. Account becomes SUSPENDED.
+
+4\. User sends the previously valid access token.
+
+5\. Backend checks current User.status.
+
+6\. Request is rejected with ACCOUNT\_SUSPENDED.
 
 Repeat the same flow for DEACTIVATED:
 
-1. User is ACTIVE.
-2. User receives a valid access token.
-3. User deactivates the account.
-4. User sends the previously valid access token.
-5. Backend checks current User.status.
-6. Request is rejected with ACCOUNT_DEACTIVATED.
+1\. User is ACTIVE.
+
+2\. User receives a valid access token.
+
+3\. User deactivates the account.
+
+4\. User sends the previously valid access token.
+
+5\. Backend checks current User.status.
+
+6\. Request is rejected with ACCOUNT\_DEACTIVATED.
 
 Also test transitions:
+
 - ACTIVE → SUSPENDED
+
 - SUSPENDED → ACTIVE
+
 - ACTIVE → DEACTIVATED
+
 - DEACTIVATED → ACTIVE
 
 Verify:
 
 Suspended users cannot self-reactivate.
+
 Deactivated users can reactivate themselves.
+
 Admin cannot deactivate users.
+
 Admin cannot change roles.
+
 Deactivation revokes all active refresh sessions.
+
 Suspension revokes all active refresh sessions.
+
 Reactivation creates a new refresh session.
+
 Previously revoked refresh sessions remain revoked.
 
 ---
 
-# 17B. Refresh Session Testing
+# 17B. Refresh Session Testing**
 
 Test:
+
 - Login creates RefreshSession
+
 - One user may have multiple refresh sessions
+
 - Refresh rotates JTI
+
 - Refresh rotates tokenHash
+
 - tokenFamily remains the same during rotation
+
 - Normal refresh updates the existing RefreshSession
+
 - Revoked session cannot refresh
+
 - Expired session cannot refresh
+
 - Token hash mismatch cannot refresh
+
 - Logout revokes only the current session
+
 - Other sessions remain active after normal logout
+
 - Deactivation revokes all active refresh sessions
+
 - Reactivation creates a new active RefreshSession rather than restoring revoked sessions
 
 ---
 
-# 17C. Password Change Testing
+# 17C. Password Change Testing**
 
 POST `/api/v1/auth/change-password`
 
 Test:
+
 - Correct old password
+
 - Incorrect old password
+
 - Valid new password
+
 - Successful password change
+
 - Old password no longer works
+
 - New password works
+
 - Current refresh session remains active
+
 - Other refresh sessions are revoked
+
 - Password change preserves the current refresh session
+
 - Password change revokes all other refresh sessions
 
 # 18. Ownership Testing
@@ -440,42 +686,63 @@ Role alone is not sufficient.
 Example:
 
 ```text
-Teacher A owns Course A
-Teacher B owns Course B
+
+Instructor A owns Course A
+
+Instructor B owns Course B
+
 ```
 
 Test:
 
 ```text
-Teacher A → Course A → allowed
-Teacher A → Course B → denied
+
+Instructor A → Course A → allowed
+
+Instructor A → Course B → denied
+
 ```
 
 This applies to:
 
 ```text
+
 Course editing
+
 Lesson editing
+
 Question editing
-Student course analytics
+
+Learner course analytics
+
 ```
 
 ---
 
-# 19. Student Enrollment Testing
+# 19. Learner Enrollment Testing
 
 Test:
 
 ```text
+
 Enroll successfully
+
 Duplicate enrollment
+
 Invalid course
+
 Inactive course
+
 Prerequisite missing
+
 Diagnostic required
+
 Diagnostic passed
+
 Diagnostic failed
+
 Unauthorized enrollment
+
 ```
 
 ---
@@ -485,26 +752,39 @@ Unauthorized enrollment
 Test:
 
 ```text
+
 No prerequisite
+
 Prerequisite completed
+
 Prerequisite incomplete
+
 Prerequisite completed but insufficient mastery
+
 Diagnostic required
+
 Diagnostic passed
+
 Diagnostic failed
+
 ```
 
 Example:
 
 ```text
+
 Advanced SQL
+
 Required: Basic SQL
 
-Student:
+Learner:
+
 Basic SQL incomplete
 
 Expected:
+
 Enrollment blocked
+
 ```
 
 ---
@@ -514,11 +794,17 @@ Enrollment blocked
 Test:
 
 ```text
+
 Diagnostic disabled
+
 Diagnostic enabled
-Student passes
-Student fails
+
+Learner passes
+
+Learner fails
+
 Retry according to policy
+
 ```
 
 If failed, the expected prerequisite recommendation should be generated.
@@ -530,18 +816,27 @@ If failed, the expected prerequisite recommendation should be generated.
 Test:
 
 ```text
+
 Course starts at 0%
+
 Lesson completed
+
 Multiple lessons completed
+
 Course reaches 100%
+
 ```
 
 Also:
 
 ```text
+
 Duplicate completion event
+
 Out-of-order request
+
 Unauthorized completion
+
 ```
 
 ---
@@ -551,24 +846,36 @@ Unauthorized completion
 Critical learning rule:
 
 ```text
+
 Lesson 1
-   ↓
+
+   ↓
+
 Assessment
-   ↓
+
+   ↓
+
 Pass
-   ↓
+
+   ↓
+
 Lesson 2 unlocked
+
 ```
 
 Test:
 
 ```text
+
 Assessment not completed
+
 Assessment failed
+
 Assessment passed
+
 ```
 
-Expected behavior must exactly match the approved Student Learning Model.
+Expected behavior must exactly match the approved Learner Learning Model.
 
 ---
 
@@ -579,11 +886,17 @@ Frontend locking is not security.
 Test:
 
 ```text
-Student attempts direct API access
-        ↓
+
+Learner attempts direct API access
+
+        ↓
+
 Backend verifies unlock state
-        ↓
+
+        ↓
+
 Reject if locked
+
 ```
 
 ---
@@ -593,19 +906,33 @@ Reject if locked
 Cover:
 
 ```text
+
 Question retrieval
+
 Question ordering
+
 Question selection
+
 Options
+
 Correct answers
+
 Marks
+
 Weight
+
 Submission
+
 Scoring
+
 Unanswered questions
+
 Time limit
+
 Passing threshold
+
 Result generation
+
 ```
 
 ---
@@ -617,9 +944,13 @@ Unanswered questions are meaningful learning evidence.
 Test separately:
 
 ```text
+
 Correct
+
 Incorrect
+
 Unanswered
+
 ```
 
 Do not silently treat unanswered questions as correct or remove them from learning evidence unless the approved assessment policy says so.
@@ -633,11 +964,17 @@ Scoring must be deterministic.
 Test boundaries:
 
 ```text
+
 0%
+
 50%
+
 84.99%
+
 85%
+
 100%
+
 ```
 
 The exact formula follows the approved assessment design.
@@ -649,12 +986,19 @@ The exact formula follows the approved assessment design.
 For timed assessments:
 
 ```text
+
 Timer starts
+
 Submission before timeout
+
 Submission at timeout
+
 Submission after timeout
+
 Browser refresh
+
 Network delay
+
 ```
 
 The backend is authoritative for time limits.
@@ -666,10 +1010,15 @@ The backend is authoritative for time limits.
 Test:
 
 ```text
+
 Double-click submit
+
 Two simultaneous requests
+
 Refresh during submission
+
 Retry after timeout
+
 ```
 
 The backend must prevent duplicate authoritative results.
@@ -681,18 +1030,27 @@ The backend must prevent duplicate authoritative results.
 If:
 
 ```text
+
 30 questions available
+
 10 questions displayed
+
 ```
 
 test:
 
 ```text
+
 Correct count
+
 No duplicate question in one attempt
+
 Randomization
+
 Only approved questions
+
 Correct assessment/topic mapping
+
 ```
 
 ---
@@ -704,15 +1062,25 @@ The approved strategy discourages repeating exactly the same question set indefi
 Test:
 
 ```text
+
 Attempt 1
- ↓
+
+ ↓
+
 Weakness identified
- ↓
+
+ ↓
+
 Remediation
- ↓
+
+ ↓
+
 Attempt 2
- ↓
+
+ ↓
+
 Different valid question selection
+
 ```
 
 ---
@@ -722,20 +1090,31 @@ Different valid question selection
 Important learning events should create/update evidence:
 
 ```text
+
 Lesson completion
+
 Practice answer
+
 Assessment answer
+
 Assessment result
+
 Tracked resource interaction where applicable
+
 ```
 
 Verify evidence is:
 
 ```text
+
 correct
+
 attributable
+
 timestamped
-associated with correct student/course/topic
+
+associated with correct learner/course/topic
+
 ```
 
 ---
@@ -747,23 +1126,37 @@ Mastery is a central personalization input.
 Test:
 
 ```text
+
 Strong performance
+
 Weak performance
+
 Repeated attempts
+
 Recent performance
+
 Topic-specific evidence
+
 Limited evidence
+
 No evidence
+
 ```
 
 Also test boundary values:
 
 ```text
+
 0
+
 0.01
+
 0.50
+
 0.85
+
 1.00
+
 ```
 
 The exact formula follows the approved personalization design.
@@ -775,11 +1168,17 @@ The exact formula follows the approved personalization design.
 Where appropriate, verify that mastery can be recalculated from authoritative learning evidence.
 
 ```text
+
 Learning evidence
-      ↓
+
+      ↓
+
 Mastery calculation
-      ↓
+
+      ↓
+
 Persisted mastery
+
 ```
 
 This reduces the risk of incorrect cumulative updates.
@@ -791,12 +1190,19 @@ This reduces the risk of incorrect cumulative updates.
 Test independently from AI:
 
 ```text
+
 Course recommendation
+
 Topic weakness
+
 Lesson recommendation
+
 Resource recommendation
+
 Practice recommendation
+
 Assessment recommendation
+
 ```
 
 ---
@@ -806,17 +1212,29 @@ Assessment recommendation
 The approved policy is:
 
 ```text
+
 Hard constraints first
-      ↓
+
+      ↓
+
 Strongest learning need
-      ↓
+
+      ↓
+
 Most specific useful intervention
-      ↓
+
+      ↓
+
 Smallest effective intervention
-      ↓
+
+      ↓
+
 Re-evaluate
-      ↓
+
+      ↓
+
 Escalate if insufficient
+
 ```
 
 Tests must verify this behavior.
@@ -828,30 +1246,43 @@ Tests must verify this behavior.
 The engine must not always perform:
 
 ```text
+
 Course
+
 → Topic
+
 → Lesson
+
 → Resource
+
 → Practice
+
 → Assessment
+
 ```
 
 Example:
 
 ```text
+
 Specific Lesson 7 weakness
+
 ```
 
 Expected:
 
 ```text
+
 Lesson intervention
+
 ```
 
 not:
 
 ```text
+
 Entire course recommendation
+
 ```
 
 ---
@@ -863,15 +1294,21 @@ AI cannot override deterministic constraints.
 Example:
 
 ```text
+
 Advanced SQL requires Basic SQL
-Student lacks prerequisite
+
+Learner lacks prerequisite
+
 AI recommends Advanced SQL
+
 ```
 
 Expected:
 
 ```text
+
 Enrollment remains blocked.
+
 ```
 
 ---
@@ -881,23 +1318,33 @@ Enrollment remains blocked.
 Test:
 
 ```text
+
 LOW
+
 MEDIUM
+
 HIGH
+
 ```
 
 Example:
 
 ```text
+
 One recent mistake
+
 → Low-intensity intervention
+
 ```
 
 versus:
 
 ```text
+
 Repeated failures + prerequisite weakness
+
 → High-intensity remediation
+
 ```
 
 ---
@@ -907,25 +1354,37 @@ Repeated failures + prerequisite weakness
 Test:
 
 ```text
+
 Before intervention
-      ↓
+
+      ↓
+
 Intervention
-      ↓
+
+      ↓
+
 New evidence
-      ↓
+
+      ↓
+
 Improved?
+
 ```
 
 If improved:
 
 ```text
+
 Continue
+
 ```
 
 If not:
 
 ```text
+
 Escalate
+
 ```
 
 The same failed intervention should not loop indefinitely.
@@ -937,13 +1396,21 @@ The same failed intervention should not loop indefinitely.
 AI outputs should be tested for:
 
 ```text
+
 Structure
+
 Safety
+
 Grounding
+
 Consistency
+
 Constraint adherence
+
 Useful quality
+
 Fallback behavior
+
 ```
 
 Do not expect identical wording from every AI response.
@@ -953,15 +1420,25 @@ Do not expect identical wording from every AI response.
 # 42. AI Output Validation
 
 ```text
+
 AI response
-    ↓
+
+    ↓
+
 Parse
-    ↓
+
+    ↓
+
 Schema validation
-    ↓
+
+    ↓
+
 Business-rule validation
-    ↓
+
+    ↓
+
 Accept / Reject
+
 ```
 
 Invalid AI output must not directly modify authoritative learning state.
@@ -973,19 +1450,29 @@ Invalid AI output must not directly modify authoritative learning state.
 Test prompts where AI could invent:
 
 ```text
+
 Course content
-Teacher information
-Student performance
+
+Instructor information
+
+Learner performance
+
 Resources
+
 Mastery
+
 Prerequisites
+
 ```
 
 Expected:
 
 ```text
+
 Use supplied context
+
 Do not invent unsupported facts
+
 ```
 
 ---
@@ -995,11 +1482,17 @@ Do not invent unsupported facts
 If AI fails because of:
 
 ```text
+
 Timeout
+
 Rate limit
+
 Provider outage
+
 Malformed response
+
 Invalid output
+
 ```
 
 the platform should use deterministic fallback behavior where available.
@@ -1011,10 +1504,15 @@ the platform should use deterministic fallback behavior where available.
 Test against:
 
 ```text
+
 Prompt injection
+
 Malicious course content
+
 Unexpected external instructions
+
 Sensitive data exposure
+
 ```
 
 Only required context should be supplied to an AI provider.
@@ -1026,15 +1524,25 @@ Only required context should be supplied to an AI provider.
 For every important job:
 
 ```text
+
 Valid payload
+
 Invalid payload
+
 Success
+
 Temporary failure
+
 Permanent failure
+
 Retry
+
 Backoff
+
 Duplicate execution
+
 Worker recovery
+
 ```
 
 ---
@@ -1046,7 +1554,9 @@ Jobs may execute more than once.
 Example:
 
 ```text
+
 update-mastery
+
 ```
 
 Repeated execution must not incorrectly double mastery.
@@ -1054,7 +1564,9 @@ Repeated execution must not incorrectly double mastery.
 Where appropriate:
 
 ```text
+
 Recalculate from authoritative evidence
+
 ```
 
 rather than blindly incrementing state.
@@ -1066,12 +1578,19 @@ rather than blindly incrementing state.
 Test:
 
 ```text
+
 Redis unavailable
+
 Worker unavailable
+
 Queue delayed
+
 Job fails
+
 Job retries
+
 Job permanently fails
+
 ```
 
 Non-critical downstream work must not unnecessarily break core synchronous learning operations.
@@ -1083,13 +1602,21 @@ Non-critical downstream work must not unnecessarily break core synchronous learn
 Example:
 
 ```text
+
 Assessment submitted
- ↓
+
+ ↓
+
 Score immediately available
- ↓
+
+ ↓
+
 Personalization processing
- ↓
+
+ ↓
+
 Recommendation becomes available
+
 ```
 
 The UI should honestly communicate processing state.
@@ -1101,11 +1628,17 @@ The UI should honestly communicate processing state.
 Test:
 
 ```text
+
 Notification created
+
 Notification sent
+
 Provider failure
+
 Retry
+
 Duplicate prevention
+
 ```
 
 Notification failure should normally not invalidate the learning transaction.
@@ -1117,32 +1650,55 @@ Notification failure should normally not invalidate the learning transaction.
 For Excel/PDF imports:
 
 ```text
+
 Valid file
+
 Invalid file
+
 Wrong format
+
 Oversized file
+
 Missing fields
+
 Invalid question
+
 Invalid option
+
 Missing correct answer
+
 Duplicate question
+
 Malformed row
+
 ```
 
 Expected:
 
 ```text
+
 Upload
- ↓
+
+ ↓
+
 Process
- ↓
+
+ ↓
+
 Validate
- ↓
+
+ ↓
+
 Preview
- ↓
-Teacher approval
- ↓
+
+ ↓
+
+Instructor approval
+
+ ↓
+
 Persist
+
 ```
 
 ---
@@ -1152,80 +1708,115 @@ Persist
 Test:
 
 ```text
+
 Unauthorized upload
+
 Malicious file
+
 Unexpected MIME type
+
 Oversized file
+
 Path traversal attempts
+
 Unsafe content
+
 ```
 
 Backend validation is mandatory.
 
 ---
 
-# 53. Teacher Course Management Testing
+# 53. Instructor Course Management Testing
 
 Test:
 
 ```text
+
 Create course
+
 Edit course
+
 Add lesson
+
 Edit lesson
+
 Reorder lesson
+
 Add resource
+
 Create assessment
+
 Add question
+
 Publish
+
 Archive/unpublish according to policy
+
 ```
 
 Also test invalid states.
 
 ---
 
-# 54. Teacher Ownership Testing
+# 54. Instructor Ownership Testing
 
-Teacher A must not be able to modify:
+Instructor A must not be able to modify:
 
 ```text
-Teacher B's course
-Teacher B's lessons
-Teacher B's question bank
-Teacher B's analytics
-Teacher B's enrolled students
+
+Instructor B's course
+
+Instructor B's lessons
+
+Instructor B's question bank
+
+Instructor B's analytics
+
+Instructor B's enrolled learners
+
 ```
 
 These require explicit authorization tests.
 
 ---
 
-# 55. Teacher Student Visibility Testing
+# 55. Instructor Learner Visibility Testing
 
-For a teacher's own course:
+For a instructor's own course:
 
 ```text
-Teacher
-   ↓
+
+Instructor
+
+   ↓
+
 Own course
-   ↓
-Enrolled students
+
+   ↓
+
+Enrolled learners
+
 ```
 
-The teacher may see only permitted course-specific information.
+The instructor may see only permitted course-specific information.
 
 Test:
 
 ```text
-Student enrolled in teacher's course
+
+Learner enrolled in instructor's course
+
 → visible
 
-Student not enrolled
-→ not shown in that course's student list
+Learner not enrolled
+
+→ not shown in that course's learner list
 
 Unrelated course data
+
 → not exposed
+
 ```
 
 ---
@@ -1233,24 +1824,37 @@ Unrelated course data
 # 56. Admin Testing
 
 Test Admin APIs:
+
 - `GET /api/v1/users`
-- `GET /api/v1/users/:userId`
-- `PATCH /api/v1/users/:userId`
-- `PATCH /api/v1/users/:userId/status`
+
+- `GET /api/v1/users/\:userId`
+
+- `PATCH /api/v1/users/\:userId`
+
+- `PATCH /api/v1/users/\:userId/status`
 
 Verify all require authentication and ADMIN authorization.
 
 Test status transitions:
+
 - ACTIVE → SUSPENDED
+
 - SUSPENDED → ACTIVE
 
 Verify Admin cannot:
+
 - change role
+
 - change another user's password
+
 - edit mastery
+
 - edit learning evidence
-- edit student learning data
-- edit teacher course data
+
+- edit learner learning data
+
+- edit instructor course data
+
 - deactivate users
 
 ---
@@ -1260,11 +1864,17 @@ Verify Admin cannot:
 Cover:
 
 ```text
+
 Utility functions
+
 Form validation
+
 Formatting
+
 Small state transformations
+
 Pure UI logic
+
 ```
 
 Avoid testing implementation details with little value.
@@ -1276,16 +1886,27 @@ Avoid testing implementation details with little value.
 Important components:
 
 ```text
+
 CourseCard
+
 LessonList
+
 QuizQuestion
+
 QuestionNavigator
+
 ProgressBar
+
 MasteryCard
+
 RecommendationCard
+
 Dashboard widgets
+
 Forms
+
 Dialogs
+
 ```
 
 Test user-visible behavior.
@@ -1295,17 +1916,29 @@ Test user-visible behavior.
 # 59. Frontend Authentication Testing
 
 Test:
+
 - Authentication initialization
+
 - Login
+
 - Logout
+
 - Refresh
+
 - Session expiration
+
 - Protected routes
+
 - Role-based navigation
+
 - 401 handling
+
 - 403 handling
+
 - Suspended-account UX
+
 - Deactivated-account UX
+
 - Admin User Management UI (search, filtering, pagination, user detail, suspend/unsuspend UI)
 
 Verify that frontend authorization is not treated as backend security.
@@ -1317,14 +1950,49 @@ Verify that frontend authorization is not treated as backend security.
 Test:
 
 ```text
-Student navigation
-Teacher navigation
+
+Learner navigation
+
+Instructor navigation
+
 Admin navigation
+
 Unauthorized route
+
 Wrong-role route
+
 ```
 
 The backend must still enforce restrictions.
+
+---
+
+# 61A. Account and Onboarding API Testing
+
+Verify the approved account/profile routes and behavior:
+
+```text
+PATCH /api/v1/users/me
+PATCH /api/v1/users/me/avatar
+DELETE /api/v1/users/me
+GET/PATCH /api/v1/learners/profile
+GET/PATCH /api/v1/learners/onboarding
+GET/PATCH /api/v1/instructors/profile
+GET/PATCH /api/v1/instructors/onboarding
+POST /api/v1/auth/reactivate
+```
+
+Test:
+
+- Account-level name update does not change role.
+- Avatar update follows the approved multipart upload flow.
+- Deactivation preserves learning data while revoking active refresh sessions.
+- Reactivation is allowed only for DEACTIVATED accounts.
+- Reactivation does not restore revoked refresh sessions; it creates a new active refresh session.
+- Learner onboarding saves answers progressively and resumes from the first unanswered fixed question.
+- Instructor onboarding saves its approved two-question flow progressively.
+- Onboarding/profile routes enforce the correct role.
+- Profile data remains separate from account-level `User` data.
 
 ---
 
@@ -1333,15 +2001,25 @@ The backend must still enforce restrictions.
 Test:
 
 ```text
+
 Question display
+
 Option selection
+
 Navigation
+
 Previous/next
+
 Timer display
+
 Unanswered state
+
 Submit
+
 Duplicate-submit prevention
+
 Result display
+
 ```
 
 ---
@@ -1351,16 +2029,23 @@ Result display
 Every major page should consider:
 
 ```text
+
 Loading
+
 Success
+
 Empty
+
 Error
+
 ```
 
 Asynchronous operations should additionally consider:
 
 ```text
+
 Processing
+
 ```
 
 ---
@@ -1370,49 +2055,85 @@ Processing
 E2E tests verify complete journeys through:
 
 ```text
+
 Browser
- ↓
+
+ ↓
+
 Frontend
- ↓
+
+ ↓
+
 API
- ↓
+
+ ↓
+
 Database
- ↓
+
+ ↓
+
 Background processing where practical
+
 ```
 
 Focus on critical journeys rather than every UI interaction.
 
 ---
 
-# 64. Critical Student E2E Journey
+# 64. Critical Learner E2E Journey
 
 ```text
+
 Signup
- ↓
+
+ ↓
+
 Login
- ↓
+
+ ↓
+
 Dashboard
- ↓
+
+ ↓
+
 Browse course
- ↓
+
+ ↓
+
 Enroll
- ↓
+
+ ↓
+
 Open course
- ↓
+
+ ↓
+
 Open unlocked lesson
- ↓
+
+ ↓
+
 Complete lesson
- ↓
+
+ ↓
+
 Attempt assessment
- ↓
+
+ ↓
+
 Submit
- ↓
+
+ ↓
+
 View result
- ↓
+
+ ↓
+
 Receive personalization
- ↓
+
+ ↓
+
 Follow recommendation
+
 ```
 
 ---
@@ -1420,75 +2141,131 @@ Follow recommendation
 # 65. Prerequisite E2E Journey
 
 ```text
-Student
- ↓
+
+Learner
+
+ ↓
+
 Advanced course
- ↓
+
+ ↓
+
 Diagnostic required
- ↓
+
+ ↓
+
 Fails
- ↓
+
+ ↓
+
 Basic course recommended
- ↓
-Student reviews prerequisite
- ↓
+
+ ↓
+
+Learner reviews prerequisite
+
+ ↓
+
 Mini-assessment
- ↓
+
+ ↓
+
 Reattempt diagnostic
- ↓
+
+ ↓
+
 Pass
- ↓
+
+ ↓
+
 Enroll
+
 ```
 
 ---
 
-# 66. Student Weakness E2E Journey
+# 66. Learner Weakness E2E Journey
 
 ```text
+
 Assessment
- ↓
+
+ ↓
+
 Weak topic detected
- ↓
+
+ ↓
+
 Lesson/resource recommendation
- ↓
+
+ ↓
+
 Targeted practice
- ↓
+
+ ↓
+
 Improvement
- ↓
+
+ ↓
+
 Reassessment
- ↓
+
+ ↓
+
 Continue
+
 ```
 
 This validates the central personalization vision.
 
 ---
 
-# 67. Teacher E2E Journey
+# 67. Instructor E2E Journey
 
 ```text
-Teacher login
- ↓
+
+Instructor login
+
+ ↓
+
 Create course
- ↓
+
+ ↓
+
 Add metadata
- ↓
+
+ ↓
+
 Add lessons
- ↓
+
+ ↓
+
 Add resources
- ↓
+
+ ↓
+
 Create question bank
- ↓
+
+ ↓
+
 Configure assessment
- ↓
+
+ ↓
+
 Publish
- ↓
-Student enrolls
- ↓
-Teacher views enrolled student
- ↓
-Teacher views analytics
+
+ ↓
+
+Learner enrolls
+
+ ↓
+
+Instructor views enrolled learner
+
+ ↓
+
+Instructor views analytics
+
 ```
 
 ---
@@ -1496,21 +2273,37 @@ Teacher views analytics
 # 68. Question Import E2E Journey
 
 ```text
-Teacher
- ↓
+
+Instructor
+
+ ↓
+
 Upload Excel/PDF
- ↓
+
+ ↓
+
 Processing
- ↓
+
+ ↓
+
 Preview
- ↓
+
+ ↓
+
 Validation
- ↓
+
+ ↓
+
 Approve
- ↓
+
+ ↓
+
 Question bank updated
- ↓
+
+ ↓
+
 Assessment uses approved questions
+
 ```
 
 ---
@@ -1518,17 +2311,29 @@ Assessment uses approved questions
 # 69. Admin E2E Journey
 
 ```text
+
 Admin login
- ↓
+
+ ↓
+
 Admin dashboard
- ↓
+
+ ↓
+
 View platform metrics
- ↓
+
+ ↓
+
 View user/course information
- ↓
+
+ ↓
+
 Perform authorized action
- ↓
+
+ ↓
+
 Audit log created
+
 ```
 
 ---
@@ -1538,16 +2343,27 @@ Audit log created
 Critical negative journeys:
 
 ```text
+
 Unauthenticated access
+
 Wrong role
-Wrong teacher ownership
+
+Wrong instructor ownership
+
 Locked lesson access
+
 Missing prerequisite
+
 Failed diagnostic
+
 Invalid assessment submission
+
 Expired authentication
+
 Invalid resource
+
 Unauthorized admin action
+
 ```
 
 ---
@@ -1557,17 +2373,29 @@ Unauthorized admin action
 Include:
 
 ```text
+
 Authentication
+
 Authorization
+
 Input validation
+
 Injection resistance
+
 XSS
+
 CSRF strategy where relevant
+
 Cookie security
+
 Rate limiting
+
 File upload security
+
 Sensitive-data exposure
+
 IDOR/BOLA testing
+
 ```
 
 ---
@@ -1579,31 +2407,41 @@ Test resource ownership through manipulated IDs.
 Example:
 
 ```text
-Student A
+
+Learner A
+
 GET /courses/courseB
+
 ```
 
-when Student A should not access Course B's protected data.
+when Learner A should not access Course B's protected data.
 
 Expected:
 
 ```text
+
 Denied
+
 ```
 
 Likewise:
 
 ```text
-Teacher A
-GET /courses/courseB/students
+
+Instructor A
+
+GET /courses/courseB/learners
+
 ```
 
-when Course B belongs to Teacher B.
+when Course B belongs to Instructor B.
 
 Expected:
 
 ```text
+
 Denied
+
 ```
 
 ---
@@ -1613,13 +2451,21 @@ Denied
 Test:
 
 ```text
+
 Empty values
+
 Very long strings
+
 Unexpected types
+
 Invalid IDs
+
 Invalid enums
+
 Malformed JSON
+
 Unexpected nested fields
+
 ```
 
 Backend validation remains mandatory.
@@ -1631,21 +2477,33 @@ Backend validation remains mandatory.
 Sensitive endpoints may include:
 
 ```text
+
 Login
+
 Refresh
+
 Signup
+
 Password-related operations
+
 AI-triggering endpoints
+
 Expensive imports
+
 ```
 
 Test:
 
 ```text
+
 Within limit
+
 At limit
+
 Above limit
+
 Recovery after window
+
 ```
 
 ---
@@ -1655,15 +2513,25 @@ Recovery after window
 Important targets:
 
 ```text
+
 Login
+
 Dashboard
+
 Course listing
+
 Course page
+
 Assessment retrieval
+
 Assessment submission
-Teacher analytics
+
+Instructor analytics
+
 Admin dashboard
+
 Recommendation retrieval
+
 ```
 
 ---
@@ -1675,9 +2543,13 @@ Eventually test realistic concurrent behavior.
 For example:
 
 ```text
-100 students
-500 students
-1000 students
+
+100 learners
+
+500 learners
+
+1000 learners
+
 ```
 
 Targets should be based on expected deployment scale.
@@ -1691,21 +2563,33 @@ Do not claim production scalability based only on local testing.
 Test bursts such as:
 
 ```text
+
 100 assessment submissions
-       ↓
+
+       ↓
+
 100 learning events
-       ↓
+
+       ↓
+
 100 personalization jobs
+
 ```
 
 Observe:
 
 ```text
+
 Queue depth
+
 Processing latency
+
 Database load
+
 Redis load
+
 AI provider rate limits
+
 ```
 
 ---
@@ -1717,14 +2601,19 @@ A meaningful bug should normally produce a regression test.
 Example:
 
 ```text
+
 Bug:
-Teacher A accessed Teacher B's course.
+
+Instructor A accessed Instructor B's course.
 
 Fix:
+
 Authorization correction.
 
 Regression:
+
 Permanent ownership test.
+
 ```
 
 ---
@@ -1734,12 +2623,19 @@ Permanent ownership test.
 Avoid uncontrolled dependence on:
 
 ```text
+
 Current random value
+
 Current time
+
 External APIs
+
 Production data
+
 Unstable network
+
 AI wording
+
 ```
 
 Mock or control these where appropriate.
@@ -1751,12 +2647,19 @@ Mock or control these where appropriate.
 For:
 
 ```text
+
 JWT expiry
+
 Assessment timer
+
 Streaks
+
 Study sessions
+
 Notifications
+
 Scheduled jobs
+
 ```
 
 use controlled/fake time where supported.
@@ -1772,10 +2675,15 @@ For randomized question selection, do not assert one exact ordering.
 Assert:
 
 ```text
+
 Correct count
+
 Valid questions
+
 No duplicates within attempt
+
 Selection respects rules
+
 ```
 
 ---
@@ -1785,10 +2693,15 @@ Selection respects rules
 External services such as:
 
 ```text
+
 AI provider
+
 Email provider
+
 File-processing provider
+
 YouTube-related integrations where applicable
+
 ```
 
 should normally be mocked in unit/integration tests.
@@ -1806,10 +2719,15 @@ A project can have high coverage and still contain a critical authorization bug.
 Prioritize:
 
 ```text
+
 Business-critical paths
+
 Security
+
 Learning integrity
+
 Failure behavior
+
 ```
 
 over maximizing one coverage percentage.
@@ -1821,19 +2739,33 @@ over maximizing one coverage percentage.
 Before MVP release, strong automated coverage should exist for:
 
 ```text
+
 Authentication
+
 Authorization
+
 Course enrollment
+
 Prerequisites
+
 Lesson unlocking
+
 Assessment scoring
+
 Unanswered questions
+
 Mastery updates
+
 Personalization decisions
-Teacher ownership
-Student visibility
+
+Instructor ownership
+
+Learner visibility
+
 Admin authorization
+
 Background job reliability
+
 ```
 
 ---
@@ -1843,27 +2775,49 @@ Background job reliability
 Recommended:
 
 ```text
+
 Push / Pull Request
-       ↓
+
+       ↓
+
 Install dependencies
-       ↓
+
+       ↓
+
 Lint
-       ↓
+
+       ↓
+
 Type check if applicable
-       ↓
+
+       ↓
+
 Unit tests
-       ↓
+
+       ↓
+
 Component tests
-       ↓
+
+       ↓
+
 Integration tests
-       ↓
+
+       ↓
+
 Build
-       ↓
+
+       ↓
+
 E2E tests
-       ↓
+
+       ↓
+
 Security/dependency checks
-       ↓
+
+       ↓
+
 Ready for merge/deployment
+
 ```
 
 ---
@@ -1873,12 +2827,19 @@ Ready for merge/deployment
 Before merging:
 
 ```text
+
 Relevant tests pass
+
 No lint errors
+
 Build succeeds
+
 API contract unchanged or documented
+
 Security considered
+
 Existing regression tests pass
+
 ```
 
 ---
@@ -1888,16 +2849,27 @@ Existing regression tests pass
 Antigravity can assist with:
 
 ```text
+
 Test scaffolding
+
 Unit tests
+
 Integration tests
+
 Component tests
+
 Fixtures
+
 Mock data
+
 E2E test scaffolding
+
 Coverage-gap identification
+
 Debugging failed tests
+
 Refactoring repetitive tests
+
 ```
 
 Generated tests must be reviewed.
@@ -1909,11 +2881,17 @@ Generated tests must be reviewed.
 A dangerous pattern is:
 
 ```text
+
 AI writes implementation
-+
+
+\+
+
 AI writes tests
-+
+
+\+
+
 All tests pass
+
 ```
 
 This does not guarantee correctness.
@@ -1923,15 +2901,25 @@ AI may reproduce the same incorrect assumption in both implementation and test.
 Use:
 
 ```text
+
 Approved design
-      ↓
+
+      ↓
+
 Expected behavior
-      ↓
+
+      ↓
+
 Test requirement
-      ↓
+
+      ↓
+
 Implementation
-      ↓
+
+      ↓
+
 Test result
+
 ```
 
 The project documentation remains the reference.
@@ -1943,14 +2931,23 @@ The project documentation remains the reference.
 Some areas require deliberate human review:
 
 ```text
+
 Learning experience
+
 Recommendation usefulness
+
 UI clarity
+
 Accessibility
+
 AI explanation quality
+
 Course content quality
-Teacher workflow
-Student workflow
+
+Instructor workflow
+
+Learner workflow
+
 ```
 
 Automated tests cannot completely replace these.
@@ -1964,34 +2961,55 @@ As a solo developer:
 ### Developer responsibility
 
 ```text
+
 Architecture decisions
+
 Business-rule verification
+
 Critical security review
+
 Learning-model validation
+
 AI behavior evaluation
+
 Final E2E acceptance
+
 ```
 
 ### Antigravity assistance
 
 ```text
+
 Test scaffolding
+
 Boilerplate
+
 Fixtures
+
 Mocks
+
 Coverage gaps
+
 Debugging
+
 Refactoring
+
 ```
 
 ### CI enforcement
 
 ```text
+
 Build
+
 Lint
+
 Unit tests
+
 Integration tests
+
 Regression suite
+
 ```
 
 ---
@@ -2001,27 +3019,45 @@ Regression suite
 A feature is not complete when:
 
 ```text
+
 "It works on my machine."
+
 ```
 
 A feature is complete when appropriate:
 
 ```text
+
 Implementation
-+
+
+\+
+
 Unit tests
-+
+
+\+
+
 Integration tests
-+
+
+\+
+
 Error handling
-+
+
+\+
+
 Authorization
-+
+
+\+
+
 Frontend states
-+
+
+\+
+
 Relevant E2E test
-+
+
+\+
+
 Documentation update
+
 ```
 
 ---
@@ -2029,27 +3065,49 @@ Documentation update
 # 92. Release Readiness Checklist
 
 ```text
+
 [ ] Authentication tested
+
 [ ] JWT refresh tested
+
 [ ] RBAC tested
-[ ] Teacher ownership tested
-[ ] Student enrollment tested
+
+[ ] Instructor ownership tested
+
+[ ] Learner enrollment tested
+
 [ ] Prerequisites tested
+
 [ ] Lesson locking tested
+
 [ ] Assessment scoring tested
+
 [ ] Unanswered handling tested
+
 [ ] Question randomization tested
+
 [ ] Retry behavior tested
+
 [ ] Mastery calculation tested
+
 [ ] Personalization tested
+
 [ ] AI fallback tested
+
 [ ] Background jobs tested
+
 [ ] Import workflow tested
+
 [ ] Notifications tested
+
 [ ] Frontend E2E tested
+
 [ ] Security checks completed
+
 [ ] Performance baseline established
+
 [ ] Production configuration reviewed
+
 ```
 
 ---
@@ -2059,23 +3117,41 @@ Documentation update
 The most important E2E validation is:
 
 ```text
+
 Learn
- ↓
+
+ ↓
+
 Practice
- ↓
+
+ ↓
+
 Assess
- ↓
+
+ ↓
+
 Analyze
- ↓
+
+ ↓
+
 Personalize
- ↓
+
+ ↓
+
 Remediate
- ↓
+
+ ↓
+
 Reassess
- ↓
+
+ ↓
+
 Improve
- ↓
+
+ ↓
+
 Continue
+
 ```
 
 This is the heart of the platform.
@@ -2087,17 +3163,29 @@ This is the heart of the platform.
 The system should prove that it can:
 
 ```text
+
 Detect weakness
-      ↓
+
+      ↓
+
 Choose appropriate intervention
-      ↓
+
+      ↓
+
 Avoid unnecessary repetition
-      ↓
+
+      ↓
+
 Measure improvement
-      ↓
+
+      ↓
+
 Escalate when necessary
-      ↓
+
+      ↓
+
 Allow progression when mastery improves
+
 ```
 
 ---
@@ -2107,65 +3195,89 @@ Allow progression when mastery improves
 ### Scenario 1 — Minor weakness
 
 ```text
+
 Mastery = 72%
+
 One recent error
+
 ```
 
 Expected:
 
 ```text
+
 Low-intensity targeted practice
+
 ```
 
 ### Scenario 2 — Specific lesson weakness
 
 ```text
+
 Mastery = 48%
+
 Repeated errors mapped to Lesson 7
+
 ```
 
 Expected:
 
 ```text
+
 Lesson 7 recommendation
+
 ```
 
 ### Scenario 3 — Persistent weakness
 
 ```text
+
 Lesson review completed
+
 Practice remains poor
+
 ```
 
 Expected:
 
 ```text
+
 Alternative resource + additional practice
+
 ```
 
 ### Scenario 4 — Prerequisite failure
 
 ```text
+
 Advanced SQL diagnostic < threshold
+
 ```
 
 Expected:
 
 ```text
+
 Prerequisite recommendation
+
 ```
 
 ### Scenario 5 — Improvement
 
 ```text
+
 Before = 48%
+
 After remediation = 82%
+
 ```
 
 Expected:
 
 ```text
+
 Progress toward reassessment/continuation rather than unnecessary repeated remediation
+
 ```
 
 ---
@@ -2175,14 +3287,23 @@ Progress toward reassessment/continuation rather than unnecessary repeated remed
 Deliberately simulate:
 
 ```text
+
 Database unavailable
+
 Redis unavailable
+
 AI provider unavailable
+
 Notification provider unavailable
+
 Worker crashes
+
 Network timeout
+
 Invalid AI response
+
 Malformed import
+
 ```
 
 The goal is graceful degradation.
@@ -2194,20 +3315,27 @@ The goal is graceful degradation.
 Examples:
 
 ```text
+
 AI unavailable
+
 → deterministic recommendation still works
 
 Notification unavailable
+
 → learning transaction succeeds
 
 Analytics delayed
+
 → core learning still works
 
 Personalization worker delayed
+
 → current learning state remains valid
 
 Redis temporarily unavailable
+
 → system follows the defined queue/cache failure policy
+
 ```
 
 ---
@@ -2217,15 +3345,25 @@ Redis temporarily unavailable
 Verify relationships:
 
 ```text
-Student → Enrollment
+
+Learner → Enrollment
+
 Enrollment → Course
+
 Course → Lessons
+
 Lesson → Assessment
+
 Assessment → Questions
+
 Question → Topic
-Learning Event → Student/Course/Topic
-Mastery → Student/Topic
-Recommendation → Student
+
+Learning Event → Learner/Course/Topic
+
+Mastery → Learner/Topic
+
+Recommendation → Learner
+
 ```
 
 Test deletion/archive behavior carefully.
@@ -2237,11 +3375,17 @@ Test deletion/archive behavior carefully.
 Important scenarios:
 
 ```text
+
 Two assessment submissions
+
 Two enrollment requests
-Teacher edits while student is learning
+
+Instructor edits while learner is learning
+
 Two workers process same job
+
 Two devices update progress
+
 ```
 
 The backend should maintain consistent authoritative state.
@@ -2253,10 +3397,15 @@ The backend should maintain consistent authoritative state.
 Where multiple writes must remain consistent, test:
 
 ```text
+
 Success
+
 Failure midway
+
 Rollback
+
 Retry
+
 ```
 
 The exact use of database transactions follows the approved database design.
@@ -2268,11 +3417,17 @@ The exact use of database transactions follows the approved database design.
 If caching is used:
 
 ```text
+
 Cache hit
+
 Cache miss
+
 Stale cache
+
 Invalidation
+
 Cache unavailable
+
 ```
 
 The system must not treat stale cache as authoritative business state.
@@ -2284,15 +3439,25 @@ The system must not treat stale cache as authoritative business state.
 Maintain permanent tests for:
 
 ```text
+
 RBAC
+
 Ownership
+
 IDOR/BOLA
+
 Locked lesson bypass
+
 Admin endpoint protection
+
 Sensitive response fields
+
 Authentication bypass
+
 File upload security
+
 Rate limiting
+
 ```
 
 ---
@@ -2304,11 +3469,17 @@ For sensitive operations, verify expected audit events.
 Example:
 
 ```text
+
 Admin suspends account
-      ↓
+
+      ↓
+
 Action succeeds
-      ↓
+
+      ↓
+
 Audit record exists
+
 ```
 
 ---
@@ -2320,11 +3491,17 @@ Background jobs and critical operations should provide enough structured informa
 Useful fields:
 
 ```text
+
 Job ID
+
 Correlation ID
+
 Status
+
 Duration
+
 Error category
+
 ```
 
 ---
@@ -2334,33 +3511,53 @@ Error category
 ### Highest priority
 
 ```text
+
 Authentication
+
 Authorization
+
 Learning progression
+
 Assessment
+
 Mastery
+
 Personalization
-Teacher ownership
+
+Instructor ownership
+
 Data integrity
+
 ```
 
 ### High priority
 
 ```text
+
 Background jobs
+
 Question import
+
 AI fallback
+
 Notifications
+
 Analytics
+
 ```
 
 ### Later
 
 ```text
+
 Advanced load testing
+
 Advanced chaos testing
+
 Autoscaling validation
+
 Complex distributed tracing
+
 ```
 
 ---
@@ -2370,16 +3567,27 @@ Complex distributed tracing
 For each feature:
 
 ```text
-1. Read relevant documentation
-2. Define expected behavior
-3. Define tests
-4. Implement backend
-5. Test backend
-6. Implement frontend
-7. Test frontend
-8. Run integration tests
-9. Run E2E where applicable
-10. Update documentation if architecture changed
+
+1\. Read relevant documentation
+
+2\. Define expected behavior
+
+3\. Define tests
+
+4\. Implement backend
+
+5\. Test backend
+
+6\. Implement frontend
+
+7\. Test frontend
+
+8\. Run integration tests
+
+9\. Run E2E where applicable
+
+10\. Update documentation if architecture changed
+
 ```
 
 Do not wait until the end of the project to test everything.
@@ -2389,37 +3597,107 @@ Do not wait until the end of the project to test everything.
 # 107. Final Testing Architecture
 
 ```text
-                       CODE CHANGE
-                           │
-                           ▼
-                    Static Analysis
-                           │
-                           ▼
-                  Unit / Component Tests
-                           │
-                           ▼
-                    Integration Tests
-                           │
-                           ▼
-                       API Tests
-                           │
-              ┌────────────┴────────────┐
-              ▼                         ▼
-       Background Jobs            AI Evaluation
-              │                         │
-              └────────────┬────────────┘
-                           ▼
-                      E2E Tests
-                           │
-                           ▼
-                    Security Checks
-                           │
-                           ▼
-                   Performance Checks
-                           │
-                           ▼
-                   Release Readiness
+
+                       CODE CHANGE
+
+                           │
+
+                           ▼
+
+                    Static Analysis
+
+                           │
+
+                           ▼
+
+                  Unit / Component Tests
+
+                           │
+
+                           ▼
+
+                    Integration Tests
+
+                           │
+
+                           ▼
+
+                       API Tests
+
+                           │
+
+              ┌────────────┴────────────┐
+
+              ▼                         ▼
+
+       Background Jobs            AI Evaluation
+
+              │                         │
+
+              └────────────┬────────────┘
+
+                           ▼
+
+                      E2E Tests
+
+                           │
+
+                           ▼
+
+                    Security Checks
+
+                           │
+
+                           ▼
+
+                   Performance Checks
+
+                           │
+
+                           ▼
+
+                   Release Readiness
+
 ```
+
+---
+
+# 108A. Testing Boundaries and Source of Truth
+
+Testing must validate the finalized project architecture rather than inventing new behavior.
+
+Use this priority order when defining expected results:
+
+```text
+Approved requirements
+        ↓
+Approved user journeys
+        ↓
+Approved database model
+        ↓
+Approved API design
+        ↓
+Approved security/authentication rules
+        ↓
+Implementation
+```
+
+If implementation behavior conflicts with an approved document, the test should expose the mismatch rather than silently redefine the architecture.
+
+For rules intentionally deferred to later phases, write tests only for the currently approved behavior. Do not turn future features into MVP requirements merely because they are mentioned as possible extensions.
+
+In particular:
+
+- Admin is a governance role, not unrestricted access to every learning domain.
+- Admin may suspend/unsuspend accounts but cannot change roles or deactivate users.
+- Public signup may create only LEARNER or INSTRUCTOR accounts.
+- One account has one platform role in the MVP.
+- Account state is checked from current persisted `User.status`, so a previously valid access token cannot bypass suspension/deactivation.
+- Learner and Instructor profile data remain separate from `User`.
+- Refresh-token rotation updates the existing refresh session and preserves its token family.
+- Learning evidence is authoritative for recalculation of derived mastery where recalculation is supported.
+- AI output must pass schema and business-rule validation before it can influence authoritative learning state.
+- Deterministic hard constraints cannot be overridden by AI recommendations.
 
 ---
 
@@ -2428,20 +3706,29 @@ Do not wait until the end of the project to test everything.
 The platform should not be considered successful merely because:
 
 ```text
+
 The website loads.
+
 ```
 
 It should be considered successful when:
 
 ```text
+
 The right user
+
 can perform the right action
+
 under the right conditions
+
 with the right permissions
+
 and receive the correct result
+
 even when dependencies fail.
+
 ```
 
 For this project specifically:
 
-> **The most important test is whether the platform can reliably observe a student's learning behavior, identify a meaningful weakness, select an appropriate intervention, measure the result, and adapt the student's next learning step without violating curriculum, authorization, or data-integrity rules.**
+\> **\*\*The most important test is whether the platform can reliably observe a learner's learning behavior, identify a meaningful weakness, select an appropriate intervention, measure the result, and adapt the learner's next learning step without violating curriculum, authorization, or data-integrity rules.\*\***

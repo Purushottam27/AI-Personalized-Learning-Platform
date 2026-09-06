@@ -1,32 +1,37 @@
-# AI Based Personalized Learning Platform --- User Journeys
+# AI Based Personalized Learning Platform — User Journeys
 
 ## 1. Purpose
 
-This document defines the end-to-end workflows for Student, Teacher, and
-Admin, plus cross-role workflows and important failure/edge cases.
+This document defines the end-to-end behavioral and product workflows for **Learner, Instructor, and Admin**, including cross-role workflows and important failure/edge cases.
 
-It is a behavioral/product document. Technical implementation belongs in
-later architecture, database, API, security, AI, and infrastructure
-documents.
+It is a behavioral/product document. Technical implementation belongs in the later architecture, database, API, security, AI, frontend, and infrastructure documents.
 
-## 2. Student Journey
+The journeys in this document must remain consistent with the finalized product requirements, role model, onboarding model, authentication behavior, account-state semantics, and personalization principles.
+
+---
+
+## 2. Learner Journey
 
 ### Signup
 
 For MVP/testing:
 
-``` text
+```text
 Public Signup
+
   ↓
-○ Student
-○ Teacher
+
+Select Role
+
+  ├── Learner
+  └── Instructor
 ```
 
 Admin is never selectable through public signup.
 
-Student flow:
+Learner flow:
 
-``` text
+```text
 Signup
   ↓
 Account Created
@@ -36,10 +41,15 @@ Login
 Onboarding
 ```
 
-### Onboarding
+The learner selects the **Learner** role during signup.
 
-The student onboarding follows this progressive flow:
+---
 
+### Learner Onboarding
+
+The learner onboarding follows this progressive flow:
+
+```text
 Signup
   ↓
 Account Created
@@ -50,9 +60,9 @@ Welcome / Onboarding Introduction
   ↓
 Start Onboarding
   ↓
-Interests
+Learning Interests
   ↓
-Goals
+Learning Goals
   ↓
 Experience Level
   ↓
@@ -62,53 +72,157 @@ Preferred Learning Format
   ↓
 Onboarding Completed
   ↓
-Personalized Student Experience
+Personalized Learner Experience
+```
 
-onboarding uses a combination of:
+The onboarding experience should be concise and progressive rather than a large single form.
 
-- structured options
-- multiple selection where appropriate
-- custom/Other input where appropriate
+The MVP contains five fixed questions.
 
-Experience question:
+#### Question 1 — Learning Interests
 
-"How would you describe your current experience with the subjects
-you've selected?"
+**What would you like to learn about?**
 
-Options:
+Multiple selections are allowed:
 
-- I'm completely new to these subjects
-- I know some basics
-- I'm comfortable with the fundamentals
+- Programming & Software Development
+- Data Science & Artificial Intelligence
+- Mathematics & Statistics
+- Business & Entrepreneurship
+- Finance & Economics
+- Science & Technology
+- Other — Please specify
+
+#### Question 2 — Learning Goals
+
+**What are your main learning goals?**
+
+Multiple selections are allowed:
+
+- Build practical skills
+- Prepare for exams or academic studies
+- Prepare for a job or career
+- Improve existing knowledge
+- Learn something new for personal interest
+- Prepare for interviews
+- Other — Please specify
+
+#### Question 3 — Experience Level
+
+**How would you describe your current experience with your selected interests?**
+
+One selection:
+
+- I have no prior knowledge
+- I have a basic understanding
+- I am comfortable with the fundamentals
 - I have substantial experience
 - I'm not sure
 
-The onboarding experience should be concise and progressive rather than
-a large single form.
+This information is an initial self-reported signal and is **not verified mastery**.
 
-This is not verified mastery.
+#### Question 4 — Daily Study Capacity
+
+**How much time can you dedicate to learning each day?**
+
+One selection:
+
+- Less than 1 hour
+- 1–2 hours
+- 2–3 hours
+- 3–4 hours
+- 5 or more hours
+
+#### Question 5 — Preferred Learning Format
+
+**How do you prefer to learn?**
+
+Multiple selections are allowed:
+
+- Reading
+- Videos
+- Interactive Learning
+- Practice Exercises
+- Projects
+
+### Onboarding Behavior
+
+The onboarding experience should:
+
+- show one question at a time
+- provide Back and Next navigation
+- save each answer progressively
+- allow the learner to resume after interruption
+- store the actual custom value when `Other — Please specify` is selected
+- treat preferred learning format as a preference rather than a strict restriction
+
+The onboarding state is:
+
+```text
+NOT_STARTED
+IN_PROGRESS
+COMPLETED
+```
+
+Onboarding can be revisited after completion to update learner preferences.
+
+---
+
+### Google Sign-In — New Learner
+
+Google authentication has a different initial journey because a permanent platform account is not created until role selection and role-specific onboarding are completed.
+
+```text
+Google Sign-In
+  ↓
+Google Authentication
+  ↓
+Temporary Setup
+  ↓
+Select Learner Role
+  ↓
+Learner Onboarding
+  ↓
+Complete Setup
+  ↓
+Create Learner Account
+  ↓
+Create Learner Profile
+  ↓
+Authenticated Session
+  ↓
+Learner Dashboard
+```
+
+A new Google learner is not required to create a password during initial setup.
+
+---
 
 ### Dashboard
 
-The dashboard answers:
+The learner dashboard should answer:
 
-1.  Where am I?
-2.  What am I good at?
-3.  What should I improve?
-4.  What should I do next?
+1. Where am I?
+2. What am I good at?
+3. What should I improve?
+4. What should I do next?
 
 Sections may include:
 
--   Continue Learning
--   Progress
--   Statistics
--   Strengths
--   Areas to Improve
--   Recommended For You
+- Continue Learning
+- Progress
+- Statistics
+- Strengths
+- Areas to Improve
+- Recommended For You
+
+Personalized recommendations should complement explicit learner controls.
+
+---
 
 ### Course Discovery
 
-``` text
+```text
 My Courses
 Explore Courses
 Recommended For You
@@ -116,50 +230,63 @@ Recommended For You
 
 Explore supports:
 
--   search
--   department
--   category/subject
--   difficulty
+- search
+- learning domain/category
+- difficulty
 
-Explicit search/filter remains available even when AI recommendations
-exist.
+Explicit search and filtering remain available even when AI recommendations exist.
+
+The shared learning-domain taxonomy includes:
+
+- Programming & Software Development
+- Data Science & Artificial Intelligence
+- Mathematics & Statistics
+- Business & Entrepreneurship
+- Finance & Economics
+- Science & Technology
+
+---
 
 ### Course Overview
 
-Before enrollment, show:
+Before enrollment, show relevant course information such as:
 
--   title
--   description
--   instructor
--   department
--   category
--   difficulty
--   objectives
--   prerequisites
--   estimated duration
--   structure overview
+- title
+- description
+- instructor
+- learning domain/category
+- difficulty
+- objectives
+- prerequisites
+- estimated duration
+- structure overview
 
 Example:
 
-``` text
+```text
 Database Management Systems
-Instructor: Dr. Rahul Dubey
-Department: Computer Science & Engineering
+
+Instructor: Example Instructor
+Domain: Programming & Software Development
 Level: Intermediate
 Prerequisite: Basic SQL
 ```
+
+---
 
 ### Prerequisite / Diagnostic
 
 No prerequisite:
 
-``` text
-Course Overview → Enroll
+```text
+Course Overview
+  ↓
+Enroll
 ```
 
 Required diagnostic:
 
-``` text
+```text
 Course Overview
   ↓
 Diagnostic
@@ -167,7 +294,7 @@ Diagnostic
 
 Pass:
 
-``` text
+```text
 Diagnostic
   ↓
 Threshold satisfied
@@ -177,7 +304,7 @@ Enroll / proceed
 
 Fail:
 
-``` text
+```text
 Diagnostic
   ↓
 Analyze prerequisite weaknesses
@@ -189,26 +316,29 @@ Mini assessment
 Retry diagnostic
 ```
 
-If the prerequisite course was already completed, targeted revision is
-preferred over repeating the whole course.
+If the prerequisite course was already completed, targeted revision is preferred over repeating the entire course.
+
+---
 
 ### Enrollment
 
-``` text
+```text
 Course Overview
   ↓
-Prerequisite policy satisfied
+Prerequisite Policy Satisfied
   ↓
 Enroll
   ↓
-Course added to My Courses
+Course Added to My Courses
 ```
 
-Teacher approval is not part of MVP.
+Teacher approval is not part of the MVP enrollment flow.
+
+---
 
 ### Course Learning
 
-``` text
+```text
 My Courses
   ↓
 Course
@@ -218,27 +348,41 @@ Topics
 Lessons
 ```
 
-The student sees progress, completed lessons, current lesson, locked
-lessons, assessment status, and final assessment status.
+The learner can see relevant course information such as:
+
+- overall progress
+- completed lessons
+- current lesson
+- locked lessons
+- assessment status
+- final assessment status
+
+Lesson unlocking follows deterministic course policies.
+
+---
 
 ### Lesson
 
 A lesson may contain:
 
--   explanation
--   examples
--   visuals
--   YouTube video
--   teacher notes
--   external references
--   practice
--   assessment
+- conceptual explanation
+- examples
+- visual material
+- YouTube video resources
+- instructor-provided resources
+- external references
+- practice
+- assessment
 
-Teachers are not required to record their own videos.
+Instructors are not required to record their own videos.
+
+Relevant YouTube videos may be embedded when embedding is permitted.
+
+---
 
 ### Practice
 
-``` text
+```text
 Lesson
   ↓
 Practice
@@ -250,190 +394,390 @@ Feedback
 Repeat if desired
 ```
 
-Practice is learning-oriented.
+Practice is learning-oriented and generally repeatable.
+
+---
 
 ### Assessment
 
-Assessment supports:
+Assessments may support:
 
--   question bank
--   configurable question count
--   marks
--   passing threshold
--   optional timer
--   previous/next navigation
--   question number
--   attempt history
--   maximum attempts where configured
+- question banks
+- configurable question count
+- marks
+- passing threshold
+- optional timer
+- previous/next navigation
+- question numbering
+- attempt history
+- maximum attempts where configured
+- randomized question selection
 
 Response states:
 
-``` text
+```text
 CORRECT
 INCORRECT
 UNANSWERED
 ```
 
-Unanswered questions receive zero marks.
+Unanswered questions receive zero marks but remain analytically distinct from incorrect answers.
+
+---
 
 ### Assessment Result
 
-``` text
+```text
 Assessment
   ↓
 Scoring
   ↓
-Question-level analysis
+Question-Level Analysis
   ↓
-Topic-level analysis
+Topic-Level Analysis
   ↓
-Learning evidence
+Learning Evidence
   ↓
-Mastery update
+Mastery Update
 ```
 
-### Pass
+Scoring and other critical assessment decisions are deterministic.
 
-``` text
+---
+
+### Assessment Pass
+
+```text
 Assessment
   ↓
 Passed
   ↓
-Learning profile updated
+Learning Evidence Updated
   ↓
-Next lesson unlocked according to policy
+Next Lesson Unlocked According to Policy
   ↓
-Next recommendation
+Next Recommendation
 ```
 
-### Fail
+Passing an assessment does not by itself represent the complete picture of learner mastery.
 
-``` text
+---
+
+### Assessment Failure
+
+```text
 Assessment
   ↓
-Not passed
+Not Passed
   ↓
-Weakness analysis
+Weakness Analysis
   ↓
-Targeted remediation
+Targeted Remediation
   ↓
 Reassessment
 ```
 
+The purpose of remediation is to address identified learning gaps rather than simply require repeated attempts.
+
+---
+
 ### Retry
 
-A retry should not simply reuse the same fixed questions.
+A retry should not simply reuse the same fixed questions when question-bank selection is configured.
 
 Example:
 
-``` text
+```text
 Question Bank = 30
-Questions per attempt = 10
+Questions per Attempt = 10
 ```
 
-Different attempts can select different questions.
+Different attempts can select different questions according to the assessment's selection policy.
+
+---
 
 ### Remediation
 
-``` text
+```text
 Weakness
   ↓
 Explanation
   ↓
 Example
   ↓
-Video/resource
+Video / Resource
   ↓
 Practice
   ↓
-Mini assessment
+Mini Assessment
   ↓
 Reassessment
 ```
+
+AI may assist with explanations, feedback, and recommendations, while deterministic rules remain responsible for critical progression and assessment decisions.
+
+---
 
 ### Improvement
 
 Example:
 
-``` text
+```text
 Before: 2NF = 45%
 After:  2NF = 74%
+
 Improvement: +29 percentage points
 ```
 
+The platform should measure improvement rather than relying only on completion or a single score.
+
+---
+
 ### Course Completion
 
-``` text
-Required lessons complete
+```text
+Required Lessons Complete
   ↓
 Final Assessment
   ↓
-Course-level analysis
+Course-Level Analysis
   ↓
 Course Mastery Report
 ```
 
-The report may contain overall mastery, strong topics, developing
-topics, weak topics, improvement history, and next steps.
+The report may contain:
+
+- overall mastery
+- strong topics
+- developing topics
+- weak topics
+- improvement history
+- next steps
 
 A single final score is not the only mastery evidence.
 
-## 3. Teacher Journey
+---
+
+### Learner Account Deactivation
+
+A learner may voluntarily deactivate their own account.
+
+```text
+Learner Account Settings
+  ↓
+Deactivate Account
+  ↓
+Confirmation
+  ↓
+Account Deactivated
+  ↓
+Active Refresh Sessions Revoked
+  ↓
+Frontend Clears Authenticated State
+  ↓
+Deactivation Screen
+```
+
+The user's account data and learning history are preserved.
+
+Learning activity is paused while the account is deactivated.
+
+The deactivation operation is represented by:
+
+```text
+DELETE /api/v1/users/me
+```
+
+The operation changes the account state to `DEACTIVATED`; it does not permanently delete the user's preserved learning data.
+
+The deactivation screen should communicate:
+
+```text
+Your account is currently deactivated.
+
+Your learning progress has been paused.
+
+Reactivate your account to continue learning.
+
+[ Reactivate Account ]
+```
+
+The deactivation screen should not provide a normal Login action.
+
+---
+
+### Learner Account Reactivation
+
+A deactivated learner can reactivate their account.
+
+```text
+Deactivation Screen
+  ↓
+Reactivate Account
+  ↓
+Enter Email + Password
+  ↓
+Verify Account
+  ↓
+Verify Password
+  ↓
+DEACTIVATED → ACTIVE
+  ↓
+Create New Authentication Session
+  ↓
+Dashboard
+  ↓
+Learning Resumes
+```
+
+Previously revoked refresh sessions are not restored or reused.
+
+Learning data and progress remain preserved.
+
+If the account is suspended, the learner cannot use self-service reactivation.
+
+---
+
+## 3. Instructor Journey
 
 ### Registration
 
 For MVP/testing:
 
-``` text
+```text
 Public Signup
   ↓
-Select Teacher
+Select Instructor
   ↓
 Create Account
   ↓
 Login
   ↓
-Teacher Dashboard
+Instructor Onboarding
+  ↓
+Instructor Dashboard
 ```
 
-Production teacher verification is deferred.
+Production instructor verification is deferred.
 
-### Teacher Profile
+The instructor selects the **Instructor** role during signup.
 
-May contain:
+---
 
--   name
--   professional title
--   department
--   subject areas
--   profile information
--   avatar
+### Instructor Onboarding
 
-Courses reference the teacher as owner.
+Instructor onboarding is intentionally different from learner onboarding.
+
+The MVP onboarding consists of two questions.
+
+#### Question 1 — Professional Role
+
+**What best describes your professional role?**
+
+One selection:
+
+- Software Developer / Designer
+- Data Scientist
+- Machine Learning Engineer
+- Cybersecurity Professional
+- Educator / Instructor
+- Finance Professional
+- Other — Please specify
+
+This contributes to the instructor's professional title.
+
+#### Question 2 — Teaching Expertise
+
+**What areas are you experienced in teaching?**
+
+Multiple selections are allowed:
+
+- Programming & Software Development
+- Data Science & Artificial Intelligence
+- Mathematics & Statistics
+- Business & Entrepreneurship
+- Finance & Economics
+- Science & Technology
+- Other — Please specify
+
+This contributes to the instructor's expertise areas.
+
+When `Other — Please specify` is selected, the actual custom value is stored rather than the literal value `Other`.
+
+Instructor onboarding can be revisited after completion.
+
+---
+
+### Google Sign-In — New Instructor
+
+A new Google instructor follows the same temporary setup concept as a new Google learner:
+
+```text
+Google Sign-In
+  ↓
+Google Authentication
+  ↓
+Temporary Setup
+  ↓
+Select Instructor Role
+  ↓
+Instructor Onboarding
+  ↓
+Complete Setup
+  ↓
+Create Instructor Account
+  ↓
+Create Instructor Profile
+  ↓
+Authenticated Session
+  ↓
+Instructor Dashboard
+```
+
+A new Google instructor is not required to create a password during initial setup.
+
+---
+
+### Instructor Profile
+
+The instructor profile may contain:
+
+- professional title
+- expertise areas
+- bio
+- years of experience
+- organization
+- social links
+
+General account information such as name, email, and avatar remains part of the user account rather than being duplicated in the instructor profile.
+
+Courses reference the instructor as their owner.
+
+---
 
 ### Dashboard
 
-``` text
+```text
 Overview
 Recent Courses
 Enrollment Summary
 Course Performance
-Student Activity
+Learner Activity
 Quick Actions
 ```
 
+---
+
 ### Course Creation
 
-``` text
+```text
 Create Course
   ↓
 Basic Information
   ↓
-Instructor/Ownership
+Instructor / Ownership
   ↓
-Department
-  ↓
-Category
+Learning Domain / Metadata
   ↓
 Difficulty
   ↓
@@ -462,54 +806,78 @@ Save Draft
 Publish
 ```
 
+Instructors can create and publish courses without mandatory Admin pre-approval in the MVP.
+
+---
+
 ### Course Lifecycle
 
-``` text
+```text
 DRAFT → PUBLISHED → ARCHIVED
 ```
 
 Draft courses are not normal public courses.
 
+A future moderation workflow may introduce:
+
+```text
+Instructor
+  ↓
+Submit Course
+  ↓
+Admin Review
+  ↓
+Approve / Reject
+  ↓
+Publish
+```
+
+This workflow is not mandatory for the MVP.
+
+---
+
 ### Lesson and Resource Management
 
-Teacher can:
+Instructor can:
 
--   add/edit lessons
--   associate lessons with topics
--   add explanations
--   add examples
--   add visuals
--   add YouTube videos
--   upload notes
--   add external references
--   create practice
--   configure assessments
+- add/edit lessons
+- associate lessons with topics
+- add explanations
+- add examples
+- add visuals
+- add YouTube videos
+- upload learning resources
+- add external references
+- create practice
+- configure assessments
 
 Resources may include:
 
-``` text
+```text
 YouTube
 PDF
-PPT/PPTX
-DOC/DOCX
+PPT / PPTX
+DOC / DOCX
 External Link
 ```
+
+---
 
 ### Question Bank
 
 Manual questions support:
 
--   question
--   options
--   correct answer
--   explanation
--   marks
--   topic
--   difficulty
+- question
+- options
+- correct answer
+- explanation
+- marks
+- topic
+- difficulty
 
 CSV/Excel bulk import:
 
-``` text
+```text
 Upload
   ↓
 Parse
@@ -518,119 +886,137 @@ Validate
   ↓
 Preview
   ↓
-Teacher confirms
+Instructor Confirms
   ↓
 Question Bank
 ```
 
 Future AI generation:
 
-``` text
-Teacher Content
+```text
+Instructor Content
   ↓
 AI Draft
   ↓
-Teacher Review/Edit
+Instructor Review / Edit
   ↓
-Teacher Approval
+Instructor Approval
   ↓
 Question Bank
 ```
 
+AI-generated questions must not automatically become official assessment content.
+
+---
+
 ### Assessment Management
 
-Teacher configures:
+Instructor configures:
 
--   question bank
--   questions per attempt
--   marks
--   passing threshold
--   timer
--   maximum attempts
--   selection strategy
--   difficulty distribution where supported
+- question bank
+- questions per attempt
+- marks
+- passing threshold
+- timer
+- maximum attempts
+- selection strategy
+- difficulty distribution where supported
 
-Assessment types:
+Assessment types include:
 
--   practice
--   lesson/topic assessment
--   diagnostic
--   final assessment
+- practice
+- lesson/topic assessment
+- diagnostic
+- final assessment
 
-### Enrolled Students
+---
 
-For every course owned by the teacher:
+### Enrolled Learners
 
-``` text
+For every course owned by the instructor:
+
+```text
 My Courses
   ↓
 Course
   ↓
-Students
+Learners
 ```
 
-Teacher can see enrolled students and course-relevant information:
+The instructor can see course-relevant information such as:
 
--   enrollment status
--   progress
--   lesson completion
--   assessment performance
--   topic performance
--   relevant strengths/weaknesses
--   course activity
+- enrollment status
+- progress
+- lesson completion
+- assessment performance
+- topic performance
+- relevant strengths/weaknesses
+- course activity
 
-Teacher cannot automatically access unrelated learning data from other
-teachers' courses.
+The instructor cannot automatically access unrelated learning data from courses owned by other instructors.
 
-### Teacher Analytics
+---
 
-``` text
+### Instructor Analytics
+
+```text
 Enrollment
 Completion
 Average Performance
 Topic Performance
 Difficult Topics
-Student Progress
+Learner Progress
 Assessment Performance
 ```
 
-### Teacher Improvement Loop
+Analytics should support course improvement while respecting course ownership and authorization boundaries.
 
-``` text
-Teacher creates course
+---
+
+### Instructor Improvement Loop
+
+```text
+Instructor Creates Course
   ↓
-Students learn
+Learners Learn
   ↓
-Performance data
+Performance Data
   ↓
-Teacher analytics
+Instructor Analytics
   ↓
-Difficult content identified
+Difficult Content Identified
   ↓
-Teacher improves course
+Instructor Improves Course
   ↓
-Students receive improved material
+Learners Receive Improved Material
 ```
+
+---
 
 ## 4. Admin Journey
 
 ### Access
 
-Admin accounts are controlled and are not created through public
-self-selected signup.
+Admin accounts are controlled and are not created through public self-selected signup.
+
+Admin accounts are provisioned separately.
+
+---
 
 ### Dashboard
 
-``` text
+```text
 Platform Overview
 Users
-Students
-Teachers
+Learners
+Instructors
 Courses
 Moderation
 Analytics
-Audit Logs
+Audit Information
 ```
+
+---
 
 ### User Management
 
@@ -638,7 +1024,7 @@ Admin may manage platform users according to authorization policy.
 
 The Admin user-management flow includes:
 
-``` text
+```text
 Admin Dashboard
   ↓
 Users
@@ -651,17 +1037,23 @@ View User
   ↓
 User Details
 ```
+
 The User Details view may contain:
 
-account information
-Student/Teacher information
-learning overview where available
-administrative actions
+- account information
+- role-specific profile information
+- learning overview where appropriate
+- administrative actions
 
-Administrative account actions include:
+Administrative account-status actions include:
 
-Active → Suspend
-Suspended → Unsuspend
+```text
+ACTIVE → SUSPENDED
+
+SUSPENDED → ACTIVE
+```
+
+When suspending a user, a suspension reason is required.
 
 Admin cannot change a user's role.
 
@@ -669,23 +1061,30 @@ Admin does not deactivate users.
 
 User deactivation is initiated by the user through their own account.
 
+---
+
 ### Course Moderation
 
-Admin may review and moderate platform courses according to platform
-policy.
+Admin may review and moderate platform courses according to platform policy.
 
-Detailed destructive actions and workflows are deferred.
+In the MVP, course publishing does not require mandatory Admin pre-approval.
+
+Admin moderation remains available for governance and intervention when content is reported or violates platform requirements.
+
+Detailed destructive moderation workflows are deferred.
+
+---
 
 ## 5. Cross-Role Workflows
 
-### Teacher Creates Course
+### Instructor Creates Course
 
-``` text
-Teacher
+```text
+Instructor
   ↓
 Create Course
   ↓
-Department / Metadata
+Learning Domain / Metadata
   ↓
 Prerequisites
   ↓
@@ -703,13 +1102,15 @@ Review
   ↓
 Publish
   ↓
-Students discover/enroll
+Learners Discover / Enroll
 ```
 
-### Student Enrollment
+---
 
-``` text
-Student
+### Learner Enrollment
+
+```text
+Learner
   ↓
 Search / Explore / Recommendation
   ↓
@@ -719,15 +1120,17 @@ Prerequisite / Diagnostic
   ↓
 Enroll
   ↓
-Course added to My Courses
+Course Added to My Courses
   ↓
-Teacher enrollment data updates
+Instructor Enrollment Data Updates
 ```
 
-### Student Learning Data
+---
 
-``` text
-Student
+### Learner Learning Data
+
+```text
+Learner
   ↓
 Lesson
   ↓
@@ -736,37 +1139,43 @@ Practice
 Assessment
   ↓
 Performance Evidence
-  ├───────────────┐
-  ▼               ▼
-Student        Teacher
-Analytics      Course Analytics
-  │               │
-  ▼               ▼
-Personalization  Course Improvement
+  ├─────────────────┐
+  ↓                 ↓
+Learner Analytics   Instructor Course Analytics
+  ↓                 ↓
+Personalization    Course Improvement
 ```
 
-### Teacher Views Student
+Learning evidence may contribute to both learner personalization and relevant course analytics.
 
-``` text
-Teacher
+---
+
+### Instructor Views Learner
+
+```text
+Instructor
   ↓
 My Courses
   ↓
 Course
   ↓
-Students
+Learners
   ↓
-Student
+Learner
   ↓
-Course-specific learning data
+Course-Specific Learning Data
 ```
 
-Server-side authorization must confirm course ownership.
+Server-side authorization must confirm that the instructor owns the relevant course.
+
+The instructor should only receive learning information relevant to that course.
+
+---
 
 ### Personalization
 
-``` text
-Student Activity
+```text
+Learner Activity
   ↓
 Learning Evidence
   ↓
@@ -774,171 +1183,231 @@ Performance Analysis
   ↓
 Learning Profile
   ↓
-Rules + AI
+Deterministic Rules + AI
   ↓
 Recommendation
   ↓
-Student
+Learner
 ```
+
+AI recommendations complement deterministic application logic and explicit learner controls.
+
+---
+
+### Google Authentication — Existing Google Account
+
+When a Google identity is already linked to a platform account:
+
+```text
+Google Sign-In
+  ↓
+Google Authentication
+  ↓
+Find Linked AuthIdentity
+  ↓
+Find Platform User
+  ↓
+Check Account Status
+  ↓
+Create / Refresh Platform Session
+  ↓
+Platform
+```
+
+The platform's own access and refresh tokens are used for authenticated application access.
+
+---
+
+### Google Authentication — Existing Password Account
+
+If Google authentication matches an existing password-based account but the Google identity is not linked:
+
+```text
+Google Sign-In
+  ↓
+Existing Password Account Found
+  ↓
+Google Identity Not Linked
+  ↓
+Do Not Auto-Link
+  ↓
+Do Not Create Application Session
+  ↓
+Ask User to Sign In Using Existing Account
+```
+
+Account linking may be introduced later through an authenticated account-settings workflow.
+
+---
 
 ## 6. Important Failure and Edge Cases
 
 ### Failed Diagnostic
 
-``` text
+```text
 Diagnostic
   ↓
 Fail
   ↓
-Identify prerequisite weakness
+Identify Prerequisite Weakness
   ↓
-Recommend prerequisite/refresher
+Recommend Prerequisite / Refresher
   ↓
-Mini assessment
+Mini Assessment
   ↓
-Retry diagnostic
+Retry Diagnostic
 ```
+
+---
 
 ### Failed Assessment
 
-``` text
+```text
 Assessment
   ↓
 Fail
   ↓
-Weakness analysis
+Weakness Analysis
   ↓
-Targeted remediation
+Targeted Remediation
   ↓
 Reassessment
 ```
 
+---
+
 ### Timer Expiration
 
-``` text
-Timer reaches zero
+```text
+Timer Reaches Zero
   ↓
-Automatic submission
+Automatic Submission
   ↓
-Unanswered = zero marks
+Unanswered = Zero Marks
 ```
+
+---
 
 ### Repeated Attempts
 
-Different attempts should use question-bank selection rather than always
-repeating the exact same questions.
+Different attempts should use question-bank selection rather than always repeating the exact same questions when the assessment is configured for randomized selection.
+
+---
 
 ### Repeated Difficulty
 
-``` text
-Repeated difficulty
+```text
+Repeated Difficulty
   ↓
-Stronger remediation
+Stronger Remediation
   ↓
-Prerequisite/refresher recommendation
+Prerequisite / Refresher Recommendation
   ↓
-Additional practice
+Additional Practice
   ↓
 Reassessment
 ```
 
 The same intervention should not be repeated indefinitely.
 
+---
+
 ### YouTube Resource Unavailable
 
-``` text
-Video unavailable
+```text
+Video Unavailable
   ↓
-Graceful fallback
+Graceful Fallback
   ↓
-Alternative resource if available
+Alternative Resource if Available
 ```
 
 The lesson must not fail because one external resource is unavailable.
 
+---
+
 ### Incomplete Course
 
-An incomplete teacher course remains DRAFT and should not be treated as
-a normal published course.
+An incomplete instructor course remains `DRAFT` and should not be treated as a normal published course.
 
-### Unauthorized Teacher Access
+---
 
-If Teacher A requests Teacher B's student data:
+### Unauthorized Instructor Access
 
-``` text
+If Instructor A requests Instructor B's learner data:
+
+```text
 Request
   ↓
-Authorization check
+Authorization Check
   ↓
-Ownership fails
+Ownership Fails
   ↓
-Access denied
+Access Denied
 ```
+
+---
 
 ### Unauthorized Role Escalation
 
 Client-side manipulation must never allow:
 
-``` text
-STUDENT → TEACHER
-STUDENT → ADMIN
-TEACHER → ADMIN
+```text
+LEARNER → INSTRUCTOR
+LEARNER → ADMIN
+INSTRUCTOR → ADMIN
 ```
 
 Roles are controlled server-side.
 
 Admin user-management operations do not provide a role-change operation.
 
+---
+
 ### Archived Course After Enrollment
 
-Historical records should remain meaningful and progress should not be
-silently destroyed. Exact active-learner handling is a later decision.
+Historical records should remain meaningful and learner progress should not be silently destroyed.
+
+Exact active-learner handling for archived courses is a later implementation decision.
+
+---
 
 ### Account Deactivation
 
-Account deactivation is user-initiated and is reversible.
+Account deactivation is user-initiated and reversible.
 
 ```text
-User Profile
+User Account Settings
   ↓
 Deactivate Account
   ↓
 Confirmation
   ↓
-DELETE /api/v1/users/me
+Account Status → DEACTIVATED
   ↓
-Account status → DEACTIVATED
+All Active Refresh Sessions Revoked
   ↓
-All active refresh sessions revoked
+Frontend Clears Authenticated State
   ↓
-Frontend clears authenticated state
-  ↓
-Deactivation screen
+Deactivation Screen
 ```
+
 The user's account data and learning history are preserved.
 
-The user's learning progress is paused while the account remains
-DEACTIVATED.
+The user's learning progress is paused while the account remains `DEACTIVATED`.
 
 Existing access tokens must not bypass the deactivated account state.
-Protected API requests are rejected after the account status is checked.
 
-Normal login does not authenticate a DEACTIVATED account.
+Protected API requests are rejected after the current account status is checked.
 
-The deactivation screen should communicate:
+Normal login does not authenticate a `DEACTIVATED` account.
 
-Your account is currently deactivated.
-
-Your learning progress has been paused.
-Reactivate your account to continue learning.
-
-[ Reactivate Account ]
-
-The deactivation screen does not provide a normal Login action.
+---
 
 ### Account Reactivation
 
-A DEACTIVATED account can be reactivated by the account owner.
+A `DEACTIVATED` account can be reactivated by the account owner.
+
 ```text
 Deactivation Screen
   ↓
@@ -946,94 +1415,147 @@ Reactivate Account
   ↓
 Enter Email + Password
   ↓
-POST /api/v1/auth/reactivate
+Verify Account
   ↓
-Verify account exists
+Verify Status
   ↓
-Verify account status
-  ↓
-Verify password
+Verify Password
   ↓
 DEACTIVATED → ACTIVE
   ↓
-Create new authentication session
-  ↓
-Return to Dashboard
-  ↓
-Learning resumes from preserved progress
-```
-Reactivation does not restore or reuse previously revoked refresh
-sessions. A new refresh session is created.
-
-If the account does not exist:
-
-ACCOUNT_NOT_FOUND
-
-The user should be directed toward the normal account-creation/login
-flow as appropriate.
-
-If the account is already ACTIVE:
-
-ACCOUNT_ALREADY_ACTIVE
-
-The user should be directed to normal login.
-
-If the account is SUSPENDED:
-
-ACCOUNT_SUSPENDED
-
-The user cannot self-reactivate and no reactivation action should be
-presented.
-
-### Account State in Authentication
-
-When login is attempted:
-```text
-ACTIVE
-  ↓
-Normal login
-
-DEACTIVATED
-  ↓
-ACCOUNT_DEACTIVATED
-  ↓
-Show deactivation screen
-  ↓
-[ Reactivate Account ]
-
-SUSPENDED
-  ↓
-ACCOUNT_SUSPENDED
-  ↓
-Show suspension screen
-  ↓
-No reactivation action
-```
-## 7. User Journey Principles
-
-1.  Every important action has a clear next step.
-2.  Failure leads toward recovery.
-3.  Students understand why an action is required.
-4.  Teachers control educational content and assessment configuration.
-5.  Teachers see relevant performance data for their own courses.
-6.  Admins operate at platform level.
-7.  AI recommendations complement explicit user controls.
-8.  Authorization is enforced server-side.
-9.  External resource failure does not break learning.
-10. MVP flows remain simple enough to test end-to-end.
-
-## 8. Core Journey Summaries
-
-### Student
-
-``` text
-Signup
-  ↓
-Onboarding
+Create New Authentication Session
   ↓
 Dashboard
   ↓
-Explore/Search
+Learning Resumes
+```
+
+Reactivation does not restore or reuse previously revoked refresh sessions.
+
+A new refresh session is created.
+
+If the account does not exist:
+
+```text
+ACCOUNT_NOT_FOUND
+```
+
+If the account is already active:
+
+```text
+ACCOUNT_ALREADY_ACTIVE
+```
+
+The user should be directed toward normal login.
+
+If the account is suspended:
+
+```text
+ACCOUNT_SUSPENDED
+```
+
+The user cannot self-reactivate.
+
+---
+
+### Account State During Authentication
+
+```text
+Login Attempt
+      ↓
+Check Account
+      │
+      ├── ACTIVE
+      │     ↓
+      │   Normal Login
+      │
+      ├── DEACTIVATED
+      │     ↓
+      │   ACCOUNT_DEACTIVATED
+      │     ↓
+      │   Show Deactivation Screen
+      │     ↓
+      │   Reactivate Account
+      │
+      └── SUSPENDED
+            ↓
+          ACCOUNT_SUSPENDED
+            ↓
+          Show Suspension State
+            ↓
+          No Self-Reactivation
+```
+
+Authentication methods must not bypass account-state restrictions.
+
+---
+
+### Google Sign-In for Restricted Accounts
+
+If a Google identity is associated with a platform account that is suspended or deactivated:
+
+```text
+Google Sign-In
+  ↓
+Existing Platform Account Found
+  ↓
+Check Account Status
+  ↓
+SUSPENDED / DEACTIVATED
+  ↓
+Access Denied
+```
+
+Google authentication must not be used to bypass the platform account state.
+
+---
+
+## 7. User Journey Principles
+
+1. **Every important action has a clear next step.**
+
+2. **Failure should lead toward recovery where recovery is appropriate.**
+
+3. **Learners should understand why an action is required.**
+
+4. **Instructors control educational content and assessment configuration for their own courses.**
+
+5. **Instructors see relevant performance data for their own courses.**
+
+6. **Admins operate primarily at the platform governance level.**
+
+7. **AI recommendations complement explicit user controls.**
+
+8. **Authorization is enforced server-side.**
+
+9. **External resource failure does not break the learning experience.**
+
+10. **MVP flows remain simple enough to test end-to-end.**
+
+11. **Learner onboarding establishes initial preferences and self-reported context; it is not treated as verified mastery.**
+
+12. **Account suspension and account deactivation are distinct workflows.**
+
+13. **Learning data and progress are preserved when an account is suspended or deactivated.**
+
+14. **Authentication methods must not bypass account restrictions.**
+
+---
+
+## 8. Core Journey Summaries
+
+### Learner
+
+```text
+Signup
+  ↓
+Login
+  ↓
+Learner Onboarding
+  ↓
+Dashboard
+  ↓
+Explore / Search / Recommendations
   ↓
 Course Details
   ↓
@@ -1052,24 +1574,30 @@ Assessment
 Performance Analysis
   ↓
 Pass → Next Lesson
-  OR
+
+OR
+
 Weakness → Remediation → Reassessment
   ↓
-Updated Learning Profile
+Updated Learning Evidence
   ↓
 Personalized Next Action
 ```
 
-### Teacher
+---
 
-``` text
-Signup/Login
+### Instructor
+
+```text
+Signup / Login
   ↓
-Teacher Profile
+Instructor Onboarding
+  ↓
+Instructor Profile
   ↓
 Create Course
   ↓
-Metadata / Department / Prerequisites
+Metadata / Prerequisites
   ↓
 Topics / Lessons / Resources
   ↓
@@ -1079,27 +1607,29 @@ Review
   ↓
 Publish
   ↓
-Students Enroll
+Learners Enroll
   ↓
-Teacher Sees Enrolled Students
+Instructor Sees Course Learners
   ↓
 Course Analytics
   ↓
 Course Improvement
 ```
 
+---
+
 ### Admin
 
-``` text
+```text
 Controlled Admin Access
   ↓
 Admin Dashboard
   ↓
 Users
   ↓
-Teachers
+Learners
   ↓
-Students
+Instructors
   ↓
 Courses
   ↓
@@ -1109,3 +1639,28 @@ Analytics
   ↓
 Audit Information
 ```
+
+---
+
+### New Google User
+
+```text
+Google Sign-In
+  ↓
+Google Authentication
+  ↓
+Temporary Setup
+  ↓
+Role Selection
+  ↓
+Role-Specific Onboarding
+  ↓
+Complete Setup
+  ↓
+Platform Account + Profile
+  ↓
+Authenticated Session
+  ↓
+Role Dashboard
+```
+

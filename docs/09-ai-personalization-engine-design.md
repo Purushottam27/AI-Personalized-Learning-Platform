@@ -2,11 +2,11 @@
 
 ## 1. Purpose
 
-This document defines the first version of the AI personalization architecture for the AI Based Personalized Learning Platform.
+This document defines the AI personalization architecture for the AI Based Personalized Learning Platform.
 
-The personalization engine is the core intelligence layer that transforms learning activity into:
+The personalization engine transforms learning activity and structured learning evidence into:
 
-- student learning state
+- learner learning state
 - topic mastery estimates
 - strengths
 - weaknesses
@@ -19,20 +19,22 @@ The system must not behave like a generic chatbot.
 
 The goal is:
 
-> **Help each student understand what they know, what they do not know, why they are struggling, and what they should do next to improve efficiently and confidently.**
+> **Help each learner understand what they know, what they do not know, why they are struggling, and what they should do next to improve efficiently and confidently.**
+
+This document defines the personalization architecture and boundaries. Exact persistence schemas belong to `06-database-design.md`; API definitions belong to `07-api-design.md`; testing requirements belong to `12-testing-strategy.md`; deferred capabilities belong to `15-future-implementation.md`.
 
 ---
 
 # 2. Personalization Philosophy
 
-The platform is built around a continuous learning loop:
+The platform follows a continuous learning loop:
 
 ```text
-Student Learns
+Learner Learns
       ↓
-Student Practices
+Learner Practices
       ↓
-Student Is Assessed
+Learner Is Assessed
       ↓
 Learning Evidence Generated
       ↓
@@ -42,14 +44,16 @@ Strengths / Weaknesses Identified
       ↓
 Next Best Action Determined
       ↓
-Student Learns Again
+Learner Acts
       ↓
 New Evidence
       ↓
 Model Updated Again
 ```
 
-Personalization is therefore a **continuous feedback system**, not a one-time recommendation.
+Personalization is therefore a **continuous feedback system**, not a one-time course recommendation.
+
+The system should continuously identify the smallest useful next action that helps the learner overcome the current learning difficulty and move forward.
 
 ---
 
@@ -59,21 +63,21 @@ The most important design rule is:
 
 > **AI enhances the personalization engine; AI does not become the personalization engine.**
 
-The system should combine:
+The personalization system combines:
 
 ```text
-Deterministic Rules
+Learning Evidence
 +
 Student Learning Model
 +
-Learning Evidence
+Deterministic Rules
 +
 Recommendation Logic
 +
-AI Reasoning
+AI Enhancement
 ```
 
-AI should not directly control authoritative learning state.
+AI must not directly control authoritative learning state.
 
 ---
 
@@ -82,14 +86,14 @@ AI should not directly control authoritative learning state.
 A simple architecture such as:
 
 ```text
-Student History
+Learner History
       ↓
 LLM
       ↓
 Recommendation
 ```
 
-has problems:
+creates problems:
 
 - inconsistent decisions
 - difficult testing
@@ -97,238 +101,199 @@ has problems:
 - difficult debugging
 - poor explainability
 - unnecessary AI cost
-- potential hallucination
+- hallucination risk
 - difficulty enforcing prerequisite rules
 - difficulty guaranteeing learning progression
 
-Therefore, the platform uses a hybrid architecture.
+Therefore, the platform uses a hybrid architecture in which deterministic application logic remains authoritative.
 
 ---
 
 # 5. Hybrid Personalization Architecture
 
 ```text
-                   Learning Events
+                  Learning Activity
                          │
                          ▼
-                 Learning Evidence
+                  Learning Evidence
                          │
                          ▼
-               Student Learning Model
+                Student Learning Model
                          │
               ┌──────────┴──────────┐
               ▼                     ▼
-      Deterministic Engine      Analytics
+      Deterministic Engine       Analytics
               │
               ▼
        Candidate Actions
               │
               ▼
-       Recommendation Engine
+      Recommendation Engine
               │
         ┌─────┴─────┐
         ▼           ▼
-     Rules          AI
+      Rules         AI
         │           │
         └─────┬─────┘
               ▼
-       Validated Recommendation
+     Validated Recommendation
               │
               ▼
-        Student Next Action
+       Student Next Action
               │
               ▼
-        New Learning Evidence
+        New Evidence
 ```
+
+The deterministic engine controls authoritative decisions. AI operates only within the boundaries provided by the platform.
 
 ---
 
-# 6. Personalization Engine Responsibilities
+# 6. Personalization Responsibilities
 
-The engine should answer:
+The personalization engine should answer five core questions.
 
-### What does the student know?
+### 6.1 What is the learner learning?
+
+```text
+Current course
+Current topic
+Current lesson
+Course progress
+Learning path
+```
+
+### 6.2 What does the learner appear to know?
 
 ```text
 Topic mastery
-Course mastery
+Course-level performance
 Prerequisite readiness
+Recent assessment performance
 ```
 
-### What does the student struggle with?
+### 6.3 What does the learner struggle with?
 
 ```text
 Weak topics
 Repeated mistakes
 Knowledge gaps
-Low-confidence areas
+High unanswered rates
+Declining performance
 ```
 
-### What is improving?
+### 6.4 What is improving?
 
 ```text
 Learning trend
 Recent assessment improvement
 Reduced mistakes
-Improved response quality
+Improved practice performance
 ```
 
-### What should happen next?
+### 6.5 What should happen next?
 
 ```text
 Continue lesson
 Review topic
+Review lesson
+Use an approved resource
 Practice
-Retry assessment
+Take an assessment
 Complete prerequisite
-Take diagnostic
-Enroll in recommended course
+Take a diagnostic
+Continue to the next course/topic
 ```
 
 ---
 
-# 7. Personalization Is Not Only Course Recommendation
+# 7. Personalization Levels
 
-The system should personalize at multiple levels.
+Personalization can operate at multiple levels:
 
 ```text
 Course
-   ↓
+  ↓
 Topic
-   ↓
+  ↓
 Lesson
-   ↓
+  ↓
 Resource
-   ↓
+  ↓
 Practice
-   ↓
+  ↓
 Assessment
-   ↓
-Remediation
 ```
 
-A student may not need a different course.
+These levels do **not** represent a mandatory sequence.
 
-They may simply need:
+A learner may not need a different course. They may only need:
 
 ```text
-one topic revision
+One topic review
 +
-three practice questions
+A small targeted practice set
 ```
 
-This is a key part of efficient learning.
+The engine should therefore select the most specific useful intervention supported by available evidence.
 
----
+## 7.1 Course
 
-# 8. Personalization Levels
-
-## Level 1 — Course
+Use when the learner's broader learning path needs to change.
 
 Examples:
 
 ```text
-Recommend DBMS
-Recommend Advanced SQL
-Recommend Operating Systems
+Recommend a prerequisite course
+Recommend a relevant next course
+Identify a course needed to continue
 ```
 
-## Level 2 — Topic
+## 7.2 Topic
 
-Examples:
+Use when a specific conceptual area is weak.
+
+Example:
 
 ```text
-Revise Normalization
+Review Normalization
 Practice SQL Joins
-Review Indexing
 ```
 
-## Level 3 — Lesson
+## 7.3 Lesson
+
+Use when evidence identifies a specific lesson or concept that needs review.
+
+## 7.4 Resource
+
+Use when another approved explanation or learning format may help.
 
 Examples:
 
 ```text
-Return to Lesson 4
-Review 3NF
-Complete SQL JOIN lesson
+Teacher notes
+Approved video
+PDF/resource
+Alternative explanation
 ```
 
-## Level 4 — Resource
+## 7.5 Practice
 
-Examples:
+Use when the learner has sufficient conceptual exposure but needs application or reinforcement.
 
-```text
-Watch an explanatory video
-Read teacher notes
-Review a PDF
-```
+## 7.6 Assessment
 
-## Level 5 — Practice
+Use when stronger evidence of readiness or improvement is required.
 
-Examples:
-
-```text
-Take 5 practice questions
-Practice INNER JOIN
-Solve normalization problems
-```
-
-## Level 6 — Assessment
-
-Examples:
-
-```text
-Retry topic assessment
-Take prerequisite diagnostic
-Attempt final assessment
-```
+Assessment is primarily a **measurement instrument**, not the default remediation mechanism.
 
 ---
 
-# 9. Inputs to the Personalization Engine
-
-The engine should consume structured evidence.
-
-Potential inputs:
-
-```text
-Course enrollment
-Lesson completion
-Lesson sequence
-Assessment results
-Question responses
-Question difficulty
-Question topic
-Correct answers
-Incorrect answers
-Unanswered questions
-Time taken
-Attempt history
-Diagnostic results
-Practice activity
-Topic mastery
-Prerequisite relationships
-Course metadata
-Learning interests
-Learning goals
-Self-reported experience level
-Daily study capacity
-Preferred learning format
-Recent activity
-Learning trends
-Recommendation history
-Intervention history
-```
-
-The engine should not blindly consume the entire database.
-
----
-
-# 10. Learning Evidence
+# 8. Learning Evidence
 
 Learning evidence is the primary input to personalization.
 
-Examples:
+Examples include:
 
 ```text
 LESSON_STARTED
@@ -344,13 +309,13 @@ INTERVENTION_COMPLETED
 COURSE_COMPLETED
 ```
 
-Each event should contain enough structured information to support later analysis.
+Each evidence record should contain enough structured information to support later analysis.
 
----
+The exact persistence schema follows `06-database-design.md`.
 
-# 11. Evidence Example
+## 8.1 Evidence Example
 
-Conceptual evidence:
+Conceptual example:
 
 ```json
 {
@@ -368,27 +333,25 @@ Conceptual evidence:
 }
 ```
 
-The exact schema follows the approved database design.
+Learning evidence is historical evidence. It should not be confused with a current mastery value.
 
 ---
 
-# 12. Evidence Is Not Equal to Mastery
+# 9. Evidence Is Not Equal to Mastery
 
 A single wrong answer does not mean:
 
 ```text
-Student does not know the topic.
+The learner does not know the topic.
 ```
 
-Similarly, one correct answer does not mean:
+Similarly, one correct answer does not prove:
 
 ```text
-Student mastered the topic.
+The learner has mastered the topic.
 ```
 
 The engine must aggregate evidence.
-
-Example:
 
 ```text
 One incorrect answer
@@ -399,48 +362,51 @@ Repeated incorrect answers
         ↓
 Stronger negative signal
 
-Repeated correct answers across varied questions
+Repeated correct answers
+across varied questions
         ↓
-Stronger positive signal
+Stronger positive evidence
 ```
 
 ---
 
-# 13. Student Learning Model
+# 10. Student Learning Model
 
-The Student Learning Model represents the current estimated state of a learner.
+The Student Learning Model is a **conceptual representation of the learner's current estimated state**.
 
-Conceptual structure:
+Conceptually:
 
 ```text
-Student
- ├── Course State
- │    ├── Progress
- │    ├── Completion
- │    └── Performance
- │
- ├── Topic State
- │    ├── Mastery
- │    ├── Confidence
- │    ├── Trend
- │    └── Evidence
- │
- ├── Strengths
- ├── Weaknesses
- ├── Knowledge Gaps
- ├── Recommendations
- └── Intervention History
+Student Learning Model
+├── Course State
+│    ├── Progress
+│    ├── Completion
+│    └── Performance
+│
+├── Topic State
+│    ├── Mastery
+│    ├── Confidence (when reliable evidence exists)
+│    ├── Trend
+│    └── Evidence Summary
+│
+├── Strengths
+├── Weaknesses
+├── Knowledge Gaps
+├── Recommendations
+└── Intervention History
 ```
 
-The detailed model is defined in `03-student-learning-model.md`.
+This does **not** imply that all of these fields must be stored in one MongoDB document.
+
+The approved database design separates historical evidence from derived/current state. The exact persistence model follows `06-database-design.md`.
 
 ---
 
-# 14. Topic Mastery
+# 11. Topic Mastery
 
-Topic mastery is an estimate, not a claim of absolute knowledge.
+Topic mastery is an estimate, not an absolute claim of knowledge.
 
-Conceptual scale:
+Initial interpretation categories:
 
 ```text
 0–39    Weak
@@ -450,14 +416,13 @@ Conceptual scale:
 90–100  Mastered
 ```
 
-These thresholds are initial design values and can be tuned using evaluation data.
+These are initial design values and can be tuned using evaluation data.
 
-### Centralized MVP Personalization Policy
+## 11.1 Mastery Categories vs Intervention Thresholds
 
-The mastery categories above describe the student's estimated mastery state.
+The mastery categories above describe estimated mastery.
 
-The following intervention thresholds serve a different purpose and must
-not be interpreted as additional mastery categories:
+Intervention thresholds serve a different purpose:
 
 ```text
 Mastery below 60%
@@ -474,37 +439,53 @@ Prioritize targeted practice
 
 Mastery above 70%
     ↓
-Generally continue the learning path unless other evidence indicates a weakness
+Generally continue unless other evidence indicates a weakness
 ```
+
+These intervention thresholds must not be interpreted as additional mastery categories.
+
 ---
 
-# 15. Mastery Calculation Principle
+# 12. Mastery Calculation Principle
 
-Mastery should consider multiple evidence signals.
+The MVP should use a transparent weighted model.
 
 Conceptually:
 
 ```text
 Mastery =
-  Performance
-+ Consistency
-+ Recency
-+ Difficulty
-+ Coverage
-+ Assessment Evidence
+Performance
++
+Consistency
++
+Recency
++
+Difficulty
++
+Coverage
++
+Assessment Evidence
 ```
 
-It should not simply equal:
+The system must not simply use:
 
 ```text
 lastQuizPercentage
 ```
 
+as mastery.
+
+Exact weights are intentionally not finalized in this document. They should be configurable, tested, and tuned using evaluation data.
+
+Do not scatter arbitrary constants throughout the codebase.
+
 ---
 
-# 16. Performance Signal
+# 13. Mastery Evidence Signals
 
-Examples:
+## 13.1 Performance
+
+Potential signals:
 
 ```text
 Correct responses
@@ -514,13 +495,11 @@ Assessment score
 Practice score
 ```
 
-Repeated performance provides stronger evidence than one event.
+Repeated performance should provide stronger evidence than an isolated event.
 
----
+## 13.2 Unanswered Questions
 
-# 17. Unanswered Questions
-
-Unanswered questions are meaningful.
+Unanswered questions are meaningful evidence.
 
 They may indicate:
 
@@ -535,10 +514,10 @@ Difficulty with application
 Therefore:
 
 ```text
-Unanswered ≠ ignored
+UNANSWERED ≠ IGNORED
 ```
 
-The engine should distinguish:
+The engine must distinguish:
 
 ```text
 CORRECT
@@ -546,49 +525,31 @@ INCORRECT
 UNANSWERED
 ```
 
----
+## 13.3 Difficulty
 
-# 18. Difficulty Signal
+Difficulty can affect evidence strength.
 
-Correctly answering:
-
-```text
-Easy
-```
-
-does not provide the same mastery evidence as correctly answering:
+Conceptually:
 
 ```text
-Hard
+Easy correct   → positive evidence
+Medium correct → stronger positive evidence
+Hard correct   → stronger evidence
 ```
 
-The engine should therefore consider question difficulty.
+Difficulty must not unfairly reward guessing.
 
-Example:
+## 13.4 Coverage
 
-```text
-Easy correct → positive signal
-Medium correct → stronger positive signal
-Hard correct → stronger evidence
-```
+The engine should consider how much of a topic has been sampled.
 
-Difficulty must not make the model unfairly reward guessing.
-
----
-
-# 19. Coverage Signal
-
-A student answering 2 questions correctly does not provide strong evidence of complete topic mastery.
-
-The engine should consider how much of the topic has been sampled.
-
-Example:
+For example:
 
 ```text
 2/2 correct
 ```
 
-is weaker evidence than:
+provides weaker evidence of broad mastery than:
 
 ```text
 18/20 correct
@@ -596,68 +557,46 @@ is weaker evidence than:
 
 across multiple concepts.
 
----
+## 13.5 Consistency
 
-# 20. Consistency Signal
-
-Mastery should consider performance across time.
+Performance should be evaluated across multiple attempts and time periods.
 
 Example:
 
 ```text
-Attempt 1 → 45%
-Attempt 2 → 62%
-Attempt 3 → 81%
+45%
+62%
+81%
 ```
 
-This suggests improvement.
+suggests improvement.
 
 But:
 
 ```text
-Attempt 1 → 90%
-Attempt 2 → 40%
+90%
+40%
 ```
 
 suggests unstable understanding.
 
----
+## 13.6 Recency
 
-# 21. Recency Signal
+Recent evidence should usually carry more influence than very old evidence.
 
-Recent evidence should usually have stronger influence than very old evidence.
-
-Conceptually:
+Old evidence should not simply disappear because it can still help identify:
 
 ```text
-Recent evidence
-      ↓
-Higher weight
-
-Old evidence
-      ↓
-Lower weight
-```
-
-However, old evidence should not simply disappear.
-
-This supports detecting both:
-
-```text
-recent improvement
-```
-
-and:
-
-```text
-knowledge decay
+Recent improvement
+Knowledge decay
+Instability
 ```
 
 ---
 
-# 22. Confidence
+# 14. Confidence
 
-Mastery and confidence are different.
+Mastery and confidence are different concepts.
 
 Example:
 
@@ -666,12 +605,7 @@ Mastery = 80
 Confidence = 45
 ```
 
-could indicate:
-
-```text
-Student performs well
-but evidence coverage is limited
-```
+may indicate strong performance with limited confidence or evidence coverage.
 
 Another example:
 
@@ -680,68 +614,67 @@ Mastery = 55
 Confidence = 90
 ```
 
-could indicate:
+may indicate that the learner believes they understand the topic while performance evidence disagrees.
 
-```text
-Student believes they understand
-but performance evidence disagrees
-```
-
-This distinction can be useful for personalization.
+Confidence can be used as a supplementary signal when reliable confidence evidence exists. It is not equivalent to mastery and does not override performance evidence.
 
 ---
 
-# 23. Strength Detection
+# 15. Strength Detection
 
 A topic may be classified as a strength when:
 
 ```text
-Mastery high
+Mastery is high
 +
-Recent performance stable
+Recent performance is stable
 +
-Evidence coverage sufficient
+Evidence coverage is sufficient
 ```
 
 Example:
 
 ```text
 SQL SELECT queries
+
 Mastery = 91
 Recent performance = strong
 Coverage = sufficient
 ```
 
-Then:
+Result:
 
 ```text
 Strength:
 SQL SELECT queries
 ```
 
+The system should allow future evidence to change this classification.
+
 ---
 
-# 24. Weakness Detection
+# 16. Weakness Detection
 
-A topic may be classified as a weakness when:
+A topic may become a weakness candidate when meaningful evidence crosses a threshold.
+
+Possible signals:
 
 ```text
-Mastery below 60%
-OR
-Repeated errors
-OR
+Mastery below threshold
+Repeated incorrect responses
 High unanswered rate
-OR
+Declining trend
+Failed assessment
 Prerequisite weakness
-OR
-Performance trend declining
 ```
 
-The engine should avoid declaring a weakness from a single mistake.
+The system should avoid declaring a weakness from a single isolated mistake.
+
+MVP weakness detection should use a minimum evidence requirement where practical.
 
 ---
 
-# 25. Knowledge Gap
+# 17. Knowledge Gaps and Error Patterns
 
 A knowledge gap is more specific than a general weakness.
 
@@ -758,25 +691,14 @@ Specific gap:
 Transitive dependency
 ```
 
-This allows more targeted recommendations.
-
----
-
-# 26. Error Pattern Detection
-
-The engine should eventually detect repeated conceptual errors.
+Repeated errors can be mapped to a knowledge gap when question metadata identifies the relevant topic/concept.
 
 Example:
 
 ```text
-Question 1:
-Incorrect
-
-Question 4:
-Incorrect
-
-Question 8:
-Incorrect
+Question 1 → Incorrect
+Question 4 → Incorrect
+Question 8 → Incorrect
 
 All involve:
 LEFT JOIN vs INNER JOIN
@@ -788,13 +710,13 @@ Potential inference:
 SQL JOIN semantics may be a knowledge gap.
 ```
 
-The exact inference should be based on structured question-topic/concept metadata, not solely on AI guesses.
+This inference should primarily use structured question-topic/concept metadata, not an unsupported AI guess.
 
 ---
 
-# 27. Learning Trend
+# 18. Learning Trend
 
-The model should classify trends:
+The model may classify learning trends as:
 
 ```text
 IMPROVING
@@ -814,35 +736,139 @@ Example:
 Trend = IMPROVING
 ```
 
+Trend should be treated as an additional signal rather than a replacement for mastery.
+
 ---
 
-# 28. Course Progress vs Mastery
+# 19. Course Progress vs Mastery
 
-These are different.
+Course completion and understanding are different.
 
-A student can have:
+Example:
 
 ```text
 Course Progress = 90%
 Mastery = 55%
 ```
 
-because they completed lessons but struggled with assessments.
+The learner completed most of the course but struggled with assessments.
 
-Likewise:
+Conversely:
 
 ```text
 Course Progress = 40%
 Mastery of completed topics = 90%
 ```
 
-The student is performing strongly on what they have learned.
+The learner is performing strongly on the material already studied.
 
 The engine must never confuse completion with understanding.
 
 ---
 
-# 29. Recommendation Engine
+# 20. Cold Start and Onboarding Signals
+
+A new learner has limited learning evidence.
+
+Therefore the system cannot immediately know their:
+
+```text
+Strengths
+Weaknesses
+Mastery
+Observed learning behavior
+```
+
+The MVP uses:
+
+```text
+Onboarding
++
+Diagnostic assessment where configured
++
+Early learning evidence
+```
+
+Finalized onboarding signals include:
+
+```text
+Interests
+Learning goals
+Experience level
+Daily study capacity
+Preferred learning format
+```
+
+These are initial signals, not permanent truths.
+
+Observed learning behavior should gradually provide stronger evidence where appropriate.
+
+---
+
+# 21. Shared Learning Taxonomy
+
+Learner interests and instructor expertise use the approved shared learning domains:
+
+```text
+Programming & Software Development
+Data Science & Artificial Intelligence
+Mathematics & Statistics
+Business & Entrepreneurship
+Finance & Economics
+Science & Technology
+```
+
+This taxonomy can later connect:
+
+```text
+Learner Interest
+      ↓
+Instructor Expertise
+      ↓
+Course Domain
+      ↓
+Recommendation / Discovery
+```
+
+The taxonomy is a relevance signal and does not permanently restrict discovery.
+
+---
+
+# 22. Diagnostic and Prerequisite Personalization
+
+Prerequisites and diagnostics are governed by deterministic course/teacher rules.
+
+A teacher may configure:
+
+```text
+Prerequisite required
+Diagnostic required
+Minimum eligibility threshold
+```
+
+Example:
+
+```text
+Advanced SQL
+      ↓
+Diagnostic required
+      ↓
+Score = 58%
+      ↓
+Not eligible
+      ↓
+Identify prerequisite weakness
+      ↓
+Recommend Basic SQL / targeted remediation
+```
+
+If a prerequisite was completed long ago but current evidence is weak, targeted review may be more appropriate than repeating the entire course.
+
+Hard eligibility constraints always take priority over ordinary recommendations.
+
+---
+
+# 23. Recommendation Engine
 
 The recommendation engine transforms learning state into candidate actions.
 
@@ -850,20 +876,22 @@ Example:
 
 ```text
 Weak Topic
-   ↓
+    ↓
 Candidate Actions
-   ├── Review lesson
-   ├── Read notes
-   ├── Watch resource
-   ├── Practice questions
-   └── Take mini-assessment
+    ├── Review lesson
+    ├── Read approved notes
+    ├── Watch approved resource
+    ├── Practice questions
+    └── Take mini-assessment
 ```
+
+The engine should generate candidates first, then select and rank appropriate actions.
 
 ---
 
-# 30. Recommendation Types
+# 24. Recommendation Types
 
-Initial types:
+Initial recommendation types:
 
 ```text
 COURSE_RECOMMENDATION
@@ -876,7 +904,7 @@ PREREQUISITE_RECOMMENDATION
 COURSE_CONTINUATION
 ```
 
-Future types may include:
+Future recommendation capabilities may include:
 
 ```text
 STUDY_PLAN
@@ -885,11 +913,39 @@ DIFFICULTY_ADJUSTMENT
 LEARNING_STRATEGY
 ```
 
+These future capabilities remain subject to the scope defined in `15-future-implementation.md`.
+
 ---
 
-# 31. Next Best Action
+# 25. Candidate Generation and Ranking
 
-The engine should identify one primary next action.
+Candidate generation should consider relevant learning context.
+
+Conceptual ranking signals include:
+
+```text
+Immediate learning need
+Prerequisite importance
+Mastery gap
+Recent performance
+Course progression
+Learning goals
+Interests
+Student context
+Previous recommendation response
+```
+
+The MVP should keep the ranking logic transparent.
+
+Exact production ranking formulas are intentionally not finalized.
+
+Course popularity is not a primary MVP personalization signal. Broader discovery may use separate discovery/ranking logic.
+
+---
+
+# 26. Next Best Action
+
+The engine should identify one primary next action rather than overwhelming the learner with many recommendations.
 
 Example:
 
@@ -900,251 +956,250 @@ Next Best Action:
 "Review SQL JOINs"
 ```
 
-rather than overwhelming the student with:
+The frontend presents the result; it does not calculate the recommendation itself.
 
-```text
-17 recommendations
-```
-
-The platform should prioritize.
+A small number of secondary recommendations may be presented where useful.
 
 ---
 
-# 32. Candidate Generation
+# 27. Recommendation Priority
 
-First generate candidate actions.
+The MVP should generally prioritize:
+
+```text
+1. Blocking prerequisite
+2. Required current-course action
+3. Immediate weakness remediation
+4. Assessment preparation
+5. Course continuation
+6. Broader course discovery
+```
+
+This keeps personalization aligned with the learner's current goal.
+
+---
+
+# 28. Personalization Intervention Selection Policy
+
+The engine must not simply move through:
+
+```text
+Course → Topic → Lesson → Resource → Practice → Assessment
+```
+
+in a fixed sequence.
+
+Instead:
+
+> **The engine selects the most specific intervention supported by available evidence, beginning with the smallest useful intervention and escalating only when subsequent evidence shows that the intervention was insufficient. Hard prerequisite constraints take priority over ordinary recommendations.**
+
+## 28.1 Hard Constraints Have Priority
+
+Examples:
+
+```text
+Missing prerequisite
+Diagnostic required
+Diagnostic below threshold
+Lesson assessment not passed
+Course eligibility not satisfied
+```
+
+These are deterministic platform/curriculum decisions.
+
+AI cannot override them.
+
+## 28.2 Strongest Need
+
+After hard constraints are resolved, the engine identifies the strongest meaningful learning need.
+
+## 28.3 Most Specific Useful Target
+
+The engine should choose the most specific useful target.
 
 Example:
 
 ```text
-Weak Normalization
-        ↓
-Candidate 1 → Review lesson
-Candidate 2 → Watch video
-Candidate 3 → Read notes
-Candidate 4 → Practice 5 questions
-Candidate 5 → Mini-assessment
+Normalization weak
+      ↓
+Specific weakness = Transitive Dependency
+      ↓
+Lesson 7 contains the concept
+      ↓
+Recommend Lesson 7
 ```
 
-Then rank them.
+Do not recommend the entire DBMS course when one lesson is sufficient.
+
+## 28.4 Smallest Useful Intervention
+
+Prefer the smallest intervention likely to solve the problem.
+
+Example:
+
+```text
+Mastery = 72%
+One recent mistake
+      ↓
+Small targeted practice
+```
+
+Do not unnecessarily force the learner to repeat an entire lesson.
 
 ---
 
-# 33. Recommendation Ranking
+# 29. Intervention Intensity
 
-Candidate score can conceptually consider:
+Personalization level and intervention intensity are separate concepts.
+
+### Personalization Level — WHERE
 
 ```text
-Need
-+
-Prerequisite importance
-+
-Mastery gap
-+
-Recency
-+
-Difficulty
-+
-Past recommendation response
-+
-Course progression
-+
-Student context
+Course
+Topic
+Lesson
+Resource
+Practice
+Assessment
+```
+
+### Intervention Intensity — HOW MUCH
+
+```text
+LOW
+MEDIUM
+HIGH
 ```
 
 Example:
 
 ```text
-Candidate:
-Review Normalization
+Mastery = 72%
+One recent mistake
 
-Need = High
-Prerequisite = High
-Mastery gap = High
-Recent failure = High
-
-→ High priority
+→ Lesson/topic target
+→ LOW intensity
+→ Small practice set
 ```
 
-The exact formula should be implemented after MVP evaluation.
+Versus:
+
+```text
+Mastery = 38%
+Repeated failures
+Prerequisite weakness
+
+→ HIGH intensity
+→ Explanation + resource + practice + reassessment
+```
 
 ---
 
-# 34. Deterministic Recommendation Rules
+# 30. Intervention Escalation
 
-Some decisions should be deterministic.
+Intervention should escalate only when evidence indicates that the current intervention was insufficient.
 
 Example:
-
-```text
-If prerequisite diagnostic fails
-    → recommend prerequisite course/topic
-```
-
-Another:
-
-```text
-If previous lesson assessment is not passed
-    → do not unlock next lesson
-```
-
-Another:
-
-```text
-If topic mastery < threshold
-    → candidate remediation action
-```
-
-These should not depend on LLM creativity.
-
----
-
-# 35. AI Recommendation Role
-
-AI can help with:
-
-```text
-Explanation
-Personalized wording
-Resource explanation
-Learning strategy
-Reasoning summary
-Alternative teaching approach
-```
-
-AI should not be the sole authority for:
-
-```text
-Pass/fail
-Lesson unlocking
-Official score
-Mastery storage
-Prerequisite eligibility
-Authorization
-```
-
----
-
-# 36. AI Recommendation Example
-
-Deterministic engine:
-
-```text
-Topic mastery = 48%
-Repeated errors = JOIN semantics
-Next action = remediation
-```
-
-AI can generate:
-
-```text
-Why:
-"You are consistently struggling with the difference between
-INNER JOIN and LEFT JOIN."
-
-What to do:
-"Review the JOIN lesson and then practice five targeted questions."
-```
-
-The decision is deterministic; AI improves the explanation.
-
----
-
-# 37. AI Teaching Assistance
-
-For a weak topic, AI can help generate an explanation based on approved content.
-
-Flow:
 
 ```text
 Weak Topic
-   ↓
-Retrieve approved lesson context
-   ↓
-AI explanation request
-   ↓
-Structured output
-   ↓
-Validate
-   ↓
-Show student
+    ↓
+Review Lesson
+    ↓
+Practice
+    ↓
+Still weak
+    ↓
+Alternative Approved Resource
+    ↓
+Practice Again
+    ↓
+Improves
+    ↓
+Assessment
+    ↓
+Ready
 ```
 
-AI should not invent course facts when authoritative teacher content is available.
+The system should not repeat the exact same failed intervention indefinitely.
+
+A persistent weakness may justify stronger remediation or prerequisite review.
 
 ---
 
-# 38. Retrieval-Grounded Learning
+# 31. Assessment as a Measurement Instrument
 
-When AI explains a topic, prefer:
+Assessment should generally measure readiness or improvement rather than serve as the default remediation mechanism.
+
+Bad loop:
 
 ```text
-Teacher-approved content
-+
-Course resources
-+
-Structured topic metadata
+FAIL
+ ↓
+Same Quiz
+ ↓
+FAIL
+ ↓
+Same Quiz
 ```
 
-as context.
-
-This reduces hallucination.
-
----
-
-# 39. AI Resource Selection
-
-The AI may help rank available resources.
-
-Example:
+Preferred flow:
 
 ```text
-Weak topic:
-Normalization
-
-Available resources:
-PDF
-YouTube video
-Teacher notes
-Practice set
+FAIL
+ ↓
+Analyze evidence
+ ↓
+Identify weakness
+ ↓
+Lesson / Resource
+ ↓
+Targeted Practice
+ ↓
+New Question Set
+ ↓
+Mini-Assessment
+ ↓
+Re-evaluate
 ```
 
-AI can help explain why one may be suitable.
-
-The backend still controls which resources are valid and available.
+Retries should use the approved question-bank strategy and avoid identical question repetition indefinitely.
 
 ---
 
-# 40. Personalization Feedback Loop
+# 32. Recommendation vs Intervention
 
-Every recommendation should produce feedback.
+A recommendation is what the system presents.
+
+An intervention is the learning action performed.
 
 Example:
 
 ```text
 Recommendation:
-Review JOINs
-      ↓
-Student accepts
-      ↓
-Completes lesson
-      ↓
-Takes practice
-      ↓
-Performance improves
-      ↓
-Evidence generated
-      ↓
-Recommendation effectiveness evaluated
+"Review Normalization Lesson 7"
+
+Intervention:
+Lesson review
 ```
 
-This allows the system to learn which interventions work.
+This distinction allows the platform to evaluate both:
+
+```text
+What was recommended?
+```
+
+and:
+
+```text
+What did the learner actually do?
+```
 
 ---
 
-# 41. Recommendation Outcome
+# 33. Recommendation Feedback and Effectiveness
 
-Track outcomes such as:
+Recommendation outcomes can eventually include:
 
 ```text
 SHOWN
@@ -1157,11 +1212,30 @@ IMPROVED
 NO_IMPROVEMENT
 ```
 
-This should eventually become useful personalization evidence.
+These signals can help determine which interventions work.
+
+For the MVP, implement only the tracking necessary for the approved recommendation/evidence workflow. More advanced feedback modeling is future work.
+
+Effectiveness can be evaluated by comparing evidence before and after an intervention.
+
+Example:
+
+```text
+Before:
+Mastery = 48%
+
+Intervention:
+Lesson review + practice
+
+After:
+Mastery = 71%
+```
+
+If improvement is insufficient, the engine may escalate.
 
 ---
 
-# 42. Avoiding Recommendation Loops
+# 34. Avoiding Recommendation Loops and Duplicates
 
 Bad behavior:
 
@@ -1179,446 +1253,337 @@ Quiz fails
 Same quiz forever
 ```
 
-The system should vary interventions.
+The system should vary interventions when evidence indicates that the previous intervention was ineffective.
+
+It should also avoid generating duplicate active recommendations unnecessarily.
+
+Conceptually:
+
+```text
+Same learner
++
+Same target
++
+Same intervention
++
+Recently shown
+→ Avoid duplicate active recommendation
+```
+
+Recommendations may become stale when new evidence changes the learner state.
 
 Example:
 
 ```text
-Attempt 1 failed
-    ↓
-Review explanation
+Recommendation:
+Review JOINs
 
-Attempt 2
-    ↓
-Practice
+Learner later scores 90%
 
-Attempt 3
-    ↓
-Mini-assessment
-
-Attempt 4
-    ↓
-Reassessment
+→ Old recommendation is no longer primary
 ```
 
 ---
 
-# 43. Retry Strategy
+# 35. AI Personalization Role
 
-Retries should not simply repeat identical questions indefinitely.
-
-Use the approved question-bank strategy:
+AI may assist with:
 
 ```text
-Large Question Bank
-       ↓
-Question Selection
-       ↓
-Attempt
-       ↓
-Failure
-       ↓
-Remediation
-       ↓
-New Attempt
-       ↓
-Different/appropriate question set
+Personalized explanation
+Recommendation wording
+Learning-strategy suggestions
+Alternative teaching approaches
+Explanation of approved resources
+Explanation of recommendation reasons
 ```
 
-The teacher should provide a sufficiently large question pool.
+AI must not be the sole authority for:
+
+```text
+Pass/fail
+Official score
+Mastery storage
+Lesson unlocking
+Prerequisite eligibility
+Enrollment authorization
+Authorization
+Teacher/curriculum constraints
+```
+
+The deterministic system remains authoritative.
 
 ---
 
-# 44. Cold Start Problem
+# 36. AI Teaching Assistance
 
-A new student has little learning evidence.
+For a weak topic, AI can generate an explanation using approved course context.
 
-Therefore the engine cannot immediately know:
+Flow:
 
 ```text
-Strengths
-Weaknesses
-Mastery
-Preferences
+Weak Topic
+    ↓
+Retrieve approved lesson context
+    ↓
+AI explanation request
+    ↓
+Structured output
+    ↓
+Validate
+    ↓
+Show learner
 ```
 
-The MVP solution is:
+AI should not invent course facts when authoritative teacher content is available.
+
+---
+
+# 37. Retrieval-Grounded Learning
+
+When AI explains a topic, preferred context is:
 
 ```text
-Onboarding
+Teacher-approved content
 +
-Diagnostic assessment where configured
+Course resources
 +
-Early learning evidence
+Structured topic metadata
 ```
+
+This reduces hallucination and keeps explanations aligned with the actual curriculum.
+
+The exact embedding/vector-database architecture is intentionally not finalized for the MVP.
 
 ---
 
-# 45. Onboarding Signals
+# 38. AI Resource Assistance
 
-Potential onboarding information:
-
-```text
-Department
-Academic level
-Areas of interest
-Learning goals
-Existing experience
-Preferred learning resources
-```
-
-These should be used as initial signals, not permanent truths.
-
----
-
-# 46. Diagnostic Assessment
-
-Diagnostic assessment is controlled by the instructor.
-
-A teacher may configure:
-
-```text
-Prerequisite required
-Diagnostic required
-Minimum eligibility threshold
-```
+AI may help explain or rank already-approved resources.
 
 Example:
 
 ```text
-Advanced SQL
-   ↓
-Diagnostic required
-   ↓
-Basic SQL knowledge insufficient
-   ↓
-Recommend Basic SQL
+Weak topic:
+Normalization
+
+Available resources:
+PDF
+Approved video
+Teacher notes
+Practice set
 ```
 
-This is a deterministic eligibility workflow.
+AI can help explain which resource may suit the learner.
+
+The backend still controls:
+
+```text
+Which resources exist
+Which resources are approved
+Which resources the learner can access
+```
+
+AI cannot invent resources or make unavailable content appear valid.
 
 ---
 
-# 47. Prerequisite Personalization
+# 39. AI Service Boundary
 
-Prerequisites can be represented as:
+AI functionality must be isolated behind a provider-neutral service abstraction.
 
-```text
-Advanced SQL
-    requires
-Basic SQL
-    requires
-DBMS fundamentals
-```
-
-If the student lacks readiness:
+Conceptually:
 
 ```text
-Recommend prerequisite
+AIService
+├── generateExplanation()
+├── generateLearningStrategy()
+├── explainRecommendation()
+└── rankApprovedResources()
 ```
 
-If prerequisite was completed long ago and evidence is weak:
-
-```text
-Recommend targeted review
-```
-
----
-
-# 48. Personalization After Course Enrollment
-
-Once enrolled:
+The AI service must not directly modify:
 
 ```text
 Enrollment
-   ↓
-Lesson
-   ↓
-Practice
-   ↓
-Assessment
-   ↓
-Evidence
-   ↓
 Mastery
-   ↓
-Recommendation
+Assessment score
+Lesson unlock state
+Authorization
+Prerequisite eligibility
 ```
 
-The system should prioritize the current course before unrelated course recommendations.
+The exact LLM provider/model remains intentionally unresolved.
 
 ---
 
-# 49. Course Recommendation
+# 40. AI Validation and Safety
 
-Course recommendations can consider:
+AI-generated output must be:
 
 ```text
-Student interests
-Department
-Completed courses
-Mastery
-Goals
+Validated
+Relevant
+Bounded
+Grounded
+Explainable
+```
+
+AI must not invent:
+
+```text
+Student performance
+Completed lessons
+Scores
+Resources
+Teacher instructions
 Prerequisites
-Course popularity
-Teacher-published course metadata
+Learning history
 ```
 
-But recommendations must respect eligibility.
+Structured AI output should be validated before it reaches the application/UI.
 
-A course should not be recommended as immediately actionable if prerequisites are missing unless the recommendation explicitly identifies the prerequisite path.
+If validation fails, the system should use a deterministic fallback where appropriate.
 
 ---
 
-# 50. Department Personalization
+# 41. Deterministic Rules and Fallback
 
-The course model includes department metadata.
-
-Example:
-
-```text
-CSE
-ECE
-ME
-MATH
-```
-
-Students can browse by department.
-
-Personalization can use department as an initial relevance signal, but it should not permanently restrict discovery.
-
----
-
-# 51. Student Preference vs Observed Behavior
-
-These are different signals.
-
-Student says:
-
-```text
-"I like SQL."
-```
-
-Observed behavior:
-
-```text
-Repeatedly practices DBMS
-Completes SQL lessons
-Performs well
-```
-
-The system can combine both.
-
-Observed learning behavior should not be ignored.
-
----
-
-# 52. Personalization Priority
-
-A reasonable priority order is:
-
-```text
-Immediate learning need
-        ↓
-Prerequisite/eligibility constraints
-        ↓
-Current course progression
-        ↓
-Weakness remediation
-        ↓
-Learning goals
-        ↓
-Interests
-        ↓
-Broader course discovery
-```
-
-This prevents irrelevant recommendations from distracting the learner.
-
----
-
-# 53. Student Confidence
-
-Personalization should eventually consider confidence.
-
-Example:
-
-```text
-High mastery + low confidence
-→ confidence-building practice
-
-Low mastery + high confidence
-→ misconception-focused intervention
-```
-
-The system should not treat self-reported confidence as equivalent to mastery.
-
----
-
-# 54. Learning Efficiency
-
-The project goal is not simply:
-
-```text
-Maximize time spent learning
-```
-
-It is:
-
-```text
-Maximize useful learning progress
-```
-
-Therefore recommendations should avoid unnecessary repetition.
-
-Example:
-
-```text
-Strong topic
-→ Move forward
-
-Weak prerequisite
-→ Target prerequisite
-
-Minor mistake
-→ Small practice intervention
-```
-
----
-
-# 55. Intervention Levels
-
-Potential intervention intensity:
-
-```text
-LEVEL 1 — Hint
-LEVEL 2 — Short explanation
-LEVEL 3 — Resource review
-LEVEL 4 — Targeted practice
-LEVEL 5 — Mini assessment
-LEVEL 6 — Prerequisite remediation
-```
-
-The engine should prefer the smallest effective intervention.
-
----
-
-# 56. Intervention Escalation
-
-Example:
-
-```text
-Minor weakness
-    ↓
-Targeted practice
-    ↓
-Still weak
-    ↓
-Lesson review
-    ↓
-Still weak
-    ↓
-Alternative explanation/resource
-    ↓
-Still weak
-    ↓
-Prerequisite remediation
-```
-
-This creates a more intelligent learning loop.
-
----
-
-# 57. Avoiding Over-Personalization
-
-The platform should not constantly interrupt the student.
-
-Bad:
-
-```text
-Weakness detected
-→ notification
-
-Minor mistake
-→ notification
-
-One unanswered question
-→ notification
-```
-
-Instead:
-
-```text
-Aggregate evidence
-   ↓
-Determine meaningful issue
-   ↓
-Recommend when intervention is justified
-```
-
----
-
-# 58. Recommendation Frequency
-
-The system should limit recommendation noise.
+Some decisions must remain deterministic.
 
 Examples:
 
 ```text
-One primary next action
-+
-A small number of secondary recommendations
+If prerequisite diagnostic fails
+    → prerequisite remediation
+
+If lesson assessment is not passed
+    → do not unlock next lesson
+
+If topic mastery is below a meaningful threshold
+    → remediation candidate
+
+If prerequisite is missing
+    → prerequisite recommendation
 ```
 
-The exact limits can be tuned after UX testing.
+If AI is unavailable:
+
+```text
+AI unavailable
+    ↓
+Deterministic recommendation rules
+    ↓
+Useful next action
+```
+
+The platform must not become unusable because an AI provider fails.
 
 ---
 
-# 59. Explainability
+# 42. AI Failure Handling
 
-Every important recommendation should have a reason.
+Potential failures include:
+
+```text
+Rate limit
+Network failure
+Provider outage
+Timeout
+Invalid output
+Malformed response
+Content safety failure
+```
+
+The system should fail gracefully.
+
+```text
+AI timeout/failure
+      ↓
+Stop or fail the AI enhancement
+      ↓
+Use deterministic fallback
+      ↓
+Continue core learning workflow
+```
+
+AI should never block a critical learning transaction indefinitely.
+
+---
+
+# 43. Event-Driven Personalization
+
+Important learning events can trigger asynchronous personalization work.
 
 Example:
 
 ```text
-Recommended:
-Review SQL JOINs
-
-Why:
-"You answered 4 of your last 6 JOIN questions incorrectly."
+Assessment Submitted
+        ↓
+Persist Result
+        ↓
+Persist Learning Evidence
+        ↓
+Update Critical Learning State
+        ↓
+Publish / Queue Personalization Work
+        ↓
+Update Recommendations
 ```
 
-The reason should be based on actual evidence.
-
-AI-generated explanations must not invent evidence.
+The authoritative result must be persisted before asynchronous analysis depends on it.
 
 ---
 
-# 60. Recommendation Confidence
+# 44. Synchronous vs Asynchronous Processing
 
-Recommendations may have internal confidence.
-
-Conceptually:
+### Authoritative / synchronous where practical
 
 ```text
-HIGH
-MEDIUM
-LOW
+Assessment result
+Question response
+Required completion state
+Critical progression state
+Critical learning-state update
 ```
 
-If evidence is insufficient:
+### Asynchronous
 
 ```text
-INSUFFICIENT_DATA
+Recommendation generation
+AI explanation generation
+Large analytics aggregation
+Non-critical personalization enhancements
+Notifications
+Other expensive processing
 ```
 
-The system should avoid pretending to know more than it does.
+This separation prevents AI or expensive analysis from blocking core learning workflows.
 
 ---
 
-# 61. Personalization State Machine
+# 45. Personalization Consistency
 
-Conceptually:
+The system should avoid contradictory states such as:
+
+```text
+Assessment = 80%
+
+Recommendation:
+"Your performance is 20%."
+```
+
+After an important learning event, authoritative learning state should be updated synchronously where practical.
+
+AI-generated enhancements may arrive asynchronously.
+
+When new evidence invalidates an old recommendation, the recommendation should be recalculated or marked stale according to the approved persistence model.
+
+---
+
+# 46. Personalization State
+
+The personalization processing lifecycle can be understood conceptually as:
 
 ```text
 NEW
@@ -1638,136 +1603,29 @@ REASSESSMENT
 IMPROVED / STILL_WEAK
 ```
 
-The exact persistence model follows the database design.
+This is a conceptual processing model, not a requirement to persist one giant learner state machine.
 
 ---
 
-# 62. Event-Driven Personalization
+# 47. Personalization Module Boundary
 
-Important learning events can trigger personalization work.
+Personalization logic must remain outside controllers.
 
-Example:
+Conceptual application-level operations include:
 
 ```text
-Assessment Submitted
-        ↓
-Persist Result
-        ↓
-Publish Learning Event
-        ↓
-Queue Personalization Job
-        ↓
-Update Recommendation
+processLearningEvidence()
+calculateTopicMastery()
+detectWeaknesses()
+detectStrengths()
+generateRecommendations()
+selectNextBestAction()
+createIntervention()
 ```
 
-This prevents expensive AI work from blocking the assessment submission request.
+Controllers should coordinate requests and responses; they should not contain personalization algorithms.
 
----
-
-# 63. Background Processing
-
-Potential asynchronous tasks:
-
-```text
-Mastery recalculation
-Recommendation generation
-AI explanation generation
-Large analytics aggregation
-Question-file parsing
-Notification creation
-```
-
-Critical transaction results should be stored before asynchronous processing begins.
-
----
-
-# 64. Personalization Consistency
-
-The system must avoid:
-
-```text
-Assessment says 80%
-Recommendation still says 20%
-```
-
-Immediately after an assessment, authoritative learning state should be updated synchronously where practical.
-
-AI-generated enhancements can arrive asynchronously.
-
----
-
-# 65. Personalization Failure Handling
-
-If AI fails:
-
-```text
-AI unavailable
-      ↓
-Deterministic recommendation rules
-      ↓
-Continue learning
-```
-
-The platform must not become unusable because the AI provider is unavailable.
-
----
-
-# 66. AI Timeout
-
-If AI exceeds a safe timeout:
-
-```text
-Timeout
-   ↓
-Cancel/fail gracefully
-   ↓
-Use fallback
-```
-
-Do not block the student's core learning workflow indefinitely.
-
----
-
-# 67. AI Provider Failure
-
-Potential failures:
-
-```text
-Rate limit
-Network failure
-Provider outage
-Invalid output
-Content safety failure
-Malformed response
-```
-
-All should have controlled fallback behavior.
-
----
-
-# 68. Deterministic Fallback
-
-Example:
-
-```text
-Mastery < 50%
-AND repeated errors
-→ Review lesson
-
-Mastery 50–70%
-→ Practice
-
-Mastery > 70%
-→ Continue
-```
-
-This basic rules engine can keep the platform functional without AI.
-
----
-
-# 69. Personalization Engine Modules
-
-Suggested modular structure:
+A possible implementation structure is:
 
 ```text
 personalization/
@@ -1783,33 +1641,15 @@ personalization/
 └── analytics
 ```
 
-The exact folder structure will be finalized during implementation.
+The exact folder structure is an implementation detail and will be finalized during implementation.
 
 ---
 
-# 70. Personalization Service Boundary
-
-The personalization module should expose application-level operations such as:
-
-```text
-processLearningEvidence()
-calculateTopicMastery()
-detectWeaknesses()
-detectStrengths()
-generateRecommendations()
-selectNextBestAction()
-createIntervention()
-```
-
-Controllers should not contain personalization algorithms.
-
----
-
-# 71. Rule Engine Boundary
+# 48. Rule Engine Boundary
 
 Rules should be centralized rather than scattered across controllers.
 
-Example:
+Examples:
 
 ```text
 shouldUnlockNextLesson()
@@ -1818,7 +1658,7 @@ shouldRecommendReview()
 shouldEscalateIntervention()
 ```
 
-This improves:
+Centralized rules improve:
 
 ```text
 Testability
@@ -1827,299 +1667,104 @@ Maintainability
 Explainability
 ```
 
+Hard platform/curriculum constraints must remain deterministic.
+
 ---
 
-# 72. AI Service Boundary
+# 49. Personalization Hierarchy
 
-AI functionality should be isolated.
-
-Conceptually:
+The system follows this authority hierarchy:
 
 ```text
-AIService
- ├── generateExplanation()
- ├── generateLearningStrategy()
- ├── explainRecommendation()
- └── rankApprovedResources()
+Platform Security
+      ↓
+Teacher / Curriculum Constraints
+      ↓
+Prerequisite Rules
+      ↓
+Student Learning State
+      ↓
+Deterministic Personalization
+      ↓
+AI Enhancement
+      ↓
+Presentation
 ```
 
-AI service should not directly modify:
+Lower layers cannot override higher-priority constraints.
+
+In particular:
+
+```text
+AI cannot override curriculum rules.
+AI cannot override prerequisite rules.
+AI cannot override authorization.
+AI cannot rewrite authoritative learning state.
+```
+
+---
+
+# 50. Teacher and Instructor Role
+
+Instructors remain responsible for defining:
+
+```text
+Course content
+Learning objectives
+Prerequisites
+Assessments
+Question banks
+Resources
+Course structure
+```
+
+The personalization engine works within those boundaries.
+
+It must not silently replace teacher-defined curriculum rules.
+
+The MVP allows instructors to create and publish courses without mandatory Admin pre-approval. Admin remains responsible for platform governance and moderation and may intervene when content is reported or inappropriate.
+
+Future teacher controls may include:
+
+```text
+Required resource
+Minimum practice
+Assessment threshold
+Prerequisite
+Recommended sequence
+```
+
+Personalization should optimize within those allowed boundaries.
+
+---
+
+# 51. Personalization and Course Progression
+
+Once a learner is enrolled:
 
 ```text
 Enrollment
-Mastery
-Assessment score
-Lesson unlock state
-Authorization
-```
-
----
-
-# 73. Personalization Data Flow
-
-```text
-                 USER ACTIVITY
-                       │
-                       ▼
-                LEARNING EVENTS
-                       │
-                       ▼
-              LEARNING EVIDENCE
-                       │
-                       ▼
-            STUDENT LEARNING MODEL
-                       │
-          ┌────────────┼────────────┐
-          ▼            ▼            ▼
-       Mastery      Trends      Error Patterns
-          │            │            │
-          └────────────┼────────────┘
-                       ▼
-               Candidate Actions
-                       │
-                       ▼
-              Deterministic Rules
-                       │
-                       ▼
-                Recommendation
-                       │
-              ┌────────┴────────┐
-              ▼                 ▼
-        Deterministic       AI Enhancement
-              │                 │
-              └────────┬────────┘
-                       ▼
-              Validated Output
-                       │
-                       ▼
-                 NEXT ACTION
-                       │
-                       ▼
-                NEW EVIDENCE
-```
-
----
-
-# 74. Example: DBMS Student
-
-Student:
-
-```text
-Course = DBMS
-```
-
-After several lessons:
-
-```text
-SQL basics → 88%
-ER modeling → 81%
-Normalization → 52%
-Transactions → 76%
-```
-
-The system identifies:
-
-```text
-Strength:
-SQL basics
-
-Weakness:
-Normalization
-```
-
----
-
-# 75. DBMS Example — Error Pattern
-
-Suppose the student repeatedly gets questions involving:
-
-```text
-1NF
-2NF
-3NF
-Functional dependencies
-Transitive dependency
-```
-
-incorrect.
-
-The engine identifies:
-
-```text
-Knowledge gap:
-Normalization dependency concepts
-```
-
----
-
-# 76. DBMS Example — Recommendation
-
-Candidate actions:
-
-```text
-Review Normalization Lesson
-Watch approved Normalization Video
-Read Teacher Notes
-Practice 5 Questions
-Take Mini Assessment
-```
-
-The deterministic engine ranks:
-
-```text
-Review Lesson
-+
+   ↓
+Lesson
+   ↓
 Practice
+   ↓
+Assessment
+   ↓
+Learning Evidence
+   ↓
+Mastery / Learning State
+   ↓
+Recommendation
 ```
 
-AI may produce:
+The current course should generally receive priority over unrelated course recommendations when the learner has an immediate learning action available.
 
-```text
-"Your recent mistakes suggest that the difference between
-partial and transitive dependencies is still unclear.
-Review the dependency section first, then try five targeted questions."
-```
+This does not permanently restrict broader discovery.
 
 ---
 
-# 77. DBMS Example — Improvement
-
-After remediation:
-
-```text
-Practice = 80%
-Mini assessment = 84%
-```
-
-Mastery increases:
-
-```text
-52 → 71
-```
-
-The engine now recommends:
-
-```text
-Continue to next topic
-```
-
-rather than repeatedly showing the same remediation.
-
----
-
-# 78. DBMS Example — Persistent Weakness
-
-If:
-
-```text
-52%
-→ remediation
-→ 55%
-→ remediation
-→ 51%
-```
-
-The engine escalates:
-
-```text
-Alternative explanation
-+
-Different resource
-+
-Prerequisite review
-```
-
-It should not simply repeat the same recommendation.
-
----
-
-# 79. Diagnostic Example — Advanced SQL
-
-Teacher configures:
-
-```text
-Prerequisite:
-Basic SQL
-Diagnostic:
-Required
-Threshold:
-75%
-```
-
-Student scores:
-
-```text
-58%
-```
-
-System:
-
-```text
-Not eligible
-   ↓
-Identify weak concepts
-   ↓
-Check Basic SQL enrollment/history
-   ↓
-If completed but weak:
-Targeted revision
-
-If not completed:
-Recommend Basic SQL course
-```
-
-After improvement:
-
-```text
-Mini assessment
-   ↓
-82%
-   ↓
-Re-run diagnostic
-   ↓
-Eligible
-```
-
----
-
-# 80. Personalization API Boundary
-
-The API exposes personalization results.
-
-Example:
-
-```text
-GET /api/v1/personalization/me/next-action
-GET /api/v1/personalization/me/weaknesses
-GET /api/v1/recommendations/me
-```
-
-The frontend consumes results.
-
-It does not calculate them.
-
----
-
-# 81. Personalization and Caching
-
-Some personalization results may be cached.
-
-Possible candidates:
-
-```text
-Dashboard summary
-Recommendation list
-Course recommendation list
-Analytics summaries
-```
-
-But authoritative learning state remains in the appropriate persistent store.
-
-Cache invalidation should occur after important learning events.
-
----
-
-# 82. Personalization and Redis
+# 52. Personalization and Redis
 
 Redis may support:
 
@@ -2127,14 +1772,23 @@ Redis may support:
 Recommendation cache
 Rate limiting
 Background job queues
-Temporary AI state
+Temporary AI-related state
 ```
 
-Do not make Redis the permanent source of truth for mastery.
+Redis must not become the permanent source of truth for:
+
+```text
+Mastery
+Learning Evidence
+Assessment Results
+Other authoritative learning state
+```
+
+Cache invalidation should occur after important learning events where cached personalization becomes stale.
 
 ---
 
-# 83. Personalization and MongoDB
+# 53. Personalization and MongoDB
 
 MongoDB stores durable state such as:
 
@@ -2147,67 +1801,160 @@ Course relationships
 Assessment results
 ```
 
-The exact schemas follow `06-database-design.md`.
+The exact schemas and relationships follow `06-database-design.md`.
+
+This document defines the personalization behavior, not the detailed MongoDB schema.
 
 ---
 
-# 84. Personalization Metrics
+# 54. Personalization API Boundary
 
-The platform should eventually evaluate:
+Personalization results are exposed through backend APIs.
 
-```text
-Recommendation acceptance rate
-Recommendation completion rate
-Post-intervention improvement
-Mastery improvement
-Repeated failure rate
-Time to mastery
-Course completion
-Diagnostic improvement
+Conceptual examples include:
+
+```http
+GET /api/v1/personalization/me/next-action
+GET /api/v1/personalization/me/weaknesses
+GET /api/v1/recommendations/me
 ```
 
-These metrics help determine whether personalization actually works.
+The frontend consumes these results and does not calculate authoritative mastery, recommendations, eligibility, or unlocking.
+
+The authoritative endpoint definitions remain in `07-api-design.md`.
 
 ---
 
-# 85. Personalization Quality
+# 55. Explainability and Auditability
 
-The engine should be evaluated on:
+Important recommendations should be explainable.
 
-### Accuracy
-
-Did it identify the actual weakness?
-
-### Relevance
-
-Was the recommendation useful?
-
-### Timing
-
-Was it delivered at the right time?
-
-### Effectiveness
-
-Did learning improve?
-
-### Explainability
-
-Can the recommendation be justified?
-
-### Efficiency
-
-Did it reduce unnecessary work?
-
----
-
-# 86. Avoiding Bias
-
-Personalization should not unfairly restrict students.
-
-For example:
+The system should be able to answer:
 
 ```text
-Student previously performed poorly in mathematics
+Which evidence triggered this recommendation?
+Which rule selected it?
+Was AI used?
+Which recommendation was shown?
+What happened afterward?
+```
+
+Example:
+
+```text
+Recommendation:
+Review Normalization
+
+Evidence:
+3 recent incorrect questions
+Mastery = 52
+Coverage = sufficient
+
+Rules:
+LOW_MASTERY
+REPEATED_ERRORS
+```
+
+AI-generated explanations must not invent evidence.
+
+---
+
+# 56. Recommendation Confidence
+
+Recommendations may have an internal confidence classification:
+
+```text
+HIGH
+MEDIUM
+LOW
+```
+
+When evidence is insufficient:
+
+```text
+INSUFFICIENT_DATA
+```
+
+The system should avoid presenting false certainty.
+
+This confidence describes the recommendation/evidence quality; it is distinct from learner self-reported confidence.
+
+---
+
+# 57. Personalization Failure Modes
+
+Potential failures include:
+
+```text
+Insufficient evidence
+AI unavailable
+Invalid AI output
+Stale recommendation
+Duplicate recommendation
+Contradictory evidence
+Incorrect question metadata
+Missing topic mapping
+Background job failure
+```
+
+The system should fail safely.
+
+## 57.1 Insufficient Evidence
+
+```text
+Do not pretend certainty.
+```
+
+Example:
+
+```text
+Mastery:
+INSUFFICIENT_DATA
+```
+
+Possible next action:
+
+```text
+Continue learning
+or
+Gather more evidence
+```
+
+## 57.2 Contradictory Evidence
+
+Example:
+
+```text
+Old evidence:
+80%
+
+Recent evidence:
+45%
+```
+
+The engine should consider:
+
+```text
+Recency
+Difficulty
+Coverage
+Assessment quality
+```
+
+Rather than blindly averaging everything.
+
+This may represent knowledge instability rather than simple mastery loss.
+
+---
+
+# 58. Personalization and Bias
+
+Personalization must not permanently restrict learners based on historical performance.
+
+Example:
+
+```text
+Learner previously performed poorly in mathematics
 ```
 
 should not permanently prevent:
@@ -2216,63 +1963,25 @@ should not permanently prevent:
 Advanced mathematics recommendation
 ```
 
-The system should allow evidence to change the learner model.
+New evidence must be able to change the learner model.
+
+Interests are relevance signals, not hard restrictions.
 
 ---
 
-# 87. Model Evolution
-
-The first personalization engine should be simple enough to understand.
-
-MVP:
-
-```text
-Rules
-+
-Weighted evidence
-+
-Basic mastery
-+
-Basic recommendations
-+
-Limited AI enhancement
-```
-
-Later:
-
-```text
-Advanced learner modeling
-+
-More sophisticated ranking
-+
-Adaptive difficulty
-+
-Spaced repetition
-+
-Predictive analytics
-+
-Advanced AI reasoning
-```
-
-Do not build the advanced engine before validating the MVP.
-
----
-
-# 88. MVP Personalization Engine
+# 59. MVP Personalization Engine
 
 The MVP should answer five questions:
 
 ```text
-1. What is the student learning?
-2. What does the student appear to know?
-3. What does the student struggle with?
-4. What should the student do next?
-5. Did that intervention help?
+1. What is the learner learning?
+2. What does the learner appear to know?
+3. What does the learner struggle with?
+4. What should the learner do next?
+5. Did the intervention help?
 ```
 
----
-
-# 89. MVP Signals
+## 59.1 MVP Signals
 
 Initial signals:
 
@@ -2281,7 +1990,7 @@ Assessment score
 Question correctness
 Unanswered questions
 Question difficulty
-Topic mapping
+Question/topic mapping
 Lesson completion
 Assessment attempts
 Diagnostic result
@@ -2292,57 +2001,46 @@ Prerequisites
 
 Avoid adding too many speculative signals initially.
 
----
+## 59.2 MVP Mastery
 
-# 90. MVP Mastery Approach
-
-The first implementation should use a transparent weighted model.
-
-Conceptually:
+Use:
 
 ```text
-Mastery =
-weighted assessment performance
+Transparent weighted evidence
 +
-recent practice performance
+Performance
 +
-consistency
+Recency
 +
-difficulty-adjusted evidence
+Consistency
 +
-coverage
+Difficulty
++
+Coverage
++
+Assessment evidence
 ```
 
-Exact weights should be configurable and tested.
+Exact weights remain configurable and subject to evaluation.
 
-Do not hard-code dozens of arbitrary constants throughout the codebase.
+## 59.3 MVP Weakness
 
----
+Create a weakness candidate when meaningful evidence supports it.
 
-# 91. MVP Weakness Rule
-
-A weakness candidate can be created when evidence crosses a meaningful threshold.
-
-Example:
+Possible triggers:
 
 ```text
-Mastery < 60%
-AND
-minimum evidence available
-```
-
-Additional triggers:
-
-```text
+Low mastery
 Repeated incorrect concept
 High unanswered rate
 Declining trend
 Failed assessment
+Prerequisite weakness
 ```
 
----
+Use sufficient evidence rather than a single isolated mistake.
 
-# 92. MVP Recommendation Rules
+## 59.4 MVP Recommendation Rules
 
 Examples:
 
@@ -2369,11 +2067,7 @@ Course completed
 → Recommend next relevant course
 ```
 
----
-
-# 93. MVP Next-Best-Action Priority
-
-Recommended priority:
+## 59.5 MVP Next-Best-Action Priority
 
 ```text
 1. Blocking prerequisite
@@ -2384,13 +2078,9 @@ Recommended priority:
 6. Broader course recommendation
 ```
 
-This keeps personalization aligned with the student's current goal.
+## 59.6 MVP AI Responsibilities
 
----
-
-# 94. MVP AI Responsibilities
-
-AI should initially focus on:
+AI initially focuses on:
 
 ```text
 Personalized explanation
@@ -2400,7 +2090,7 @@ Approved-resource explanation
 Alternative explanation style
 ```
 
-AI should not initially control:
+AI does not control:
 
 ```text
 Score
@@ -2412,64 +2102,317 @@ Enrollment authorization
 
 ---
 
-# 95. AI Fallback
+# 60. Personalization Processing Pipeline
 
-If AI is unavailable:
+The overall MVP pipeline is:
 
 ```text
-Rule Engine
-   ↓
-Deterministic Recommendation
+Learning Event
+      ↓
+Validate Event
+      ↓
+Persist Learning Evidence
+      ↓
+Update Authoritative Learning State
+      ↓
+Evaluate Rules
+      ↓
+Generate Candidate Actions
+      ↓
+Rank / Select Candidate
+      ↓
+Optional AI Enhancement
+      ↓
+Validate AI Output
+      ↓
+Persist Recommendation
+      ↓
+Serve Next Action
+      ↓
+Observe Intervention Outcome
+      ↓
+Generate New Evidence
 ```
 
-The student still receives a useful next action.
+The pipeline should be deterministic where authority is required and asynchronous where expensive processing is appropriate.
 
 ---
 
-# 96. Personalization Safety
+# 61. Personalization Metrics
 
-AI-generated recommendations must be:
-
-```text
-Validated
-Relevant
-Bounded
-Explainable
-Grounded in available evidence
-```
-
-AI must not invent:
+The platform should eventually evaluate:
 
 ```text
-student performance
-completed lessons
-scores
-resources
-teacher instructions
-prerequisites
+Recommendation acceptance rate
+Recommendation completion rate
+Post-intervention improvement
+Mastery improvement
+Repeated failure rate
+Time to mastery
+Course completion
+Diagnostic improvement
 ```
+
+Personalization quality can be evaluated using:
+
+### Accuracy
+
+Did the system identify the actual weakness?
+
+### Relevance
+
+Was the recommendation useful?
+
+### Timing
+
+Was it delivered at an appropriate time?
+
+### Effectiveness
+
+Did learning improve?
+
+### Explainability
+
+Can the recommendation be justified?
+
+### Efficiency
+
+Did it reduce unnecessary work?
 
 ---
 
-# 97. Personalization Auditability
+# 62. Testing the Personalization Engine
 
-For important recommendations, the system should be able to explain:
+Personalization tests should cover:
+
+### Strong learner
 
 ```text
-Which evidence triggered it?
-Which rule selected it?
-Was AI used?
-Which recommendation was shown?
-What happened afterward?
+High performance
+→ Continue
 ```
 
-This is important for debugging and future research.
+### Weak learner
+
+```text
+Low mastery
+→ Remediation
+```
+
+### Improving learner
+
+```text
+Performance increasing
+→ Reduce unnecessary intervention
+```
+
+### Declining learner
+
+```text
+Performance declining
+→ Targeted review
+```
+
+### Insufficient evidence
+
+```text
+Few events
+→ Insufficient-data state
+```
+
+### Prerequisite failure
+
+```text
+Diagnostic below threshold
+→ Prerequisite recommendation
+```
+
+### AI failure
+
+```text
+AI unavailable
+→ Deterministic fallback
+```
+
+### Explainability
+
+For every important recommendation, tests should verify that the reason can be traced to actual evidence and deterministic rules.
+
+The detailed testing strategy belongs to `12-testing-strategy.md`.
 
 ---
 
-# 98. Example Recommendation Record
+# 63. Example: DBMS Learner
 
-Conceptual:
+Consider a learner studying:
+
+```text
+Course = DBMS
+```
+
+After several lessons:
+
+```text
+SQL basics      → 88%
+ER modeling     → 81%
+Normalization   → 52%
+Transactions    → 76%
+```
+
+The system identifies:
+
+```text
+Strength:
+SQL basics
+
+Weakness:
+Normalization
+```
+
+If the learner repeatedly performs poorly on:
+
+```text
+1NF
+2NF
+3NF
+Functional dependencies
+Transitive dependency
+```
+
+the structured question metadata may support:
+
+```text
+Knowledge gap:
+Normalization dependency concepts
+```
+
+Candidate actions:
+
+```text
+Review Normalization Lesson
+Watch approved Normalization Video
+Read Teacher Notes
+Practice 5 Questions
+Take Mini Assessment
+```
+
+The deterministic engine may select:
+
+```text
+Review Lesson
++
+Targeted Practice
+```
+
+AI may then produce a grounded explanation of why the learner is being asked to review the lesson.
+
+After remediation:
+
+```text
+Practice = 80%
+Mini assessment = 84%
+```
+
+and estimated mastery changes:
+
+```text
+52 → 71
+```
+
+The system should then move the learner forward rather than repeatedly recommending the same remediation.
+
+---
+
+# 64. Persistent Weakness Example
+
+If the learner remains weak:
+
+```text
+52%
+ ↓
+Remediation
+ ↓
+55%
+ ↓
+Remediation
+ ↓
+51%
+```
+
+the engine may escalate to:
+
+```text
+Alternative explanation
++
+Different approved resource
++
+Prerequisite review
++
+New targeted practice
++
+Reassessment
+```
+
+The exact escalation should be evidence-driven rather than a fixed universal sequence.
+
+---
+
+# 65. Diagnostic Example — Advanced SQL
+
+Teacher configuration:
+
+```text
+Prerequisite:
+Basic SQL
+
+Diagnostic:
+Required
+
+Threshold:
+75%
+```
+
+Learner result:
+
+```text
+58%
+```
+
+System:
+
+```text
+Not eligible
+    ↓
+Identify weak concepts
+    ↓
+Check prerequisite history/evidence
+    ↓
+If prerequisite is missing:
+    Recommend Basic SQL
+
+If prerequisite exists but evidence is weak:
+    Recommend targeted revision
+```
+
+After improvement:
+
+```text
+Mini assessment
+    ↓
+82%
+    ↓
+Re-evaluate diagnostic/readiness
+    ↓
+Eligible
+```
+
+Eligibility remains controlled by deterministic course rules.
+
+---
+
+# 66. Recommendation Example
+
+Conceptual recommendation record:
 
 ```json
 {
@@ -2488,419 +2431,18 @@ Conceptual:
 }
 ```
 
-The exact schema follows the database design.
+The exact schema follows `06-database-design.md`.
 
 ---
 
-# 99. Personalization Processing Pipeline
+# 67. Future Personalization Roadmap
 
-```text
-Learning Event
-      ↓
-Validate Event
-      ↓
-Persist Evidence
-      ↓
-Update Learning State
-      ↓
-Evaluate Rules
-      ↓
-Generate Candidate Actions
-      ↓
-Rank Candidates
-      ↓
-Optional AI Enhancement
-      ↓
-Validate AI Output
-      ↓
-Persist Recommendation
-      ↓
-Serve Next Action
-```
-
----
-
-# 100. Personalization Failure Modes
-
-Potential failures:
-
-```text
-Insufficient evidence
-AI unavailable
-Invalid AI output
-Stale recommendation
-Duplicate recommendation
-Contradictory evidence
-Incorrect question metadata
-Missing topic mapping
-Background job failure
-```
-
-The system should fail safely.
-
----
-
-# 101. Insufficient Evidence
-
-If evidence is insufficient:
-
-```text
-Do not pretend certainty.
-```
-
-Example:
-
-```text
-Mastery:
-INSUFFICIENT_DATA
-```
-
-Then:
-
-```text
-Recommendation:
-Continue learning / gather more evidence
-```
-
----
-
-# 102. Stale Recommendations
-
-If a student improves after a recommendation was generated, the old recommendation may become stale.
-
-Example:
-
-```text
-Recommendation:
-Review JOINs
-
-Student later scores 90%
-
-Old recommendation:
-No longer primary
-```
-
-The next recommendation should be recalculated or invalidated.
-
----
-
-# 103. Duplicate Recommendations
-
-The engine should avoid repeatedly generating identical active recommendations.
-
-Potential rule:
-
-```text
-Same student
-+
-same target
-+
-same intervention
-+
-recently shown
-→ avoid duplicate
-```
-
----
-
-# 104. Contradictory Evidence
-
-If evidence conflicts:
-
-```text
-Old:
-80%
-
-Recent:
-45%
-```
-
-the engine should not blindly average everything.
-
-It should consider:
-
-```text
-recency
-difficulty
-coverage
-assessment quality
-```
-
-This may indicate:
-
-```text
-knowledge instability
-```
-
-rather than simple mastery loss.
-
----
-
-# 105. Personalization and Human Teacher
-
-The teacher remains important.
-
-Teachers define:
-
-```text
-Course content
-Prerequisites
-Assessments
-Question banks
-Resources
-Learning objectives
-```
-
-The personalization engine works within those boundaries.
-
-It should not silently replace teacher-defined curriculum rules.
-
----
-
-# 106. Teacher Override Principle
-
-Future versions may allow teachers to define:
-
-```text
-required resource
-minimum practice
-assessment threshold
-prerequisite
-recommended sequence
-```
-
-Personalization must respect hard teacher rules.
-
-AI can optimize within allowed boundaries.
-
----
-
-# 107. Personalization Hierarchy
-
-```text
-Platform Security
-       ↓
-Teacher/Curriculum Constraints
-       ↓
-Prerequisite Rules
-       ↓
-Student Learning State
-       ↓
-Deterministic Personalization
-       ↓
-AI Enhancement
-       ↓
-Presentation
-```
-
-Lower layers cannot override higher-priority constraints.
-
----
-
-# 108. Personalization Architecture Summary
-
-```text
-                    STUDENT
-                       │
-                       ▼
-                 Learning Activity
-                       │
-                       ▼
-                Learning Evidence
-                       │
-                       ▼
-             Student Learning Model
-                       │
-        ┌──────────────┼──────────────┐
-        ▼              ▼              ▼
-     Mastery        Weakness       Strength
-        │              │              │
-        └──────────────┼──────────────┘
-                       ▼
-                Candidate Actions
-                       │
-                       ▼
-              Deterministic Rules
-                       │
-                       ▼
-                Recommendation
-                       │
-                ┌──────┴──────┐
-                ▼             ▼
-             Rule         AI Enhancement
-                │             │
-                └──────┬──────┘
-                       ▼
-                Validated Result
-                       │
-                       ▼
-                 Next Best Action
-                       │
-                       ▼
-                 Student Acts
-                       │
-                       ▼
-                New Evidence
-```
-
----
-
-# 109. Implementation Principles
-
-The implementation should follow:
-
-1. Keep personalization logic outside controllers.
-2. Centralize rules.
-3. Keep scoring deterministic.
-4. Keep AI behind an abstraction.
-5. Validate AI output.
-6. Never let AI modify authoritative state directly.
-7. Store evidence before asynchronous analysis.
-8. Make recommendation generation idempotent where practical.
-9. Make weights/configuration easy to tune.
-10. Keep the MVP explainable.
-11. Add advanced intelligence only after validating the baseline.
-12. Test personalization with deterministic fixtures.
-
----
-
-# 110. Testing the Personalization Engine
-
-Tests should include:
-
-### Strong student
-
-```text
-High performance
-→ continue
-```
-
-### Weak student
-
-```text
-Low mastery
-→ remediation
-```
-
-### Improving student
-
-```text
-Performance increasing
-→ reduce intervention
-```
-
-### Declining student
-
-```text
-Performance declining
-→ targeted review
-```
-
-### Insufficient evidence
-
-```text
-Few events
-→ insufficient-data state
-```
-
-### Prerequisite failure
-
-```text
-Diagnostic below threshold
-→ prerequisite recommendation
-```
-
-### AI failure
-
-```text
-AI unavailable
-→ deterministic fallback
-```
-
----
-
-# 111. Example Test Fixture
-
-Conceptual:
-
-```text
-Student: S1
-Topic: Normalization
-
-Evidence:
-5 correct
-3 incorrect
-2 unanswered
-Recent trend: improving
-Difficulty: medium
-
-Expected:
-Mastery = calculated value
-Weakness = possible
-Recommendation = targeted practice
-```
-
-The exact expected values should be established after the mastery formula is finalized.
-
----
-
-# 112. Explainability Test
-
-For every important recommendation, test:
-
-```text
-Can we identify why it was generated?
-```
-
-Example:
-
-```text
-Recommendation:
-Review Normalization
-
-Evidence:
-3 recent incorrect questions
-Mastery = 52
-Coverage = sufficient
-```
-
-If the system cannot explain the recommendation, it is harder to trust and debug.
-
----
-
-# 113. Personalization Evaluation
-
-The project should eventually compare:
-
-```text
-Baseline learning
-vs
-Personalized learning
-```
-
-Potential metrics:
-
-```text
-Mastery improvement
-Assessment improvement
-Time to mastery
-Course completion
-Recommendation acceptance
-Intervention effectiveness
-```
-
-This can become a future experiment/evaluation phase.
-
----
-
-# 114. Future Personalization Roadmap
-
-### Phase 1 — MVP
+## Phase 1 — MVP
 
 ```text
 Rules
 +
-Weighted mastery
+Transparent weighted mastery
 +
 Weakness detection
 +
@@ -2909,7 +2451,7 @@ Basic recommendations
 Basic AI explanations
 ```
 
-### Phase 2
+## Phase 2
 
 ```text
 Adaptive difficulty
@@ -2921,7 +2463,7 @@ Recommendation feedback
 Improved analytics
 ```
 
-### Phase 3
+## Phase 3
 
 ```text
 Spaced repetition
@@ -2933,7 +2475,7 @@ Predictive mastery
 Advanced learner modeling
 ```
 
-### Phase 4
+## Phase 4
 
 ```text
 Advanced adaptive learning
@@ -2942,33 +2484,37 @@ Personalized study plans
 +
 More sophisticated AI tutoring
 +
-Research/evaluation models
+Research / evaluation models
 ```
+
+Advanced personalization should not be built before the MVP baseline is validated.
 
 ---
 
-# 115. Scope Boundary
+# 68. Scope Boundary
 
-This document does not yet finalize:
+This document does not finalize:
 
-- Exact mastery formula weights
-- Exact machine-learning model
-- Exact LLM provider
-- Exact prompt templates
-- Exact embedding/vector database
-- Advanced knowledge graph
-- Adaptive testing algorithm
-- Spaced-repetition algorithm
-- Production recommendation ranking model
-- Complete AI evaluation framework
+- exact mastery formula weights
+- exact machine-learning model
+- exact LLM provider
+- exact prompt templates
+- exact embedding/vector database
+- advanced knowledge graph
+- adaptive testing algorithm
+- spaced-repetition algorithm
+- production recommendation ranking model
+- complete AI evaluation framework
 
 These should be introduced only when justified by the MVP and validated data.
 
+Deferred capabilities must also remain consistent with `15-future-implementation.md`.
+
 ---
 
-# 116. Final Personalization Principle
+# 69. Final Personalization Principles
 
-The platform should follow:
+The platform follows:
 
 ```text
 LEARN
@@ -2988,373 +2534,31 @@ REASSESS
 IMPROVE
 ```
 
-The most important principle is:
+The finalized principles are:
 
-> **The platform should not simply tell students what course to take. It should continuously identify the smallest useful next action that helps them overcome their current learning difficulty and move forward confidently.**
+```text
+1. Use learning evidence as the foundation.
+2. Keep authoritative decisions deterministic.
+3. Treat mastery as an estimate, not absolute truth.
+4. Distinguish completion from understanding.
+5. Use sufficient evidence before declaring weaknesses.
+6. Respect hard prerequisite and curriculum constraints.
+7. Select the most specific useful intervention.
+8. Prefer the smallest effective intervention.
+9. Use assessment primarily to measure readiness/improvement.
+10. Avoid repeating failed interventions indefinitely.
+11. Re-evaluate after meaningful intervention.
+12. Keep AI behind a controlled backend abstraction.
+13. Ground AI explanations in approved learning content.
+14. Validate AI output before use.
+15. Never let AI override authoritative learning state.
+16. Provide deterministic fallback when AI is unavailable.
+17. Keep personalization logic outside controllers.
+18. Make important recommendations explainable and auditable.
+19. Keep MVP personalization transparent and testable.
+20. Add advanced intelligence only after validating the baseline.
+```
+
+> **The platform should not simply tell learners what course to take. It should continuously identify the smallest useful next action that helps them overcome their current learning difficulty and move forward confidently.**
 
 AI makes the experience more adaptive and understandable, while deterministic application logic keeps the learning system reliable, testable, and explainable.
-
-
----
-
-# 117. Personalization Intervention Selection Policy
-
-The six personalization levels defined earlier are now governed by an explicit selection and escalation policy.
-
-The engine must not simply move through:
-
-```text
-Course → Topic → Lesson → Resource → Practice → Assessment
-```
-
-in a fixed sequence.
-
-Instead:
-
-> **The engine selects the most specific intervention supported by available evidence, beginning with the smallest useful intervention and escalating only when subsequent evidence shows that the intervention was insufficient. Hard prerequisite constraints take priority over ordinary recommendations.**
-
-## 117.1 Personalization Levels
-
-The six levels are:
-
-```text
-1. Course
-2. Topic
-3. Lesson
-4. Resource
-5. Practice
-6. Assessment
-```
-
-### Course
-
-Use when the student's broader learning path needs to change.
-
-Examples:
-
-```text
-Missing prerequisite
-Course completed
-New appropriate course identified
-Student needs a prerequisite course
-```
-
-### Topic
-
-Use when a specific conceptual area is weak.
-
-### Lesson
-
-Use when evidence identifies the specific lesson responsible for the weakness.
-
-### Resource
-
-Use when the student needs another explanation format or approved learning material.
-
-### Practice
-
-Use when the student has enough conceptual understanding but needs application or reinforcement.
-
-### Assessment
-
-Use when the system needs stronger evidence of readiness or improvement.
-
-## 117.2 Selection Rule
-
-The engine should choose the **most specific useful intervention**, not the broadest available intervention.
-
-Example:
-
-```text
-Normalization weak
-        ↓
-Specific weakness = Transitive Dependency
-        ↓
-Lesson 7 contains the concept
-        ↓
-Recommend Lesson 7
-```
-
-Do not recommend the entire DBMS course when a single lesson is sufficient.
-
-## 117.3 Hard Constraints Have Priority
-
-Some decisions are not ordinary recommendations:
-
-```text
-Missing prerequisite
-Diagnostic required
-Diagnostic below threshold
-Lesson assessment not passed
-Course eligibility not satisfied
-```
-
-These are controlled by deterministic platform/teacher rules.
-
-AI cannot override these constraints.
-
-## 117.4 Smallest Useful Intervention Principle
-
-When evidence is sufficient, prefer the smallest intervention likely to solve the problem.
-
-Example:
-
-```text
-Mastery = 72%
-One recent mistake
-        ↓
-Small targeted practice
-```
-
-Do not force the student to repeat an entire lesson unnecessarily.
-
-## 117.5 Intervention Selection Matrix
-
-| Student state | Primary intervention |
-|---|---|
-| Missing prerequisite | Course |
-| Prerequisite recently completed but weak | Topic/Lesson review |
-| General conceptual weakness | Topic |
-| Specific lesson weakness | Lesson |
-| Needs alternative explanation | Resource |
-| Concept understood but application weak | Practice |
-| Improvement needs verification | Assessment |
-| Course completed and ready for next path | Course |
-
-The engine may combine interventions when necessary.
-
-Example:
-
-```text
-Lesson review
-+
-Targeted practice
-+
-Mini-assessment
-```
-
-## 117.6 Intervention Intensity
-
-Personalization level and intervention intensity are separate concepts.
-
-### Personalization Level
-
-Defines **where** the intervention occurs:
-
-```text
-Course / Topic / Lesson / Resource / Practice / Assessment
-```
-
-### Intervention Intensity
-
-Defines **how much** support is required:
-
-```text
-LOW
-MEDIUM
-HIGH
-```
-
-Example:
-
-```text
-Normalization mastery = 72%
-One recent mistake
-
-→ Topic/Lesson target
-→ LOW intensity
-→ Small practice set
-```
-
-Versus:
-
-```text
-Normalization mastery = 38%
-Repeated failures
-Prerequisite weakness
-
-→ Lesson/prerequisite remediation
-→ HIGH intensity
-→ Explanation + resource + practice + reassessment
-```
-
-## 117.7 Intervention Escalation
-
-Intervention should escalate when evidence indicates that the current intervention was insufficient.
-
-```text
-Weak Topic
-   ↓
-Review Lesson
-   ↓
-Practice
-   ↓
-Still weak
-   ↓
-Alternative Resource
-   ↓
-Practice again
-   ↓
-Improves
-   ↓
-Assessment
-   ↓
-Ready
-```
-
-The system should not repeat the exact same failed intervention indefinitely.
-
-## 117.8 Assessment Is a Measurement Instrument
-
-Assessment should generally be treated as a way to measure readiness or improvement, not as the primary remediation mechanism.
-
-Bad loop:
-
-```text
-FAIL
- ↓
-Same Quiz
- ↓
-FAIL
- ↓
-Same Quiz
-```
-
-Preferred:
-
-```text
-FAIL
- ↓
-Analyze evidence
- ↓
-Identify weakness
- ↓
-Lesson / Resource
- ↓
-Targeted Practice
- ↓
-New Question Set
- ↓
-Mini-Assessment
- ↓
-Re-evaluate
-```
-
-## 117.9 Personalization Decision Flow
-
-```text
-                    STUDENT STATE
-                         │
-                         ▼
-              Is there a hard constraint?
-                    /          \
-                  YES           NO
-                   │             │
-                   ▼             ▼
-             Resolve it      Continue
-                   │             │
-                   └──────┬──────┘
-                          ▼
-                Identify strongest need
-                          │
-                          ▼
-              Choose most specific target
-                          │
-          ┌───────────────┼────────────────┐
-          ▼               ▼                ▼
-       Topic           Lesson           Resource
-          │               │                │
-          └───────────────┼────────────────┘
-                          ▼
-                       Practice
-                          │
-                          ▼
-                    Re-evaluate
-                          │
-                   ┌──────┴──────┐
-                   ▼             ▼
-               Improved      Still weak
-                   │             │
-                   ▼             ▼
-               Continue       Escalate
-                                 │
-                                 ▼
-                              Reassess
-```
-
-## 117.10 No Forced Sequential Escalation
-
-The engine must not assume:
-
-```text
-Every weakness
-→ Course
-→ Topic
-→ Lesson
-→ Resource
-→ Practice
-→ Assessment
-```
-
-Instead:
-
-```text
-Evidence
-   ↓
-Most appropriate specific intervention
-```
-
-## 117.11 Recommendation vs Intervention
-
-A recommendation is what the system presents to the student.
-
-An intervention is the learning action the student performs.
-
-Example:
-
-```text
-Recommendation:
-"Review Normalization Lesson 7"
-
-Intervention:
-Lesson review
-```
-
-## 117.12 Measuring Intervention Effectiveness
-
-After an intervention, compare evidence before and after.
-
-Example:
-
-```text
-Before:
-Mastery = 48%
-
-Intervention:
-Lesson review + practice
-
-After:
-Mastery = 71%
-```
-
-If improvement is insufficient, the system may escalate.
-
-## 117.13 Final Policy
-
-The finalized personalization policy is:
-
-```text
-1. Respect hard constraints first.
-2. Identify the strongest learning need.
-3. Select the most specific useful intervention.
-4. Prefer the smallest effective intervention.
-5. Use practice for application/reinforcement.
-6. Use assessment to measure readiness/improvement.
-7. Avoid repeating failed interventions indefinitely.
-8. Re-evaluate after meaningful intervention.
-9. Escalate only when evidence indicates insufficient improvement.
-10. Let deterministic rules control authoritative decisions.
-11. Let AI enhance explanations and personalization within those boundaries.
-```
-
-This policy is now part of the approved personalization architecture.

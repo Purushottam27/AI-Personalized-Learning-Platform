@@ -1,223 +1,369 @@
-# AI Based Personalized Learning Platform — Database Design
+**# AI Based Personalized Learning Platform — Database Design**
 
-## 1. Purpose
+**## 1. Purpose**
 
 This document defines the conceptual database design for the AI Based Personalized Learning Platform.
 
-It translates the approved Product Requirements, MVP Scope, Student Learning Model, User Journeys, and System Architecture into a durable data model.
+It translates the approved Product Requirements, MVP Scope, Learner Learning Model, User Journeys, and System Architecture into a durable data model.
 
 The document focuses on what data exists, why it exists, how it relates, how learning history is preserved, and how the data supports personalization.
 
-It intentionally does not yet define final Mongoose schema code. Exact field types, validators, indexes, and implementation details will be finalized during schema/API design.
+It intentionally does not define final Mongoose schema implementation code.
+The conceptual fields and relationships finalized by the project are defined
+here; exact Mongoose syntax, validators, and implementation-level details
+belong to schema/API design.
 
-## 2. Database Goals
+**## 2. Database Goals**
 
 The database must support:
 
-- Authentication and user identity
-- Student, teacher, and admin roles
-- Teacher-owned courses
-- Course discovery by department/category/difficulty
-- Topics, lessons, resources, practice, and assessments
-- Enrollment and course progress
-- Reusable question banks and randomized assessment attempts
-- Diagnostic and prerequisite workflows
-- Detailed assessment responses
-- Historical learning evidence
-- Topic-level mastery
-- Student learning profiles
-- Personalized recommendations
-- Remediation/intervention tracking
-- Teacher course analytics
-- Admin/audit information
-- Future scalability
+\- Authentication and user identity
 
-**Core principle:** store enough reliable learning evidence to understand not only the student's current state, but also how that state changed over time.
+\- Learner, instructor, and admin roles
 
-## 3. Primary Database
+\- Instructor-owned courses
 
-The MVP uses **MongoDB** as the primary persistent data store.
+\- Course discovery by department/category/difficulty
+
+\- Topics, lessons, resources, practice, and assessments
+
+\- Enrollment and course progress
+
+\- Reusable question banks and randomized assessment attempts
+
+\- Diagnostic and prerequisite workflows
+
+\- Detailed assessment responses
+
+\- Historical learning evidence
+
+\- Topic-level mastery
+
+\- Learner learning profiles
+
+\- Personalized recommendations
+
+\- Remediation/intervention tracking
+
+\- Instructor course analytics
+
+\- Admin/audit information
+
+\- Future scalability
+
+**\*\*Core principle:\*\*** store enough reliable learning evidence to understand not only the learner's current state, but also how that state changed over time.
+
+**## 3. Primary Database**
+
+The MVP uses **\*\*MongoDB\*\*** as the primary persistent data store.
 
 MongoDB is suitable for user/profile data, course content, assessment structures, learning evidence, and evolving personalization state.
 
 Flexibility does not mean everything should be embedded. The design deliberately combines references, selective embedding, indexes, and derived state.
 
-## 4. Core Database Principles
+**## 4. Core Database Principles**
 
-### 4.1 Separate Major Domains
+**### 4.1 Separate Major Domains**
 
 Major entities should generally be separate documents/collections rather than one enormous document.
 
-```text
+\`\`\`text
+
 User
+
 Course
+
 Topic
+
 Lesson
+
 Enrollment
+
 Assessment
+
 Question
+
 Attempt
+
 Learning Evidence
+
 Recommendation
-```
 
-### 4.2 Avoid Giant Documents
+\`\`\`
 
-A Course should not contain every lesson, resource, question, attempt, and student record.
+**### 4.2 Avoid Giant Documents**
 
-```text
+A Course should not contain every lesson, resource, question, attempt, and learner record.
+
+\`\`\`text
+
 Course
-  ↓
-Topics
-  ↓
-Lessons
-  ↓
-Resources / Assessments
-```
 
-### 4.3 Historical Evidence vs Current State
+  ↓
+
+Topics
+
+  ↓
+
+Lessons
+
+  ↓
+
+Resources / Assessments
+
+\`\`\`
+
+**### 4.3 Historical Evidence vs Current State**
 
 Historical evidence represents what actually happened:
 
-```text
-Student answered Question 7 incorrectly.
-Student completed Lesson 3.
-Student scored 55% on Assessment A.
-Student improved after remediation.
-```
+\`\`\`text
+
+Learner answered Question 7 incorrectly.
+
+Learner completed Lesson 3.
+
+Learner scored 55% on Assessment A.
+
+Learner improved after remediation.
+
+\`\`\`
 
 These records should generally be append-oriented and preserved.
 
 Current derived state represents the latest calculated understanding:
 
-```text
+\`\`\`text
+
 Current course progress = 63%
+
 Current mastery of normalization = 71%
+
 Current recommendation = revise 2NF
-```
+
+\`\`\`
 
 Current state can be recalculated or updated from historical evidence.
 
-## 5. High-Level Domain Model
+**## 5. High-Level Domain Model**
 
-```text
-                         PLATFORM
-                            │
-       ┌────────────────────┼────────────────────┐
-       │                    │                    │
-       ▼                    ▼                    ▼
-     USERS              COURSES              ADMIN
-       │                    │                    │
-       │             ┌──────┼──────┐             │
-       │             ▼      ▼      ▼             ├── Audit
-       │          Topics Lessons Resources        └── Moderation
-       │                    │
-       │                    ▼
-       │               Assessments
-       │                    │
-       │               Question Bank
-       │
-       ├── Student
-       │     │
-       │     ├── Enrollment
-       │     ├── Progress
-       │     ├── Attempts
-       │     ├── Learning Evidence
-       │     ├── Topic Mastery
-       │     └── Recommendations
-       │
-       └── Teacher
-             │
-             ├── Courses
-             └── Course Analytics
-```
+\`\`\`text
 
-## 6. Core Collections
+                         PLATFORM
+
+                            │
+
+       ┌────────────────────┼────────────────────┐
+
+       │                    │                    │
+
+       ▼                    ▼                    ▼
+
+     USERS              COURSES              ADMIN
+
+       │                    │                    │
+
+       │             ┌──────┼──────┐             │
+
+       │             ▼      ▼      ▼             ├── Audit
+
+       │          Topics Lessons Resources        └── Moderation
+
+       │                    │
+
+       │                    ▼
+
+       │               Assessments
+
+       │                    │
+
+       │               Question Bank
+
+       │
+
+       ├── Learner
+
+       │     │
+
+       │     ├── Enrollment
+
+       │     ├── Progress
+
+       │     ├── Attempts
+
+       │     ├── Learning Evidence
+
+       │     ├── Topic Mastery
+
+       │     └── Recommendations
+
+       │
+
+       └── Instructor
+
+             │
+
+             ├── Courses
+
+             └── Course Analytics
+
+\`\`\`
+
+**## 6. Core Collections**
 
 Initial conceptual collections:
 
-```text
+\`\`\`text
+
 users
-studentProfiles
-teacherProfiles
+
+learnerProfiles
+
+instructorProfiles
+
+authIdentities
+
+refreshSessions
+
+oauthSetupSessions
 
 courses
+
 topics
+
 lessons
+
 resources
 
 enrollments
 
 questionBanks / questions
+
 assessments
+
 assessmentAttempts
+
 questionResponses
 
 learningEvidence
+
 topicMastery
+
 learningProfiles
 
 recommendations
+
 interventions
 
 notifications
+
 auditLogs
-```
+
+\`\`\`
 
 The final decision on whether question banks and questions are separate collections or questions are grouped under a bank can be finalized during implementation. The conceptual relationship remains:
 
-```text
-Question Bank
-      ↓
-Questions
-      ↓
-Assessment
-```
+\`\`\`text
 
-## 7. User Model
+Question Bank
+
+      ↓
+
+Questions
+
+      ↓
+
+Assessment
+
+\`\`\`
+
+**## 7. User Model**
 
 There should be one central User identity.
 
-```text
+\`\`\`text
+
 Approved common User fields:
 
 User
+
 ├── name
+
 ├── email
+
 ├── password
+
 ├── role
+
 ├── status
+
 ├── suspensionReason
+
 ├── suspendedAt
+
 ├── avatar
+
 └── timestamps
 
-```
+\`\`\`
+
 Clarify:
 
-- name is common identity information.
-- email is normalized account identity.
-- password represents stored password authentication information;
-  never plaintext.
-- Passwords are hashed with bcryptjs before persistence.
-  The current implementation uses a cost factor of 12.
-- role is STUDENT / TEACHER / ADMIN.
-- status is ACTIVE / SUSPENDED / DEACTIVATED.
-- avatar is common User-level profile information.
+\- name is common identity information.
 
-Do NOT put avatar into StudentProfile or TeacherProfile.
+\- email is normalized account identity.
+
+\- password represents stored password authentication information;
+
+  never plaintext.
+
+\- Passwords are hashed with bcryptjs before persistence.
+
+  The current implementation uses a cost factor of 12.
+
+\- role is LEARNER / INSTRUCTOR / ADMIN.
+
+\- status is ACTIVE / SUSPENDED / DEACTIVATED.
+
+\- avatar is common User-level profile information.
+
+Do NOT put avatar into LearnerProfile or InstructorProfile.
 
 Roles:
 
-```text
-STUDENT
-TEACHER
+\`\`\`text
+
+LEARNER
+
+INSTRUCTOR
+
 ADMIN
+
+\`\`\`
+
+Public signup may allow Learner or Instructor. Admin accounts are controlled and are not self-created through public role selection.
+
+**### Final Role and Profile Mapping**
+
+```text
+LEARNER
+   ↓
+LearnerProfile
+
+INSTRUCTOR
+   ↓
+InstructorProfile
+
+ADMIN
+   ↓
+No role-specific learning profile required
 ```
 
-Public signup may allow Student or Teacher. Admin accounts are controlled and are not self-created through public role selection.
+One account has one platform role in the MVP.
 
-### Account Status Semantics
+Role is not changed through normal profile editing or user-status management.
+
+**### Account Status Semantics**
 
 ACTIVE represents normal account access.
 
@@ -227,17 +373,23 @@ SUSPENDED represents an Admin/platform-controlled restriction.
 
 The platform must distinguish suspension from deactivation:
 
-```text
+\`\`\`text
+
 ACTIVE
-  ├── User deactivates → DEACTIVATED
-  └── Admin suspends → SUSPENDED
+
+  ├── User deactivates → DEACTIVATED
+
+  └── Admin suspends → SUSPENDED
 
 DEACTIVATED
-  └── User reactivates → ACTIVE
+
+  └── User reactivates → ACTIVE
 
 SUSPENDED
-  └── Admin resolves → ACTIVE
-  ```
+
+  └── Admin resolves → ACTIVE
+
+  \`\`\`
 
 Admin does not directly deactivate users.
 
@@ -246,117 +398,157 @@ A suspended user cannot self-reactivate.
 Suspension metadata is stored as:
 
 suspensionReason
+
 suspendedAt
 
 No suspendedBy field is required for the current design.
 
 Role changes are not supported as a normal user-management operation.
 
-### Authentication Session Behavior
+**### Authentication Session Behavior**
 
 Account-state changes affect authentication sessions:
 
-```text
+\`\`\`text
+
 ACTIVE
-    ↓
+
+    ↓
+
 Normal authentication sessions
 
 User deactivates
-    ↓
+
+    ↓
+
 DEACTIVATED
-    ↓
+
+    ↓
+
 Active RefreshSession records revoked
 
 Admin suspends
-    ↓
+
+    ↓
+
 SUSPENDED
-    ↓
+
+    ↓
+
 Active RefreshSession records revoked
 
 DEACTIVATED
-    ↓
+
+    ↓
+
 User reactivates
-    ↓
+
+    ↓
+
 ACTIVE
-    ↓
+
+    ↓
+
 New RefreshSession created
-```
 
-## 8. Student Profile
+\`\`\`
 
-Student-specific information belongs conceptually in a Student Profile.
+**## 8. Learner Profile**
 
-```text
-StudentProfile
+Learner-specific information belongs conceptually in a Learner Profile.
+
+\`\`\`text
+
+LearnerProfile
+
 ├── userId
+
 ├── interests
+
 ├── goals
+
 ├── experienceLevel
+
 ├── studyPreferences
-│   ├── dailyStudyTime
-│   └── preferredLearningFormat
+
+│   ├── dailyStudyTime
+
+│   └── preferredLearningFormat
+
 ├── onboardingState
+
 └── timestamps
-```
+
+\`\`\`
+
 Clarify:
 
-### interests
+**### interests**
 
 Multiple learner interests selected during onboarding.
 
-### goals
+**### goals**
 
 Learner goals declared during onboarding.
 
-### experienceLevel
+**### experienceLevel**
 
 A single overall, self-reported experience level relating to the
-subjects/interests selected by the student.
+
+subjects/interests selected by the learner.
 
 It is NOT:
 
-- platform experience
-- verified mastery
-- subject-specific mastery
+\- platform experience
+
+\- verified mastery
+
+\- subject-specific mastery
 
 Onboarding question:
 
 "How would you describe your current experience with the subjects
+
 you've selected?"
 
 Options:
 
-- I'm completely new to these subjects
-- I know some basics
-- I'm comfortable with the fundamentals
+- I have no prior knowledge
+- I have a basic understanding
+- I am comfortable with the fundamentals
 - I have substantial experience
 - I'm not sure
 
 The project intentionally uses ONE overall experience level for the MVP,
+
 even if multiple interests are selected.
 
 Do not create per-interest experience records.
 
-### studyPreferences
+**### studyPreferences**
 
 MVP contains only:
 
 studyPreferences
+
 ├── dailyStudyTime
+
 └── preferredLearningFormat
 
 dailyStudyTime represents realistic daily learning capacity.
 
 Approved displayed choices:
 
-- < 1 hour
+- Less than 1 hour
 - 1–2 hours
 - 2–3 hours
 - 3–4 hours
-- 5+ hours
+- 5 or more hours
 
 This information is intentionally relevant to personalization because
+
 recommendation volume/granularity can be adjusted according to learner
+
 capacity.
 
 preferredLearningFormat supports multiple selections.
@@ -364,9 +556,9 @@ preferredLearningFormat supports multiple selections.
 Approved options:
 
 - Reading
-- Video
-- Interactive
-- Practice
+- Videos
+- Interactive Learning
+- Practice Exercises
 - Projects
 
 Do NOT make preferredLearningFormat a single-value preference.
@@ -377,1504 +569,2372 @@ preferredLearningFormat → array of strings
 
 Exact implementation-level enum naming belongs to schema implementation.
 
-### onboardingState
+**### onboardingState**
 
 Approved states:
 
-NOT_STARTED
-IN_PROGRESS
+NOT\_STARTED
+
+IN\_PROGRESS
+
 COMPLETED
 
 Reason:
 
 The MVP uses a multi-step onboarding experience.
 
-## 9. Teacher Profile
+**## 9. Instructor Profile**
 
-Teacher-specific information may include:
+Instructor-specific information may include:
 
-```text
-TeacherProfile
+\`\`\`text
+
+InstructorProfile
+
 ├── userId
+
 ├── professionalTitle
+
 ├── department
+
 ├── subjectAreas
+
 ├── bio
+
 └── timestamps
-```
-Avatar belongs to User because it is common across Student, Teacher,
+
+\`\`\`
+
+Avatar belongs to User because it is common across Learner, Instructor,
+
 and Admin.
 
-Courses reference the teacher/user as owner rather than duplicating the full teacher profile.
+Courses reference the instructor/user as owner rather than duplicating the full instructor profile.
 
-## User → Profile Relationship
+**## User → Profile Relationship**
 
-For Student:
+For Learner:
 
-User.role = STUDENT
-        ↓
-StudentProfile
+User.role = LEARNER
 
-For Teacher:
+        ↓
 
-User.role = TEACHER
-        ↓
-TeacherProfile
+LearnerProfile
+
+For Instructor:
+
+User.role = INSTRUCTOR
+
+        ↓
+
+InstructorProfile
 
 For Admin:
 
 User.role = ADMIN
-        ↓
-No StudentProfile/TeacherProfile required.
 
-For both StudentProfile and TeacherProfile:
+        ↓
+
+No LearnerProfile/InstructorProfile required.
+
+For both LearnerProfile and InstructorProfile:
 
 userId is:
 
-- required
-- reference to User
-- unique within the respective profile collection
+\- required
+
+\- reference to User
+
+\- unique within the respective profile collection
 
 This represents one profile per user for the applicable profile type.
 
 This is an APPLICATION-LEVEL invariant.
 
 Do not imply that MongoDB must atomically create User + Profile through
+
 a schema hook.
 
 Registration/onboarding may temporarily have:
 
 User exists
-    ↓
+
+    ↓
+
 Profile not yet completed
-    ↓
+
+    ↓
+
 Onboarding
-    ↓
+
+    ↓
+
 Profile completed
 
-## 10. Course Model
+**## 10. Course Model**
 
-A Course represents the educational product created by a teacher.
+A Course represents the educational product created by a instructor.
 
-```text
+\`\`\`text
+
 Course
+
 ├── title
+
 ├── description
+
 ├── createdBy
+
 ├── department
+
 ├── category
+
 ├── difficulty
+
 ├── objectives
+
 ├── prerequisites
+
 ├── diagnosticPolicy
+
 ├── status
+
 └── timestamps
-```
+
+\`\`\`
 
 Course status:
 
-```text
+\`\`\`text
+
 DRAFT
+
 PUBLISHED
+
 ARCHIVED
-```
 
-## 11. Course Ownership and Discovery
+\`\`\`
 
-Each course has a teacher/owner:
+**## 11. Course Ownership and Discovery**
 
-```text
-Teacher
-   │
-   ├── Course A
-   ├── Course B
-   └── Course C
-```
+Each course has a instructor/owner:
+
+\`\`\`text
+
+Instructor
+
+   │
+
+   ├── Course A
+
+   ├── Course B
+
+   └── Course C
+
+\`\`\`
 
 Conceptually:
 
-```text
-Course.createdBy → User/Teacher
-```
+\`\`\`text
+
+Course.createdBy → User/Instructor
+
+\`\`\`
 
 Discovery metadata includes:
 
-```text
-department
-category
+\`\`\`text
+
+domain/category
+
 difficulty
+
 title
-subject
+
 status
-```
+
+\`\`\`
 
 This supports search, department/category filtering, and AI recommendations.
 
-## 12. Prerequisite and Diagnostic Model
+**## 12. Prerequisite and Diagnostic Model**
 
 A course may require prerequisite knowledge:
 
-```text
+\`\`\`text
+
 Advanced SQL
-   │
-   └── Prerequisite
-          ↓
-       Basic SQL
-```
+
+   │
+
+   └── Prerequisite
+
+          ↓
+
+       Basic SQL
+
+\`\`\`
 
 A prerequisite may reference a prerequisite course, required knowledge/topic, and/or diagnostic requirement.
 
 Some courses have a diagnostic assessment:
 
-```text
+\`\`\`text
+
 Course
-   ├── prerequisites
-   └── diagnosticAssessment
-```
 
-The teacher decides whether the diagnostic is required. A student's diagnostic attempt is stored separately from course configuration.
+   ├── prerequisites
 
-## 13. Topic Model
+   └── diagnosticAssessment
+
+\`\`\`
+
+The instructor decides whether the diagnostic is required. A learner's diagnostic attempt is stored separately from course configuration.
+
+**## 13. Topic Model**
 
 Topics are a major structural layer:
 
-```text
+\`\`\`text
+
 Course
-  │
-  ├── Topic A
-  ├── Topic B
-  └── Topic C
-```
+
+  │
+
+  ├── Topic A
+
+  ├── Topic B
+
+  └── Topic C
+
+\`\`\`
 
 Conceptually:
 
-```text
+\`\`\`text
+
 Topic
+
 ├── courseId
+
 ├── title
+
 ├── description
+
 ├── order
+
 └── learningObjectives
-```
+
+\`\`\`
 
 Topic-level identity is essential because personalization must reason about specific concepts.
 
-## 14. Lesson Model
+**## 14. Lesson Model**
 
 A lesson belongs to a topic:
 
-```text
+\`\`\`text
+
 Course
-  ↓
+
+  ↓
+
 Topic
-  ↓
+
+  ↓
+
 Lesson
-```
+
+\`\`\`
 
 Conceptually:
 
-```text
+\`\`\`text
+
 Lesson
+
 ├── topicId
+
 ├── title
+
 ├── explanation
+
 ├── examples
+
 ├── order
+
 ├── accessPolicy
+
 └── status
-```
+
+\`\`\`
 
 Lesson content may later use structured content blocks, rich text, or resource references.
 
-## 15. Lesson Ordering and Unlocking
+**## 15. Lesson Ordering and Unlocking**
 
 Lesson order is stored explicitly:
 
-```text
+\`\`\`text
+
 Lesson 1 → order 1
+
 Lesson 2 → order 2
+
 Lesson 3 → order 3
-```
 
-Unlocking is a business rule, not merely a database field. The Learning module decides whether a student can access the next lesson using stored state and evidence.
+\`\`\`
 
-## 16. Resource Model
+Unlocking is a business rule, not merely a database field. The Learning module decides whether a learner can access the next lesson using stored state and evidence.
+
+**## 16. Resource Model**
 
 A lesson may have multiple resources:
 
-```text
+\`\`\`text
+
 Lesson
-  ├── YouTube Video
-  ├── PDF Notes
-  ├── External Reference
-  └── Teacher Material
-```
+
+  ├── YouTube Video
+
+  ├── PDF Notes
+
+  ├── External Reference
+
+  └── Instructor Material
+
+\`\`\`
 
 Conceptually:
 
-```text
+\`\`\`text
+
 Resource
+
 ├── lessonId
+
 ├── type
+
 ├── title
+
 ├── externalUrl / storageReference
+
 ├── metadata
+
 └── createdBy
-```
+
+\`\`\`
 
 Potential types:
 
-```text
+\`\`\`text
+
 VIDEO
+
 PDF
+
 PRESENTATION
+
 DOCUMENT
+
 LINK
-```
+
+\`\`\`
 
 Actual files are stored in object/file storage; MongoDB stores metadata.
 
-## 17. Enrollment Model
+**## 17. Enrollment Model**
 
 Enrollment represents:
 
-```text
-Student ↔ Course
-```
+\`\`\`text
+
+Learner ↔ Course
+
+\`\`\`
 
 Conceptually:
 
-```text
+\`\`\`text
+
 Enrollment
-├── studentId
+
+├── learnerId
+
 ├── courseId
+
 ├── status
+
 ├── enrolledAt
+
 ├── completedAt
+
 └── currentProgressState
-```
+
+\`\`\`
 
 Possible statuses:
 
-```text
+\`\`\`text
+
 ACTIVE
+
 COMPLETED
+
 ARCHIVED
-```
+
+\`\`\`
 
 The exact lifecycle can be refined later.
 
-## 18. Current Progress vs Historical Activity
+**## 18. Current Progress vs Historical Activity**
 
 Enrollment can hold current derived state such as:
 
-```text
+\`\`\`text
+
 progressPercentage
+
 currentLessonId
+
 currentTopicId
-```
+
+\`\`\`
 
 It should not become the historical activity store. Historical activity belongs to learning evidence/activity records.
 
-## 19. Question Bank
+**## 19. Question Bank**
 
-Teachers maintain reusable question banks:
+Instructors maintain reusable question banks:
 
-```text
+\`\`\`text
+
 Question Bank
-      │
-      ├── Question 1
-      ├── Question 2
-      ├── Question 3
-      └── ...
-```
+
+      │
+
+      ├── Question 1
+
+      ├── Question 2
+
+      ├── Question 3
+
+      └── ...
+
+\`\`\`
 
 Conceptually:
 
-```text
-Question
-├── courseId
-├── topicId
-├── questionText
-├── options
-├── correctAnswer
-├── explanation
-├── marks
-├── difficulty
-└── metadata
-```
+\`\`\`text
 
-## 20. Why Question Banks Matter
+Question
+
+├── courseId
+
+├── topicId
+
+├── questionText
+
+├── options
+
+├── correctAnswer
+
+├── explanation
+
+├── marks
+
+├── difficulty
+
+└── metadata
+
+\`\`\`
+
+**## 20. Why Question Banks Matter**
 
 Example:
 
-```text
+\`\`\`text
+
 Question Bank = 30
+
 Questions per attempt = 10
-```
+
+\`\`\`
 
 Attempt 1 selects one combination and a retry can select another.
 
 This supports better retries, less memorization, broader evidence, and more reliable assessment.
 
-## 21. Bulk Question Import
+**## 21. Bulk Question Import**
 
 Questions may enter through:
 
-```text
+\`\`\`text
+
 Manual Creation
+
 CSV/Excel Import
+
 Future AI-Assisted Drafting
-```
+
+\`\`\`
 
 Pipeline:
 
-```text
+\`\`\`text
+
 Upload
-  ↓
+
+  ↓
+
 Parse
-  ↓
+
+  ↓
+
 Validate
-  ↓
+
+  ↓
+
 Preview
-  ↓
-Teacher Approval
-  ↓
+
+  ↓
+
+Instructor Approval
+
+  ↓
+
 Question Bank
-```
+
+\`\`\`
 
 AI-generated questions are not automatically trusted as official assessment content.
 
-## 22. Assessment Model
+**## 22. Assessment Model**
 
 Assessment represents a configured evaluation.
 
 Types:
 
-```text
+\`\`\`text
+
 PRACTICE
-LESSON_ASSESSMENT
+
+LESSON\_ASSESSMENT
+
 DIAGNOSTIC
+
 FINAL
-```
+
+\`\`\`
 
 Conceptually:
 
-```text
+\`\`\`text
+
 Assessment
+
 ├── courseId
+
 ├── topicId / lessonId
+
 ├── type
+
 ├── questionBankId
+
 ├── questionCount
+
 ├── passingThreshold
+
 ├── timeLimit
+
 ├── maxAttempts
+
 └── configuration
-```
 
-## 23. Assessment Attempt
+\`\`\`
 
-An Attempt represents one actual student session/submission.
+**## 23. Assessment Attempt**
 
-```text
+An Attempt represents one actual learner session/submission.
+
+\`\`\`text
+
 Assessment
-     │
-     ├── Attempt 1
-     ├── Attempt 2
-     └── Attempt 3
-```
+
+     │
+
+     ├── Attempt 1
+
+     ├── Attempt 2
+
+     └── Attempt 3
+
+\`\`\`
 
 Conceptually:
 
-```text
+\`\`\`text
+
 AssessmentAttempt
-├── studentId
+
+├── learnerId
+
 ├── assessmentId
+
 ├── startedAt
+
 ├── submittedAt
+
 ├── score
+
 ├── percentage
+
 ├── status
+
 └── attemptNumber
-```
+
+\`\`\`
 
 Possible statuses:
 
-```text
-IN_PROGRESS
-SUBMITTED
-AUTO_SUBMITTED
-```
+\`\`\`text
 
-## 24. Question Response
+IN\_PROGRESS
+
+SUBMITTED
+
+AUTO\_SUBMITTED
+
+\`\`\`
+
+**## 24. Question Response**
 
 Question Response represents what happened for one question during one attempt.
 
-```text
+\`\`\`text
+
 AssessmentAttempt
-     ├── Response Q1
-     ├── Response Q2
-     ├── Response Q3
-     └── ...
-```
+
+     ├── Response Q1
+
+     ├── Response Q2
+
+     ├── Response Q3
+
+     └── ...
+
+\`\`\`
 
 Conceptually:
 
-```text
+\`\`\`text
+
 QuestionResponse
+
 ├── attemptId
+
 ├── questionId
+
 ├── selectedAnswer
+
 ├── responseStatus
+
 ├── isCorrect
+
 ├── marksObtained
+
 └── timeSpent
-```
+
+\`\`\`
 
 Response status:
 
-```text
+\`\`\`text
+
 CORRECT
+
 INCORRECT
+
 UNANSWERED
-```
+
+\`\`\`
 
 Unanswered remains analytically distinct from incorrect.
 
-## 25. Assessment Scoring and History
+**## 25. Assessment Scoring and History**
 
 Scoring is deterministic:
 
-```text
+\`\`\`text
+
 Question Responses
-      ↓
+
+      ↓
+
 Marks Calculation
-      ↓
+
+      ↓
+
 Score
-      ↓
+
+      ↓
+
 Percentage
-      ↓
+
+      ↓
+
 Pass/Fail
-```
+
+\`\`\`
 
 AI does not decide official numerical scores.
 
 Attempts remain historical:
 
-```text
+\`\`\`text
+
 Attempt 1 → 45%
+
 Attempt 2 → 61%
+
 Attempt 3 → 78%
-```
+
+\`\`\`
 
 This allows improvement measurement.
 
-## 26. Learning Evidence
+**## 26. Learning Evidence**
 
 Learning Evidence records meaningful learning events:
 
-```text
+\`\`\`text
+
 Lesson completed
+
 Practice attempted
+
 Assessment submitted
+
 Question answered incorrectly
+
 Question answered correctly
+
 Diagnostic failed
+
 Remediation completed
+
 Mastery improved
-```
+
+\`\`\`
 
 Conceptually:
 
-```text
+\`\`\`text
+
 LearningEvidence
-├── studentId
+
+├── learnerId
+
 ├── courseId
+
 ├── topicId
+
 ├── lessonId
+
 ├── assessmentId
+
 ├── attemptId
+
 ├── eventType
+
 ├── eventData
+
 └── occurredAt
-```
+
+\`\`\`
 
 Not every event needs every reference.
 
-## 27. Immutable Learning Evidence
+**## 27. Immutable Learning Evidence**
 
 Learning evidence should generally be append-oriented.
 
 Example:
 
-```text
+\`\`\`text
+
 Evidence 1
+
 Normalization question → incorrect
 
 Evidence 2
+
 Normalization practice → completed
 
 Evidence 3
+
 2NF mini assessment → 68%
 
 Evidence 4
+
 2NF assessment → 82%
-```
+
+\`\`\`
 
 Evidence 1 is not rewritten later.
 
 This preserves the learning trajectory.
 
-## 28. Topic Mastery
+**## 28. Topic Mastery**
 
 Topic Mastery is derived/current state:
 
-```text
-Student
-   ↓
+\`\`\`text
+
+Learner
+
+   ↓
+
 Topic
-   ↓
+
+   ↓
+
 TopicMastery
-```
+
+\`\`\`
 
 Conceptually:
 
-```text
+\`\`\`text
+
 TopicMastery
-├── studentId
+
+├── learnerId
+
 ├── topicId
+
 ├── courseId
+
 ├── masteryScore
+
 ├── status
+
 ├── confidence
+
 ├── evidenceCount
+
 └── lastEvaluatedAt
-```
+
+\`\`\`
 
 Possible statuses:
 
-```text
+\`\`\`text
+
 STRONG
+
 DEVELOPING
-NEEDS_IMPROVEMENT
-```
+
+NEEDS\_IMPROVEMENT
+
+\`\`\`
 
 Exact formulas remain a personalization-design decision.
 
-## 29. Mastery Is Derived
+**## 29. Mastery Is Derived**
 
 The flow is:
 
-```text
+\`\`\`text
+
 Learning Evidence
-       ↓
+
+       ↓
+
 Mastery Calculation
-       ↓
+
+       ↓
+
 Topic Mastery
-```
+
+\`\`\`
 
 If the calculation strategy changes, historical evidence can support recalculation.
 
-## 30. Student Learning Profile
+**## 30. Learner Learning Profile**
 
-Learning Profile represents a higher-level view of the learner:
+The Learning Profile represents a higher-level, derived view of the learner:
 
-```text
+\`\`\`text
+
 LearningProfile
-├── studentId
+
+├── learnerId
+
 ├── goals
+
 ├── interests
+
 ├── strengths
+
 ├── weaknesses
+
 ├── learningPatterns
+
 └── personalizationState
-```
+
+\`\`\`
 
 It should not contain every historical learning event.
 
-## 31. Student Profile vs Learning Profile
+**## 31. Learner Profile vs Learning Profile**
 
-### Student Profile
+**### LearnerProfile**
 
 Answers:
 
-> Who is the student and what did they tell us?
+> What did the learner explicitly tell us during onboarding/profile setup?
 
 Examples:
 
 - interests
 - goals
 - experience level
+- study preferences
+- onboarding state
 
-### Learning Profile
+**### Learning Profile**
 
 Answers:
 
-> What have we learned about the student's learning?
+\> Who is the learner and what did they tell us?
 
 Examples:
 
-- mastery
-- weaknesses
-- strengths
-- learning patterns
-- intervention outcomes
+\- interests
 
-## 32. Recommendation Model
+\- goals
+
+\- experience level
+
+**### Learning Profile**
+
+Answers:
+
+\> What have we learned about the learner's learning?
+
+Examples:
+
+\- mastery
+
+\- weaknesses
+
+\- strengths
+
+\- learning patterns
+
+\- intervention outcomes
+
+**## 32. Recommendation Model**
 
 Recommendation represents a proposed next action:
 
-```text
+\`\`\`text
+
 Recommendation
-├── studentId
+
+├── learnerId
+
 ├── type
+
 ├── target
+
 ├── reason
+
 ├── priority
+
 ├── status
+
 ├── generatedAt
+
 └── expiresAt
-```
+
+\`\`\`
 
 Potential types:
 
-```text
+\`\`\`text
+
 COURSE
+
 LESSON
+
 TOPIC
+
 RESOURCE
+
 PRACTICE
+
 PREREQUISITE
+
 REASSESSMENT
-```
 
-## 33. Recommendation Flow
+\`\`\`
 
-```text
+**## 33. Recommendation Flow**
+
+\`\`\`text
+
 Learning Evidence
-      ↓
+
+      ↓
+
 Analysis
-      ↓
+
+      ↓
+
 Learning State
-      ↓
+
+      ↓
+
 Recommendation
-```
+
+\`\`\`
 
 Example:
 
-```text
+\`\`\`text
+
 Topic mastery:
+
 2NF = 42%
 
 Recommendation:
-Review 2NF lesson
-→ Watch recommended video
-→ Complete practice
-→ Take mini assessment
-```
 
-## 34. Recommendation History
+Review 2NF lesson
+
+→ Watch recommended video
+
+→ Complete practice
+
+→ Take mini assessment
+
+\`\`\`
+
+**## 34. Recommendation History**
 
 Recommendation history can help answer:
 
-```text
+\`\`\`text
+
 What was recommended?
-Did the student follow it?
+
+Did the learner follow it?
+
 Did it help?
-```
+
+\`\`\`
 
 This can become future evidence for improving the personalization engine.
 
-## 35. Intervention / Remediation Model
+**## 35. Intervention / Remediation Model**
 
 An intervention represents an attempt to address a weakness:
 
-```text
+\`\`\`text
+
 Intervention
-├── studentId
+
+├── learnerId
+
 ├── targetTopicId
+
 ├── type
+
 ├── reason
+
 ├── recommendedAction
+
 ├── startedAt
+
 ├── completedAt
+
 └── outcome
-```
+
+\`\`\`
 
 Types may include:
 
-```text
-LESSON_REVIEW
-RESOURCE_REVIEW
-PRACTICE
-MINI_ASSESSMENT
-PREREQUISITE_REVIEW
-REASSESSMENT
-```
+\`\`\`text
 
-## 36. Intervention Outcome
+LESSON\_REVIEW
+
+RESOURCE\_REVIEW
+
+PRACTICE
+
+MINI\_ASSESSMENT
+
+PREREQUISITE\_REVIEW
+
+REASSESSMENT
+
+\`\`\`
+
+**## 36. Intervention Outcome**
 
 The platform should eventually measure:
 
-```text
+\`\`\`text
+
 Weakness
-   ↓
+
+   ↓
+
 Intervention
-   ↓
+
+   ↓
+
 Outcome
-```
+
+\`\`\`
 
 Example:
 
-```text
+\`\`\`text
+
 Before intervention: 45%
+
 Intervention: targeted practice
+
 After intervention: 73%
-```
+
+\`\`\`
 
 This helps evaluate which remediation strategies are effective.
 
-## 37. Teacher Analytics
+**## 37. Instructor Analytics**
 
-Teacher analytics are primarily derived from student/course learning data:
+Instructor analytics are primarily derived from learner/course learning data:
 
-```text
-Student Learning Evidence
-          ↓
+\`\`\`text
+
+Learner Learning Evidence
+
+          ↓
+
 Aggregation
-          ↓
+
+          ↓
+
 Course Analytics
-          ↓
-Teacher Dashboard
-```
+
+          ↓
+
+Instructor Dashboard
+
+\`\`\`
 
 Examples:
 
-- enrollment count
-- active students
-- completion rate
-- average assessment score
-- difficult topics
-- strongest topics
-- assessment distribution
+\- enrollment count
 
-## 38. Analytics Data Strategy
+\- active learners
 
-Avoid unnecessarily duplicating all student data.
+\- completion rate
+
+\- average assessment score
+
+\- difficult topics
+
+\- strongest topics
+
+\- assessment distribution
+
+**## 38. Analytics Data Strategy**
+
+Avoid unnecessarily duplicating all learner data.
 
 For expensive calculations:
 
-```text
+\`\`\`text
+
 Raw Data
-  ↓
+
+  ↓
+
 Background Aggregation
-  ↓
+
+  ↓
+
 Cached/Materialized Analytics
-```
+
+\`\`\`
 
 The exact analytics storage strategy can evolve after performance testing.
 
-## 39. Notification Model
+**## 39. Notification Model**
 
 A Notification represents a message/event intended for a user:
 
-```text
+\`\`\`text
+
 Notification
+
 ├── recipientId
+
 ├── type
+
 ├── title
+
 ├── message
+
 ├── relatedEntity
+
 ├── readAt
+
 └── createdAt
-```
+
+\`\`\`
 
 Examples:
 
-- course published
-- enrollment confirmation
-- assessment result
-- recommendation available
+\- course published
+
+\- enrollment confirmation
+
+\- assessment result
+
+\- recommendation available
 
 Notifications are not part of the critical learning path.
 
-## 40. Audit Log Model
+**## 40. Audit Log Model**
 
 Audit records capture important administrative/security actions:
 
-```text
+\`\`\`text
+
 AuditLog
+
 ├── actorId
+
 ├── action
+
 ├── targetType
+
 ├── targetId
+
 ├── metadata
+
 └── occurredAt
-```
+
+\`\`\`
 
 Examples:
 
-```text
-Admin changed role
-Teacher published course
-Teacher archived course
-Admin moderated course
-```
+\`\`\`text
 
-## 41. Application Logs vs Audit Logs
+Admin suspended/unsuspended user
+
+Instructor published course
+
+Instructor archived course
+
+Admin moderated course
+
+\`\`\`
+
+**## 41. Application Logs vs Audit Logs**
 
 Application logs answer:
 
-> What happened technically?
+\> What happened technically?
 
 Audit logs answer:
 
-> Who performed an important business/security action?
+\> Who performed an important business/security action?
 
 They should not be treated as the same data.
 
-## 42. Relationship Map
+**## 42. Relationship Map**
 
-```text
+\`\`\`text
+
 User
- │
- ├── StudentProfile
- └── TeacherProfile
-       │
-       └── Course
-            │
-            ├── Topic
-            │    └── Lesson
-            │         └── Resource
-            │
-            ├── Question Bank
-            │    └── Question
-            │
-            ├── Diagnostic Assessment
-            └── Final Assessment
 
-Student
- │
- └── Enrollment
-       │
-       └── Course
+ │
 
-Student
- │
- ├── AssessmentAttempt
- │      └── QuestionResponse
- │
- ├── LearningEvidence
- │
- ├── TopicMastery
- │
- ├── LearningProfile
- │
- ├── Recommendation
- │
- └── Intervention
-```
+ ├── LearnerProfile
 
-## 43. Complete Learning Data Flow
+ └── InstructorProfile
 
-```text
-Student
-   ↓
+       │
+
+       └── Course
+
+            │
+
+            ├── Topic
+
+            │    └── Lesson
+
+            │         └── Resource
+
+            │
+
+            ├── Question Bank
+
+            │    └── Question
+
+            │
+
+            ├── Diagnostic Assessment
+
+            └── Final Assessment
+
+Learner
+
+ │
+
+ └── Enrollment
+
+       │
+
+       └── Course
+
+Learner
+
+ │
+
+ ├── AssessmentAttempt
+
+ │      └── QuestionResponse
+
+ │
+
+ ├── LearningEvidence
+
+ │
+
+ ├── TopicMastery
+
+ │
+
+ ├── LearningProfile
+
+ │
+
+ ├── Recommendation
+
+ │
+
+ └── Intervention
+
+\`\`\`
+
+**## 43. Complete Learning Data Flow**
+
+\`\`\`text
+
+Learner
+
+   ↓
+
 Enrollment
-   ↓
+
+   ↓
+
 Course
-   ↓
+
+   ↓
+
 Topic
-   ↓
+
+   ↓
+
 Lesson
-   ↓
+
+   ↓
+
 Practice / Assessment
-   ↓
+
+   ↓
+
 Assessment Attempt
-   ↓
+
+   ↓
+
 Question Responses
-   ↓
+
+   ↓
+
 Learning Evidence
-   ↓
+
+   ↓
+
 Topic Mastery
-   ↓
+
+   ↓
+
 Learning Profile
-   ↓
+
+   ↓
+
 Personalization
-   ↓
+
+   ↓
+
 Recommendation
-   ↓
+
+   ↓
+
 Intervention
-   ↓
+
+   ↓
+
 New Learning Evidence
-   ↓
+
+   ↓
+
 Updated Mastery
-```
+
+\`\`\`
 
 This is the central data loop of the platform.
 
-## 44. Historical vs Current Data
+**## 44. Historical vs Current Data**
 
-### Historical
+**### Historical**
 
-```text
+\`\`\`text
+
 LearningEvidence
+
 AssessmentAttempt
+
 QuestionResponse
+
 Intervention history
+
 Recommendation history
+
 AuditLog
-```
 
-### Current / Derived
+\`\`\`
 
-```text
+**### Current / Derived**
+
+\`\`\`text
+
 Enrollment progress
+
 TopicMastery
+
 LearningProfile
+
 Current recommendations
+
 Course analytics snapshots
-```
+
+\`\`\`
 
 This separation is important for analytics and future personalization.
 
-## 45. Data Lifecycle Example
+**## 45. Data Lifecycle Example**
 
-For a student learning 2NF:
+For a learner learning 2NF:
 
-```text
-1. Student opens 2NF lesson
-       ↓
-2. Lesson completion event
-       ↓
-3. Practice attempt
-       ↓
-4. Assessment
-       ↓
-5. Question responses
-       ↓
-6. Learning evidence created
-       ↓
-7. Mastery recalculated
-       ↓
-8. Weakness detected
-       ↓
-9. Recommendation created
-       ↓
-10. Student completes remediation
-       ↓
-11. New assessment
-       ↓
-12. New evidence
-       ↓
-13. Mastery updated
-```
+\`\`\`text
+
+1\. Learner opens 2NF lesson
+
+       ↓
+
+2\. Lesson completion event
+
+       ↓
+
+3\. Practice attempt
+
+       ↓
+
+4\. Assessment
+
+       ↓
+
+5\. Question responses
+
+       ↓
+
+6\. Learning evidence created
+
+       ↓
+
+7\. Mastery recalculated
+
+       ↓
+
+8\. Weakness detected
+
+       ↓
+
+9\. Recommendation created
+
+       ↓
+
+10\. Learner completes remediation
+
+       ↓
+
+11\. New assessment
+
+       ↓
+
+12\. New evidence
+
+       ↓
+
+13\. Mastery updated
+
+\`\`\`
 
 The database preserves the journey rather than only the final state.
 
-## 46. Data Integrity Principles
+**## 46. Data Integrity Principles**
 
 Important invariants include:
 
-- A student should not have multiple unintended active enrollments for the same course.
-- An attempt belongs to exactly one student and assessment.
-- A response belongs to one attempt and one question.
-- A course belongs to its creator/owner.
-- Teacher access is validated through course ownership and enrollment.
-- Learning evidence must reference valid relevant entities when applicable.
+\- A learner should not have multiple unintended active enrollments for the same course.
 
-## 47. Referential Integrity in MongoDB
+\- An attempt belongs to exactly one learner and assessment.
+
+\- A response belongs to one attempt and one question.
+
+\- A course belongs to its creator/owner.
+
+\- Instructor access is validated through course ownership and enrollment.
+
+\- Learning evidence must reference valid relevant entities when applicable.
+
+**## 47. Referential Integrity in MongoDB**
 
 MongoDB does not enforce traditional relational foreign keys.
 
 Integrity will therefore be enforced through:
 
-- application validation
-- service-layer business rules
-- schema validation where appropriate
-- indexes
-- controlled deletion rules
-- careful reference handling
+\- application validation
+
+\- service-layer business rules
+
+\- schema validation where appropriate
+
+\- indexes
+
+\- controlled deletion rules
+
+\- careful reference handling
 
 References should not be trusted merely because an ID is syntactically valid.
 
-## 48. Deletion and Archival Strategy
+**## 48. Deletion and Archival Strategy**
 
 Not every record should be hard-deleted immediately.
 
-Important historical data may affect analytics, teacher reports, learning history, and auditability.
+Important historical data may affect analytics, instructor reports, learning history, and auditability.
 
 The platform should distinguish where appropriate between:
 
-```text
+\`\`\`text
+
 ACTIVE
+
 ARCHIVED
+
 DELETED
-```
+
+\`\`\`
 
 Exact retention rules belong in the Security/Privacy document.
 
-## 49. Course Archival
+**## 49. Course Archival**
 
 When a course becomes archived, historical records should remain meaningful.
 
 For example:
 
-```text
+\`\`\`text
+
 Enrollment
+
 Assessment Attempts
+
 Learning Evidence
+
 Mastery History
-```
+
+\`\`\`
 
 should not disappear merely because the course is archived.
 
-## 50. Indexing Strategy
+**## 50. Indexing Strategy**
 
 Indexes should be based on real query patterns.
 
 Conceptual candidates:
 
-```text
+\`\`\`text
+
 users:
-  email
-  role
+
+  email
+
+  role
 
 courses:
-  createdBy
-  department
-  category
-  difficulty
-  status
+
+  createdBy
+
+  department
+
+  category
+
+  difficulty
+
+  status
 
 topics:
-  courseId
-  order
+
+  courseId
+
+  order
 
 lessons:
-  topicId
-  order
+
+  topicId
+
+  order
 
 enrollments:
-  studentId
-  courseId
-  status
+
+  learnerId
+
+  courseId
+
+  status
 
 assessments:
-  courseId
-  topicId
-  type
+
+  courseId
+
+  topicId
+
+  type
 
 assessmentAttempts:
-  studentId
-  assessmentId
-  submittedAt
+
+  learnerId
+
+  assessmentId
+
+  submittedAt
 
 questionResponses:
-  attemptId
-  questionId
+
+  attemptId
+
+  questionId
 
 learningEvidence:
-  studentId
-  courseId
-  topicId
-  eventType
-  occurredAt
+
+  learnerId
+
+  courseId
+
+  topicId
+
+  eventType
+
+  occurredAt
 
 topicMastery:
-  studentId
-  topicId
-  courseId
+
+  learnerId
+
+  topicId
+
+  courseId
 
 recommendations:
-  studentId
-  status
-  createdAt
-```
+
+  learnerId
+
+  status
+
+  createdAt
+
+\`\`\`
 
 These are conceptual candidates, not final index definitions.
 
-## 51. Compound Index Thinking
+**## 51. Compound Index Thinking**
 
 Some queries require multiple fields.
 
 Examples:
 
-```text
-Find all active enrollments for a student.
-Find a student's recent evidence for a topic.
-```
+\`\`\`text
+
+Find all active enrollments for a learner.
+
+Find a learner's recent evidence for a topic.
+
+\`\`\`
 
 Potential compound indexes:
 
-```text
-(studentId, status)
-(studentId, topicId, occurredAt)
-```
+\`\`\`text
+
+(learnerId, status)
+
+(learnerId, topicId, occurredAt)
+
+\`\`\`
 
 The exact order should be determined from actual query patterns and explain plans.
 
-## 52. Uniqueness
+**## 52. Uniqueness**
 
 Potential uniqueness constraints include:
 
-```text
+\`\`\`text
+
 User email
-Student + Course active enrollment
-```
+
+Learner + Course active enrollment
+
+\`\`\`
 
 Other uniqueness requirements should be evaluated individually.
 
 Uniqueness is not merely a frontend validation concern.
 
-## 53. Pagination
+**## 53. Pagination**
 
 Large collections must not be retrieved without limits.
 
 Potentially large collections include:
 
-- learning evidence
-- assessment attempts
-- question responses
-- notifications
-- audit logs
-- course lists
+\- learning evidence
+
+\- assessment attempts
+
+\- question responses
+
+\- notifications
+
+\- audit logs
+
+\- course lists
 
 The API should use appropriate pagination strategies.
 
-## 54. Growth-Sensitive Collections
+**## 54. Growth-Sensitive Collections**
 
 Collections that can grow rapidly include:
 
-```text
+\`\`\`text
+
 learningEvidence
+
 questionResponses
+
 assessmentAttempts
+
 auditLogs
+
 notifications
-```
+
+\`\`\`
 
 They should be designed with indexes, pagination, retention considerations, asynchronous aggregation, and future archival strategies.
 
-## 55. Personalization Data Principle
+**## 55. Personalization Data Principle**
 
 The database should not store only:
 
-```text
-Student → Score
-```
+\`\`\`text
+
+Learner → Score
+
+\`\`\`
 
 It should preserve:
 
-```text
-Student
-  ↓
+\`\`\`text
+
+Learner
+
+  ↓
+
 Course
-  ↓
+
+  ↓
+
 Topic
-  ↓
+
+  ↓
+
 Lesson
-  ↓
+
+  ↓
+
 Assessment
-  ↓
+
+  ↓
+
 Question
-  ↓
+
+  ↓
+
 Response
-  ↓
+
+  ↓
+
 Evidence
-  ↓
+
+  ↓
+
 Mastery
-  ↓
+
+  ↓
+
 Intervention
-  ↓
+
+  ↓
+
 Outcome
-```
+
+\`\`\`
 
 This enables evidence-based personalization.
 
-## 56. AI Data Boundary
+**## 56. AI Data Boundary**
 
 AI should not query the entire database indiscriminately.
 
 Instead:
 
-```text
+\`\`\`text
+
 MongoDB
-   ↓
+
+   ↓
+
 Personalization Service
-   ↓
+
+   ↓
+
 Relevant structured learning state
-   ↓
+
+   ↓
+
 AI
-```
+
+\`\`\`
 
 Example AI context:
 
-```text
+\`\`\`text
+
 Topic: Normalization
+
 Mastery: 48%
+
 Recent attempts: 3
+
 Recent trend: improving
+
 Common error pattern: 2NF dependency reasoning
+
 Completed remediation: yes
-```
+
+\`\`\`
 
 This is safer and more reliable than unrestricted database access.
 
-## 57. Privacy Principle
+**## 57. Privacy Principle**
 
-Only data required for a specific operation should be exposed to another module, teacher, admin, or AI provider.
+Only data required for a specific operation should be exposed to another module, instructor, admin, or AI provider.
 
 Examples:
 
-- Teacher receives relevant course-level student data.
-- AI receives relevant learning context.
-- Admin receives data required for administrative operations.
-- Student receives their own learning data.
+\- Instructor receives relevant course-level learner data.
+
+\- AI receives relevant learning context.
+
+\- Admin receives data required for administrative operations.
+
+\- Learner receives their own learning data.
 
 Data minimization should guide access design.
 
-## 58. Teacher Data Boundary
+**## 58. Instructor Data Boundary**
 
-Teacher access follows:
+Instructor access follows:
 
-```text
-Teacher
-  ↓
+\`\`\`text
+
+Instructor
+
+  ↓
+
 Own Course
-  ↓
-Enrolled Students
-  ↓
+
+  ↓
+
+Enrolled Learners
+
+  ↓
+
 Course-Relevant Data
-```
 
-A teacher should not automatically receive:
+\`\`\`
 
-```text
-Student's unrelated courses
-Student's unrelated assessments
-Student's unrelated learning history
-```
+A instructor should not automatically receive:
 
-## 59. Admin Data Boundary
+\`\`\`text
+
+Learner's unrelated courses
+
+Learner's unrelated assessments
+
+Learner's unrelated learning history
+
+\`\`\`
+
+**## 59. Admin Data Boundary**
 
 Admin has broader platform access, but sensitive operations should still be:
 
-- authorized
-- audited
-- minimized
-- explicitly designed
+\- authorized
+
+\- audited
+
+\- minimized
+
+\- explicitly designed
 
 Admin does not mean unlogged unrestricted access.
 
-## 60. Performance Strategy
+**## 60. Performance Strategy**
 
 Initial performance priorities:
 
-1. Correct indexes.
-2. Efficient queries.
-3. Pagination.
-4. Avoid giant documents.
-5. Avoid unnecessary populate chains.
-6. Selective caching.
-7. Background aggregation.
-8. Efficient question selection.
-9. Appropriate field projection.
+1\. Correct indexes.
+
+2\. Efficient queries.
+
+3\. Pagination.
+
+4\. Avoid giant documents.
+
+5\. Avoid unnecessary populate chains.
+
+6\. Selective caching.
+
+7\. Background aggregation.
+
+8\. Efficient question selection.
+
+9\. Appropriate field projection.
 
 Optimization should follow measured bottlenecks.
 
-## 61. Future Evolution
+**## 61. Future Evolution**
 
 The model should allow future additions such as:
 
-- spaced repetition
-- richer learning patterns
-- knowledge graphs
-- advanced recommendation models
-- ML-based mastery estimation
-- adaptive assessments
-- more sophisticated intervention tracking
+\- spaced repetition
+
+\- richer learning patterns
+
+\- knowledge graphs
+
+\- advanced recommendation models
+
+\- ML-based mastery estimation
+
+\- adaptive assessments
+
+\- more sophisticated intervention tracking
 
 These should extend the model rather than rewrite the core identity/course/enrollment/evidence architecture.
 
-## 62. Conceptual Entity Checklist
+**## 62. Conceptual Entity Checklist**
 
-```text
+\`\`\`text
+
 Identity
+
 ├── User
-├── StudentProfile
-└── TeacherProfile
+
+├── LearnerProfile
+
+├── InstructorProfile
+
+├── AuthIdentity
+
+├── RefreshSession
+
+└── OAuthSetupSession
 
 Content
+
 ├── Course
+
 ├── Topic
+
 ├── Lesson
+
 └── Resource
 
 Enrollment
+
 └── Enrollment
 
 Assessment
+
 ├── Question Bank
+
 ├── Question
+
 ├── Assessment
+
 ├── Assessment Attempt
+
 └── Question Response
 
 Personalization
+
 ├── Learning Evidence
+
 ├── Topic Mastery
+
 ├── Learning Profile
+
 ├── Recommendation
+
 └── Intervention
 
 Platform
+
 ├── Notification
+
 └── Audit Log
-```
 
-## 63. Final Database Architecture
+\`\`\`
 
-```text
-                              USER
-                               │
-                 ┌─────────────┴─────────────┐
-                 ▼                           ▼
-          Student Profile              Teacher Profile
-                 │                           │
-                 │                           ▼
-                 │                        Course
-                 │                           │
-                 │                  ┌────────┼────────┐
-                 │                  ▼        ▼        ▼
-                 │                Topics   Lessons  Assessments
-                 │                  │        │        │
-                 │                  │        ▼        ▼
-                 │                  │    Resources Question Bank
-                 │                  │                 │
-                 │                  │                 ▼
-                 │                  │             Questions
-                 │                  │
-                 ▼                  ▼
-              Enrollment         Learning
-                 │               Activity
-                 │                  │
-                 └─────────┬────────┘
-                           ▼
-                    Assessment Attempt
-                           │
-                           ▼
-                    Question Responses
-                           │
-                           ▼
-                    Learning Evidence
-                           │
-                 ┌─────────┴─────────┐
-                 ▼                   ▼
-            Topic Mastery      Learning Profile
-                 │                   │
-                 └─────────┬─────────┘
-                           ▼
-                     Personalization
-                           │
-                 ┌─────────┴─────────┐
-                 ▼                   ▼
-          Recommendation       Intervention
-                 │                   │
-                 └─────────┬─────────┘
-                           ▼
-                    New Learning Evidence
-```
+**## 63. Final Database Architecture**
 
-## 64. Core Database Principle
+\`\`\`text
+
+                              USER
+
+                               │
+
+                 ┌─────────────┴─────────────┐
+
+                 ▼                           ▼
+
+          Learner Profile              Instructor Profile
+
+                 │                           │
+
+                 │                           ▼
+
+                 │                        Course
+
+                 │                           │
+
+                 │                  ┌────────┼────────┐
+
+                 │                  ▼        ▼        ▼
+
+                 │                Topics   Lessons  Assessments
+
+                 │                  │        │        │
+
+                 │                  │        ▼        ▼
+
+                 │                  │    Resources Question Bank
+
+                 │                  │                 │
+
+                 │                  │                 ▼
+
+                 │                  │             Questions
+
+                 │                  │
+
+                 ▼                  ▼
+
+              Enrollment         Learning
+
+                 │               Activity
+
+                 │                  │
+
+                 └─────────┬────────┘
+
+                           ▼
+
+                    Assessment Attempt
+
+                           │
+
+                           ▼
+
+                    Question Responses
+
+                           │
+
+                           ▼
+
+                    Learning Evidence
+
+                           │
+
+                 ┌─────────┴─────────┐
+
+                 ▼                   ▼
+
+            Topic Mastery      Learning Profile
+
+                 │                   │
+
+                 └─────────┬─────────┘
+
+                           ▼
+
+                     Personalization
+
+                           │
+
+                 ┌─────────┴─────────┐
+
+                 ▼                   ▼
+
+          Recommendation       Intervention
+
+                 │                   │
+
+                 └─────────┬─────────┘
+
+                           ▼
+
+                    New Learning Evidence
+
+\`\`\`
+
+**## 64. Core Database Principle**
 
 The most important decision is:
 
-> **The database must preserve the student's learning journey, not merely their latest score.**
+\> **\*\*The database must preserve the learner's learning journey, not merely their latest score.\*\***
 
 Therefore:
 
-```text
+\`\`\`text
+
 Historical Evidence
-        ↓
+
+        ↓
+
 Current Derived State
-        ↓
+
+        ↓
+
 Personalization
-        ↓
+
+        ↓
+
 Intervention
-        ↓
+
+        ↓
+
 New Evidence
-        ↓
+
+        ↓
+
 Updated State
-```
+
+\`\`\`
 
 This makes the database a foundation for an actual personalized learning system rather than simply a CRUD course-management database.
 
-## 65. Refresh Session
+**## 65. External Authentication Identity**
+
+External authentication identities are maintained separately from User.
+
+Conceptually:
+
+```text
+AuthIdentity
+
+├── userId
+├── provider
+├── providerAccountId
+└── timestamps
+```
+
+The primary current external provider is Google.
+
+The conceptual relationship is:
+
+```text
+Google Identity
+      ↓
+AuthIdentity
+      ↓
+User
+```
+
+The same external identity must not create multiple unintended platform
+accounts.
+
+For an existing password-based account, a matching Google email does not
+automatically link the accounts.
+
+Account linking is a future authenticated account-settings workflow.
+
+Google-only users may exist without a local password.
+
+For new Google users, a temporary OAuth setup record is used before the
+permanent User account is created.
+
+Conceptually:
+
+```text
+OAuthSetupSession
+
+├── provider
+├── providerAccountId
+├── email
+├── name
+├── avatar
+├── role
+├── onboardingState
+├── onboardingData
+├── expiresAt
+└── timestamps
+```
+
+OAuthSetupSession is temporary and is invalidated/removed after successful
+account creation.
+
+Google authentication is not the platform's API access token. After a
+successful platform account setup or existing-account authentication, the
+application issues its own access and refresh session.
+
+**## 66. Refresh Session**
 
 Do NOT place refreshToken directly inside User.
 
 The authentication architecture uses a separate RefreshSession
+
 persistence
+
 RefreshSession stores the server-side state required to validate and
+
 revoke refresh-token sessions.
 
 RefreshSession
+
 ├── userId
+
 ├── jti
+
 ├── tokenHash
+
 ├── expiresAt
+
 ├── revokedAt
+
 ├── tokenFamily
+
 └── timestamps
 
 Login
- ↓
+
+ ↓
+
 Create RefreshSession
 
 Refresh
- ↓
+
+ ↓
+
 Same RefreshSession
- ↓
+
+ ↓
+
 Update jti + tokenHash
- ↓
+
+ ↓
+
 Keep tokenFamily
 
 Logout
- ↓
+
+ ↓
+
 Set revokedAt
 
 One User may have multiple RefreshSession records.
 
 RefreshSession persistence has been finalized for the current
+
 authentication implementation.
 
 RefreshSession is maintained separately from User.
+
 Each session is associated with a User through userId.
+
 The refresh token contains a unique jti that identifies the
+
 corresponding persisted refresh session.
+
 Logout revokes the current session by setting revokedAt.
+
 Password change revokes other active refresh sessions while preserving
+
 the current authenticated session according to the authentication flow.
 
 A User may have multiple refresh sessions.
 
-## 66. Scope Boundary
+**## 67. Scope Boundary**
 
 This document intentionally does not yet finalize:
 
-- Mongoose schema code
-- exact field types
-- exact validation syntax
-- exact collection naming conventions
-- complete API endpoints
-- detailed aggregation pipelines
-- mastery formula implementation
-- AI prompt schemas
-- production database deployment
-- advanced sharding/partitioning
+\- Mongoose schema code
+
+\- exact field types
+
+\- exact validation syntax
+
+\- exact collection naming conventions
+
+\- complete API endpoints
+
+\- detailed aggregation pipelines
+
+\- mastery formula implementation
+
+\- AI prompt schemas
+
+\- production database deployment
+
+\- advanced sharding/partitioning
 
 Those decisions belong to later design and implementation documents.
-
-
