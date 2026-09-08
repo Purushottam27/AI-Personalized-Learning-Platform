@@ -332,7 +332,7 @@ Enroll
 Course Added to My Courses
 ```
 
-Teacher approval is not part of the MVP enrollment flow.
+Instructor approval is not part of the MVP enrollment flow.
 
 ---
 

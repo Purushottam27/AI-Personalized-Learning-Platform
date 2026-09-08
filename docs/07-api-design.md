@@ -995,26 +995,171 @@ PATCH /users/me/avatar
 
 
 \`\`\`
+### Role-Specific Profile APIs:
 
-Learner:
+Learner and Instructor profiles are role-specific resources associated with
+the authenticated User.
 
-/api/v1/learners/me/profile
+The backend uses separate Learner and Instructor modules for their respective
+profile and onboarding business logic.
 
-GET   /learners/me/profile
+### Learner Profile
 
-PATCH /learners/me/profile
+/api/v1/learner-profile
 
-Instructor:
+GET   /api/v1/learner-profile/me
 
-/api/v1/instructors/me/profile
+PATCH /api/v1/learner-profile/me
 
-GET   /instructors/me/profile
+# GET /api/v1/learner-profile/me
 
-PATCH /instructors/me/profile
+Purpose:
 
+Return the authenticated Learner's current profile.
 
+If a LearnerProfile does not exist, the endpoint must not create one as a
+side effect. Profile absence represents that learner onboarding has not yet
+started.
 
-Role-specific profile operations may be separated if their business rules differ.
+# PATCH /api/v1/learner-profile/me
+
+Purpose:
+
+Partially update normal Learner profile data.
+
+Normal profile management must not create a missing LearnerProfile and must
+not own onboarding-state calculation.
+
+Learner onboarding is handled by the dedicated onboarding endpoint below.
+
+### Learner Onboarding
+PATCH /api/v1/learner-profile/me/onboarding
+
+Purpose:
+
+Persist a Learner's onboarding answer progressively.
+
+Each onboarding answer is saved immediately rather than waiting for the learner to complete all onboarding questions.
+
+The onboarding endpoint may create the LearnerProfile when onboarding begins if no LearnerProfile currently exists.
+
+The endpoint is responsible for:
+
+validating the onboarding answer
+creating the LearnerProfile when onboarding begins
+persisting the submitted onboarding field
+evaluating the persisted onboarding state
+returning the updated onboarding/profile state
+
+The five onboarding fields are:
+
+interests
+goals
+experienceLevel
+studyPreferences.dailyStudyTime
+studyPreferences.preferredLearningFormat
+
+The backend determines onboarding state:
+
+No meaningful answers
+    → NOT_STARTED
+
+At least one meaningful answer
+    → IN_PROGRESS
+
+All five meaningful answers
+    → COMPLETED
+
+The frontend must not submit or persist an authoritative currentQuestion
+field.
+
+### Instructor Profile
+
+Base:
+
+/api/v1/instructor-profile
+
+Authenticated Instructor profile endpoints:
+
+GET   /api/v1/instructor-profile/me
+PATCH /api/v1/instructor-profile/me
+
+# GET /api/v1/instructor-profile/me
+
+Purpose:
+
+Return the authenticated Instructor's current profile.
+
+If an InstructorProfile does not exist, the endpoint must not create one as a
+side effect.
+
+# PATCH /api/v1/instructor-profile/me
+
+Purpose:
+
+Partially update normal Instructor profile data.
+
+Normal profile management is separate from instructor onboarding.
+
+### Instructor Onboarding
+
+# PATCH /api/v1/instructor-profile/me/onboarding
+
+Purpose:
+
+Persist an Instructor's onboarding answer progressively.
+
+The onboarding endpoint may create the InstructorProfile when onboarding
+begins if no InstructorProfile currently exists.
+
+The two onboarding fields are:
+
+professionalTitle
+expertiseAreas[]
+
+The onboarding questions are completed progressively. The InstructorProfile
+does not persist a separate onboardingState field.
+
+Instructor onboarding is considered complete when:
+
+professionalTitle has a meaningful value
+AND expertiseAreas contains at least one meaningful value
+
+The following fields belong to normal Instructor profile management and are not required during onboarding:
+
+bio
+experienceYears
+organization
+socialLinks
+Role and Authorization
+
+Learner profile and onboarding endpoints require:
+
+Authentication + LEARNER role
+
+Instructor profile and onboarding endpoints require:
+
+Authentication + INSTRUCTOR role
+
+The authenticated user's identity must be taken from the backend authentication context. The client must not be allowed to specify another user's profile identity.
+
+Profile Creation Boundary
+
+Normal profile GET/PATCH operations must not silently create missing role-specific profiles.
+
+Role-specific profiles are created when role-specific onboarding begins.
+
+This preserves the distinction between:
+
+User exists
+    ↓
+Profile does not yet exist
+    ↓
+Onboarding begins
+    ↓
+Role-specific Profile is created
+    ↓
+Onboarding answers are progressively persisted
 
 **---**
 

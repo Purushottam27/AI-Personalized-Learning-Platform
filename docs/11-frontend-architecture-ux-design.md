@@ -625,10 +625,13 @@ must not wait until the final question to persist all answers.
 If the learner leaves or disconnects, the flow resumes from the first
 unanswered fixed field using backend onboarding state.
 
-```text
-GET   /api/v1/learners/onboarding
-PATCH /api/v1/learners/onboarding
-```
+The frontend loads the current Learner profile using:
+
+GET /api/v1/learner-profile/me
+
+Each onboarding answer is persisted immediately using:
+
+PATCH /api/v1/learner-profile/me/onboarding
 
 ### Q1 — What would you like to learn about?
 **Multi-select**
@@ -719,10 +722,13 @@ Maps to `professionalTitle`.
 
 Maps to `expertiseAreas[]`.
 
-```text
-GET   /api/v1/instructors/onboarding
-PATCH /api/v1/instructors/onboarding
-```
+The frontend loads the current Instructor profile using:
+
+GET /api/v1/instructor-profile/me
+
+Each onboarding answer is persisted immediately using:
+
+PATCH /api/v1/instructor-profile/me/onboarding
 
 When `Other — Please specify` is selected, display a text input and store the
 custom value.
@@ -752,6 +758,19 @@ The UI may show `Question 3 of 5`, but it must not create an authoritative
 `currentQuestion` field.
 
 On resume, derive the first unanswered fixed field from backend data.
+
+The frontend retrieves the persisted role-specific profile before rendering
+or resuming onboarding.
+
+Learner onboarding state is read from the LearnerProfile `onboardingState`.
+
+Instructor onboarding completion is derived from the presence of a meaningful
+`professionalTitle` and at least one `expertiseAreas` value, because the
+InstructorProfile does not persist a separate onboardingState field.
+
+The frontend may determine which question to display from the persisted
+profile data, but the backend remains authoritative for onboarding validity
+and completion.
 
 Normal flow:
 

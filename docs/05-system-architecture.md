@@ -22,11 +22,9 @@ Modular Backend
 
  ├── Identity/Auth
 
- ├── Users
-
- ├── Identity/Auth
-  ├── Users
-  ├── Courses
+ ├── Users
+ 
+ ├── Courses
 
  ├── Lessons
 

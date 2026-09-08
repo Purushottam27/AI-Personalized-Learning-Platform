@@ -6,9 +6,7 @@ The Learner Learning Model defines how the platform represents,
 
 observes, evaluates, and improves a learner's learning journey.
 
-The platform is not intended to function only as a traditional LMS. Its
-
-primary objective is to help students:
+The platform is not intended to function only as a traditional LMS. Its primary objective is to help learners:
 
 - gain conceptual and practical knowledge
 
@@ -532,9 +530,8 @@ Possible components:
 
 - assessment
 
-Teachers should be able to provide meaningful educational content
-
-without being required to record their own videos.
+Instructor should be able to provide meaningful educational content
+ without being required to record their own videos.
 
 ## 11. Lesson Resources**
 

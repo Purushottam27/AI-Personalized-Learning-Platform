@@ -23,7 +23,7 @@ The database must support:
 
 \- Instructor-owned courses
 
-\- Course discovery by department/category/difficulty
+\- Course discovery by domain/category/difficulty
 
 \- Topics, lessons, resources, practice, and assessments
 
@@ -585,31 +585,75 @@ The MVP uses a multi-step onboarding experience.
 
 **## 9. Instructor Profile**
 
-Instructor-specific information may include:
+Instructor-specific professional information belongs conceptually in an
+Instructor Profile.
 
-\`\`\`text
-
+```text
 InstructorProfile
-
 ├── userId
-
 ├── professionalTitle
-
-├── department
-
-├── subjectAreas
-
+├── expertiseAreas[]
 ├── bio
+├── experienceYears
+├── organization
+├── socialLinks
+├── createdAt
+└── updatedAt
+```
 
-└── timestamps
+professionalTitle:
 
-\`\`\`
+Represents the instructor's professional role or title collected during
+instructor onboarding.
+
+The MVP onboarding options include:
+
+Software Developer / Designer
+Data Scientist
+Machine Learning Engineer
+Cybersecurity Professional
+Educator / Instructor
+Finance Professional
+Other — Please specify
+
+If Other — Please specify is selected, the actual custom value is stored.
+
+expertiseAreas:
+
+Represents the areas in which the instructor is experienced in teaching.
+
+Multiple areas may be selected.
+
+Approved options include:
+
+Programming & Software Development
+Data Science & Artificial Intelligence
+Mathematics & Statistics
+Business & Entrepreneurship
+Finance & Economics
+Science & Technology
+Other — Please specify
+
+If Other — Please specify is selected, the actual custom value is stored.
+
+Additional Profile Fields:
+
+The instructor profile also supports:
+
+bio
+experienceYears
+organization
+socialLinks
+
+These fields belong to the instructor profile but are not required as part
+of the initial two-question onboarding flow.
 
 Avatar belongs to User because it is common across Learner, Instructor,
-
 and Admin.
 
-Courses reference the instructor/user as owner rather than duplicating the full instructor profile.
+Courses reference the instructor/user as owner rather than duplicating the
+full instructor profile.
+
 
 **## User → Profile Relationship**
 
@@ -685,7 +729,7 @@ Course
 
 ├── createdBy
 
-├── department
+├── domain
 
 ├── category
 
@@ -755,7 +799,7 @@ status
 
 \`\`\`
 
-This supports search, department/category filtering, and AI recommendations.
+This supports search, domain/category filtering, and AI recommendations.
 
 **## 12. Prerequisite and Diagnostic Model**
 
