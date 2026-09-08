@@ -53,7 +53,8 @@ docs/
 ├── 11-frontend-architecture-ux-design.md
 ├── 12-testing-strategy.md
 ├── 13-current-progress.md
-└── 14-deployment.md
+├── 14-deployment.md
+└── 15-future-implementation.md
 ```
 
 Authoritative responsibilities:
@@ -73,6 +74,7 @@ Authoritative responsibilities:
 12 → Testing strategy
 13 → Current project status
 14 → Deployment + operations
+15 → Future plans
 ```
 
 Critical mapping:
