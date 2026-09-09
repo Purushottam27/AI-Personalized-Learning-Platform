@@ -1,7 +1,7 @@
 import { User } from "../../identity/models/user.model.js";
 import { ApiError } from '../../../shared/errors/ApiError.js';
-import { LearnerProfile } from "../../identity/models/learnerProfile.model.js";
-import { InstructorProfile } from "../../identity/models/instructorProfile.model.js";
+import { LearnerProfile } from "../../learner/models/learnerProfile.model.js";
+import { InstructorProfile } from "../../instructor/models/instructorProfile.model.js";
 import { RefreshSession } from "../../identity/models/refreshSession.model.js";
 import { uploadOnCloudinary } from "../../../shared/utils/cloudinary.js";
 

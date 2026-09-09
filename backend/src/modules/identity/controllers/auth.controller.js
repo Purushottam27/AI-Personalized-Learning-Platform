@@ -1,4 +1,5 @@
 import { ApiResponse } from "../../../shared/responses/ApiResponse.js"
+import { User } from "../models/user.model.js"
 import { loginService, logoutService, passwordService, reactivateService, refreshService, signupService } from "../services/auth.service.js"
 
 const registerUser = async(req,res)=>{
@@ -77,9 +78,24 @@ const logoutUser = async(req,res)=>{
 }
 
 const currentUser = async(req,res)=>{
+    const user = await User.findById(req.user._id)
+    .select("_id name email role status avatar emailVerified");
+
+    if (!user) {
+        throw new ApiError(
+            404,
+            "USER_NOT_FOUND",
+            "User not found"
+        );
+    }
+
+    
     return res.status(200).json(
-        new ApiResponse({user:req.user},"Current user fetched successfully")
-    )
+        new ApiResponse(
+            user,
+            "Current user fetched successfully"
+        )
+    );
 }
 
 const changePassword = async(req,res)=>{
