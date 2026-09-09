@@ -99,7 +99,8 @@ User account management                 🟢 Implemented
 Account deactivation                    🟢 Implemented
 Account reactivation                    🟢 Implemented
 
-Learner/Instructor profile APIs         ⬜ Not started
+Learner/Instructor profile APIs         🟢 Implemented
+Learner/Instructor onboarding           🟢 Implemented & manually verified
 Course/domain features                  ⬜ Not started
 Assessment features                     ⬜ Not started
 Learning evidence                       ⬜ Not started
@@ -130,10 +131,10 @@ docs/
 ├── 05-system-architecture.md
 ├── 06-database-design.md
 ├── 07-api-design.md
-├── 08-security-authentication.md
-├── 09-ai-personalization-engine.md
+├── 08-security-authentication-design.md
+├── 09-ai-personalization-engine-design.md
 ├── 10-background-processing-design.md
-├── 11-frontend-architecture-ux.md
+├── 11-frontend-architecture-ux-design.md
 ├── 12-testing-strategy.md
 ├── 13-current-progress.md
 ├── 14-deployment.md
@@ -145,10 +146,10 @@ The exact filenames in the repository are authoritative.
 The current intended naming is:
 
 ```text
-08-security-authentication.md
-09-ai-personalization-engine.md
-10-background-processing-design.md
-11-frontend-architecture-ux.md
+08-security-authentication-design.md
+09-ai-personalization-engine-design.md
+10-background-processing-design-design.md
+11-frontend-architecture-ux-design.md
 ```
 
 If the repository uses a different finalized filename, update references to match the actual repository rather than creating duplicate documents.
@@ -335,6 +336,19 @@ Forgot/reset password                ⚪ Deferred
 
 **Status note:** The authentication foundation is implemented and manually verified. Public signup role selection must remain limited to `LEARNER` and `INSTRUCTOR`; `ADMIN` is never publicly selectable.
 
+## Learner Profile & Onboarding
+
+```text
+Learner profile model                🟢
+Learner profile GET                  🟢
+Learner profile PATCH                🟢
+Learner onboarding                   🟢
+Progressive onboarding               🟢
+Onboarding resume                    🟢
+Onboarding state tracking            🟢
+Role-based profile access            🟢
+```
+
 ## Learner Dashboard
 
 ```text
@@ -410,8 +424,8 @@ Reassessment                         ⬜
 
 ```text
 Instructor authentication            🟢 Foundation shared with auth
-Instructor onboarding                ⬜
-Instructor profile                   ⬜
+Instructor onboarding                🟢
+Instructor profile                   🟢
 Instructor dashboard                 ⬜
 Create course                        ⬜
 Edit course                          ⬜
@@ -492,8 +506,8 @@ Current implementation:
 
 ```text
 User model                          🟢
-LearnerProfile model                ⬜
-InstructorProfile model             ⬜
+LearnerProfile model                🟢
+InstructorProfile model             🟢
 AuthIdentity model                  ⬜
 RefreshSession model                🟢
 OAuthSetupSession model             ⬜
@@ -567,8 +581,10 @@ users                                 🟢
 Not yet implemented:
 
 ```text
-learners                              ⬜
-instructors                           ⬜
+learners                              🟡 
+instructors                           🟡
+Profile & onboarding capabilities implemented;
+broader learner/instructor domain features remain pending.
 courses                               ⬜
 lessons                               ⬜
 enrollments                           ⬜
@@ -595,10 +611,10 @@ Current status:
 ```text
 Auth APIs                           🟢
 User APIs                           🟢
-Learner profile APIs                ⬜
-Learner onboarding APIs             ⬜
-Instructor profile APIs             ⬜
-Instructor onboarding APIs          ⬜
+Learner profile APIs                🟢
+Learner onboarding APIs             🟢
+Instructor profile APIs             🟢
+Instructor onboarding APIs          🟢
 Course APIs                         ⬜
 Enrollment APIs                     ⬜
 Lesson APIs                         ⬜
@@ -638,6 +654,20 @@ DELETE /api/v1/users/me
 ```
 
 The `DELETE /users/me` operation is intentionally retained as the approved account-deactivation API.
+
+## Implemented Learner Profile APIs
+
+```text
+GET   /api/v1/learner-profile/me
+PATCH /api/v1/learner-profile/me
+PATCH /api/v1/learner-profile/me/onboarding
+```
+
+## Implemented Instructor Profile APIs
+
+GET   /api/v1/instructor-profile/me
+PATCH /api/v1/instructor-profile/me
+PATCH /api/v1/instructor-profile/me/onboarding
 
 ---
 
@@ -748,7 +778,7 @@ Learning evidence model                ⬜
 Mastery calculation                    ⬜
 Weakness detection                     ⬜
 Intervention selection                 ⬜
-Intervention intensity                ⬜
+Intervention intensity                 ⬜
 Recommendation ranking                 ⬜
 Escalation logic                       ⬜
 Effectiveness evaluation               ⬜
@@ -830,9 +860,9 @@ Current implementation:
 Project setup                         ⬜
 Design system                         ⬜
 Theme                                 ⬜
-Application shell                    ⬜
+Application shell                     ⬜
 API client                            ⬜
-Authentication state                 ⬜
+Authentication state                  ⬜
 Role routing                          ⬜
 Learner layout                        ⬜
 Instructor layout                     ⬜
@@ -841,7 +871,7 @@ Learner dashboard                     ⬜
 Course experience                     ⬜
 Lesson experience                     ⬜
 Assessment UI                         ⬜
-Personalization UI                   ⬜
+Personalization UI                    ⬜
 Analytics UI                          ⬜
 Instructor UI                         ⬜
 Admin UI                              ⬜
@@ -858,10 +888,10 @@ Approved testing strategy exists in `12-testing-strategy.md`.
 Current implementation:
 
 ```text
-Linting                             ⬜
-Unit tests                          ⬜
-Component tests                     ⬜
-Integration tests                   ⬜
+Linting                              ⬜
+Unit tests                           ⬜
+Component tests                      ⬜
+Integration tests                    ⬜
 API tests                            ⬜
 E2E tests                            ⬜
 Security tests                       ⬜
@@ -871,7 +901,7 @@ Background-job tests                 ⬜
 Regression suite                     ⬜
 ```
 
-The implemented authentication/user features have been **manually verified through API testing**, but this does not count as the automated testing suite being complete.
+The implemented authentication, user-management, learner-profile, learner-onboarding, instructor-profile, and instructor-onboarding features have been manually verified through API testing. This does not count as the automated testing suite being complete.
 
 Testing status must distinguish manual verification from automated coverage.
 
@@ -1518,8 +1548,8 @@ Document:
 04-user-journeys.md
 06-database-design.md
 07-api-design.md
-09-ai-personalization-engine.md
-11-frontend-architecture-ux.md
+09-ai-personalization-engine-design.md
+11-frontend-architecture-ux-design.md
 
 Change: Finalized Learner/Instructor onboarding and shared learning
 domain taxonomy.
@@ -1539,7 +1569,7 @@ Status: Active
 Date: September 2026
 
 Document:
-09-ai-personalization-engine.md
+09-ai-personalization-engine-design.md
 10-background-processing-design.md
 
 Change: Finalized evidence-driven personalization and background

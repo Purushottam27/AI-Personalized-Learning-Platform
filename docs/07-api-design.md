@@ -944,25 +944,29 @@ The authentication middleware:
 
 6\. attaches the selected safe user context to \`req.user\`.
 
-The \`/me\` controller returns the authenticated user context from
+The \`/me\` controller returns the authenticated user's safe account representation.
 
-\`req.user\` and does not perform another User query.
+Response fields:
+- _id
+- name
+- email
+- role
+- status
+- avatar
+- emailVerified
 
-Current authenticated context:
+The authentication middleware continues to attach only the
+minimal authenticated context to req.user:
+- _id
+- name
+- role
+- status
 
-\`\`\`text
+The controller performs a User query to retrieve the safe
+account representation.
 
-req.user
-
-├── \_id
-
-├── name
-
-├── role
-
-└── status
-
-\`\`\`
+Sensitive fields such as password/passwordHash,
+refresh credentials, token hashes, etc. must never be returned.
 
 **---**
 
