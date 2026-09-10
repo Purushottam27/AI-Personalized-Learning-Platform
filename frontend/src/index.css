@@ -1,1 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --color-paper: #F4F0E8;
+  --color-ink: #171717;
+  --color-signal: #E4572E;
+  --color-sage: #7C8C72;
+  --color-surface: #E9E3D8;
+  --color-muted: #68645D;
+  --font-display: 'Fraunces', serif;
+  --font-sans: 'DM Sans', sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  @apply bg-paper text-ink font-sans antialiased;
+}
