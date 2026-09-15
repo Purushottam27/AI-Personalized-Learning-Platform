@@ -65,6 +65,21 @@ const updateInstructorOnboardingService = async (userId, updateData) => {
         profile.expertiseAreas = updateData.expertiseAreas;
     }
 
+    const hasProfessionalTitle = profile.professionalTitle !== null && profile.professionalTitle !== undefined &&
+        profile.professionalTitle.trim().length > 0
+
+    const hasExpertiseAreas = Array.isArray(profile.expertiseAreas) && profile.expertiseAreas.length > 0
+
+    const answersCount = [hasProfessionalTitle,hasExpertiseAreas].filter(Boolean).length
+
+    if (answersCount === 2) {
+        profile.onboardingState = 'COMPLETED';
+    } else if (answersCount > 0) {
+        profile.onboardingState = 'IN_PROGRESS';
+    } else {
+        profile.onboardingState = 'NOT_STARTED';
+    }
+
     await profile.save();
 
     return profile.toObject();

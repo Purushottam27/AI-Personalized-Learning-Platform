@@ -38,6 +38,12 @@ const instructorProfileSchema = new mongoose.Schema(
       type: Map,
       of: String,
       default: {}
+    },
+    onboardingState:{
+        type:String,
+        required:true,
+        enum:['NOT_STARTED','IN_PROGRESS','COMPLETED'],
+        default:'NOT_STARTED'
     }
   },
   { timestamps: true },

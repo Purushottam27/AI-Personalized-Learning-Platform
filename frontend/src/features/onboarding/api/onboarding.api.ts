@@ -56,6 +56,7 @@ export interface InstructorProfile {
   experienceYears: number | null;
   organization: string | null;
   socialLinks: Record<string, string>;
+  onboardingState: OnboardingState;
   createdAt: string;
   updatedAt: string;
 }
@@ -89,8 +90,5 @@ export function isLearnerOnboardingComplete(profile: LearnerProfile | null): boo
 
 export function isInstructorOnboardingComplete(profile: InstructorProfile | null): boolean {
   if (!profile) return false;
-  // Instructor completion is derived from meaningful professionalTitle plus at least one expertiseAreas value
-  const hasTitle = typeof profile.professionalTitle === 'string' && profile.professionalTitle.trim().length > 0;
-  const hasExpertise = Array.isArray(profile.expertiseAreas) && profile.expertiseAreas.length > 0;
-  return hasTitle && hasExpertise;
+  return profile.onboardingState === 'COMPLETED';
 }
