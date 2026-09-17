@@ -17,11 +17,13 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    'bg-ink text-paper hover:bg-ink/85 active:bg-ink/95 focus-visible:ring-ink/30 disabled:bg-ink/40',
+    'bg-signal text-paper hover:bg-signal-hover active:bg-signal-active focus-visible:ring-focus disabled:bg-surface-disabled disabled:text-text-disabled',
+
   secondary:
-    'bg-transparent text-ink border border-ink/25 hover:bg-ink/5 hover:border-ink/40 active:bg-ink/10 focus-visible:ring-ink/20 disabled:opacity-40',
+    'bg-transparent text-text-primary border border-border hover:bg-surface hover:border-border active:bg-surface-disabled focus-visible:ring-focus disabled:bg-surface-disabled disabled:text-text-disabled disabled:border-border-muted',
+
   ghost:
-    'bg-transparent text-muted hover:text-ink hover:bg-ink/5 active:bg-ink/10 focus-visible:ring-ink/20 disabled:opacity-40',
+    'bg-transparent text-text-secondary hover:text-text-primary hover:bg-surface active:bg-surface-disabled focus-visible:ring-focus disabled:text-text-disabled',
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -42,8 +44,8 @@ const Button: React.FC<ButtonProps> = ({
   <button
     disabled={disabled || loading}
     className={[
-      'inline-flex items-center justify-center gap-2 font-semibold transition-all duration-150',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+      'inline-flex items-center justify-center gap-2 font-semibold transition-colors duration-150',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-paper',
       'disabled:cursor-not-allowed select-none',
       variantClasses[variant],
       sizeClasses[size],

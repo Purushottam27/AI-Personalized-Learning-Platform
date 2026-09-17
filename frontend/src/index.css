@@ -2,12 +2,46 @@
 @import "tailwindcss";
 
 @theme {
-  --color-paper: #F4F0E8;
-  --color-ink: #171717;
-  --color-signal: #E4572E;
-  --color-sage: #7C8C72;
-  --color-surface: #E9E3D8;
-  --color-muted: #68645D;
+  /* Brand */
+  --color-paper: #F7F3EA;
+  --color-ink: #191816;
+  --color-signal: #B94F35;
+  --color-sage: #536B50;
+
+  /* Surfaces */
+  --color-background: #F7F3EA;
+  --color-surface: #FFFCF5;
+  --color-surface-elevated: #FFFDF8;
+  --color-surface-disabled: #F0ECE4;
+
+  /* Text */
+  --color-text-primary: #191816;
+  --color-text-secondary: #4F4B45;
+  --color-text-tertiary: #6B665E;
+  --color-text-disabled: #858078;
+
+  /* Borders */
+  --color-border: rgba(25, 24, 22, 0.12);
+  --color-border-muted: rgba(25, 24, 22, 0.07);
+
+  /* Actions */
+  --color-signal-hover: #A9432D;
+  --color-signal-active: #963B28;
+
+  /* Semantic states */
+  --color-sage-soft: #E8EEE5;
+  --color-signal-soft: #F5E5DF;
+
+  --color-warning: #A66A2B;
+  --color-warning-soft: #F4EBDD;
+
+  --color-error: #B64535;
+  --color-error-soft: #F5E2DE;
+
+  /* Accessibility */
+  --color-focus: #B94F35;
+
+  /* Typography */
   --font-display: 'Fraunces', serif;
   --font-sans: 'DM Sans', sans-serif;
 }
@@ -23,5 +57,5 @@ html {
 }
 
 body {
-  @apply bg-paper text-ink font-sans antialiased;
+  @apply bg-background text-text-primary font-sans antialiased;
 }

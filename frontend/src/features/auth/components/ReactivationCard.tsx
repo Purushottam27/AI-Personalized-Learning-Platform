@@ -52,11 +52,11 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
   // Close on Escape (unless suspended — user must explicitly dismiss)
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !isLoading) onClose();
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
+  }, [onClose,isLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,8 +130,9 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
             {/* Close button */}
             <button
               onClick={onClose}
+              disabled={isLoading}
               aria-label="Close reactivation dialog"
-              className="absolute top-5 right-5 p-1.5 rounded-lg text-ink/30 hover:text-ink hover:bg-ink/5 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20"
+              className="absolute top-5 right-5 p-1.5 rounded-lg text-ink/30 hover:text-ink hover:bg-ink/5 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <X className="w-4 h-4" />
             </button>
@@ -146,19 +147,24 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
                   id="reactivation-title"
                   className="font-serif text-xl font-semibold text-ink leading-tight"
                 >
-                  Reactivate your account
+                  Restore your account
                 </h2>
-                <p className="text-xs text-ink/40 mt-0.5">Your progress is still here — pick up right where you left off.</p>
+                {/* <p className="text-xs text-ink/40 mt-0.5">Your progress is still here — pick up right where you left off.</p> */}
               </div>
             </div>
 
             {/* Explainer */}
-            <p className="text-sm text-ink/50 mb-6 leading-relaxed">
-              Your account was deactivated, but your learning history is preserved.
-              Enter your password to restore access.
+            <p className="text-sm text-ink/70 mb-3 leading-relaxed">
+              Your account is currently deactivated. Your learning progress and profile are still preserved.
+              
             </p>
-
-            <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+            <p className="text-sm text-ink/60 mb-4 leading-relaxed">
+               Reactivating restores your access to your learning journey.
+            </p>
+           
+            <hr></hr>
+            
+            <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4 mt-5">
               {/* Email (read-only) */}
               <Input
                 id="reactivate-email"
@@ -174,7 +180,7 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
               <Input
                 ref={passwordRef}
                 id="reactivate-password"
-                label="Password"
+                label="Confirm your password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -232,7 +238,7 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
                 disabled={isSuspended}
                 className="w-full mt-1"
               >
-                Reactivate Account
+                Restore Account Access →
               </Button>
             </form>
           </GlassPanel>
