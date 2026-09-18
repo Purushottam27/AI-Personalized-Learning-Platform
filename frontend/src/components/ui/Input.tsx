@@ -16,7 +16,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={id}
-        className="text-xs font-semibold uppercase tracking-widest text-muted select-none"
+        className="text-xs font-semibold uppercase tracking-widest text-text-secondary select-none"
       >
         {label}
       </label>
@@ -26,12 +26,14 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           id={id}
           disabled={disabled}
           className={[
-            'w-full px-4 py-3 rounded-lg text-sm font-sans bg-surface/60',
-            'border transition-all duration-150 outline-none',
+            'w-full px-4 py-3 rounded-lg text-sm font-sans bg-surface',
+            'border transition-colors  duration-150 outline-none',
             error
-              ? 'border-signal text-ink placeholder:text-signal/50 focus-visible:ring-2 focus-visible:ring-signal/30'
-              : 'border-ink/15 text-ink placeholder:text-muted/50 focus-visible:border-ink/40 focus-visible:ring-2 focus-visible:ring-ink/10',
-            disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-ink/25',
+              ? 'border-error text-text-primary bg-error-soft/40 placeholder:text-text-tertiary focus-visible:border-error focus-visible:ring-2 focus-visible:ring-error/25'
+              : 'border-border text-text-primary placeholder:text-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25',
+            disabled
+              ? 'bg-surface-disabled text-text-disabled border-border-muted cursor-not-allowed'
+              : 'hover:border-border',
             rightElement ? 'pr-12' : '',
             className,
           ].join(' ')}
@@ -46,7 +48,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         )}
       </div>
       {error && (
-        <p id={`${id}-error`} role="alert" className="text-xs text-signal font-medium">
+        <p id={`${id}-error`} role="alert" className="text-xs text-error  font-medium">
           {error}
         </p>
       )}

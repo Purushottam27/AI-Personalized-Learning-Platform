@@ -73,14 +73,14 @@ const RoleCard: React.FC<RoleCardProps> = ({ role, selected, onSelect }) => {
       <div
         className={[
           'w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-200',
-          selected ? 'bg-signal/15 text-signal' : 'bg-ink/5 text-ink/50',
+          selected ? 'bg-signal/15 text-signal' : 'bg-ink/5 text-text-tertiary',
         ].join(' ')}
       >
         {meta.icon}
       </div>
       <div>
         <p className={`font-semibold text-sm ${selected ? 'text-signal' : 'text-ink'}`}>{meta.label}</p>
-        <p className={`text-xs leading-relaxed mt-0.5 ${selected ? 'text-ink/60' : 'text-ink/40'}`}>
+        <p className={`text-xs leading-relaxed mt-0.5 ${selected ? 'text-text-secondary' : 'text-text-tertiary'}`}>
           {meta.description}
         </p>
       </div>
@@ -183,16 +183,16 @@ const SignupPage: React.FC = () => {
       >
         {/* Wordmark */}
         <div className="mb-8 text-center">
-          <Link to="/" className="inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 rounded">
+          <Link to="/" className="inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 rounded">
             <span className="font-serif text-2xl font-semibold tracking-tight text-ink">Adaptive</span>
-            <span className="font-serif text-2xl font-light text-ink/40 ml-1">Learning</span>
+            <span className="font-serif text-2xl font-light text-text-tertiary ml-1">Learning</span>
           </Link>
         </div>
 
         <GlassPanel className="p-8 md:p-10">
           <div className="mb-7">
             <h1 className="font-serif text-2xl font-semibold text-ink mb-1.5">Create your account</h1>
-            <p className="text-sm text-ink/50">Start your personalized learning journey today.</p>
+            <p className="text-sm text-text-secondary">Start your personalized learning journey today.</p>
           </div>
 
           {/* General error */}
@@ -255,7 +255,7 @@ const SignupPage: React.FC = () => {
                   type="button"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   onClick={() => setShowPassword((v) => !v)}
-                  className="text-ink/40 hover:text-ink transition-colors duration-150 focus-visible:outline-none"
+                  className="text-text-tertiary hover:text-text-primary transition-colors duration-150 focus-visible:outline-none"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -278,7 +278,7 @@ const SignupPage: React.FC = () => {
                   type="button"
                   aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                   onClick={() => setShowConfirmPassword((v) => !v)}
-                  className="text-ink/40 hover:text-ink transition-colors duration-150 focus-visible:outline-none"
+                  className="text-text-tertiary hover:text-text-primary transition-colors duration-150 focus-visible:outline-none"
                 >
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -287,7 +287,7 @@ const SignupPage: React.FC = () => {
 
             {/* Role selection */}
             <div className="flex flex-col gap-2.5">
-              <span className="text-xs font-semibold uppercase tracking-widest text-ink/40">
+              <span className="text-xs font-semibold uppercase tracking-widest text-text-secondary">
                 I am a…
               </span>
               <div className="grid grid-cols-2 gap-3">
@@ -311,7 +311,7 @@ const SignupPage: React.FC = () => {
             </Button>
           </form>
 
-          <p className="text-sm text-ink/40 text-center mt-7">
+          <p className="text-sm text-text-secondary text-center mt-7">
             Already have an account?{' '}
             <Link
               to="/login"

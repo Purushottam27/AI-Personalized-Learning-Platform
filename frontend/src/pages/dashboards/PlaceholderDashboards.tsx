@@ -36,7 +36,7 @@ const DashboardShell: React.FC<DashboardShellProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-paper font-sans text-ink selection:bg-signal/20">
+    <div className="min-h-screen bg-paper font-sans text-text-primary selection:bg-signal/20">
       {/* Top nav */}
       <header className="border-b border-ink/5 bg-paper/80 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -48,7 +48,7 @@ const DashboardShell: React.FC<DashboardShellProps> = ({
               {icon}
             </div>
             <div>
-              <span className="text-sm font-semibold text-ink">{user?.name ?? 'User'}</span>
+              <span className="text-sm font-semibold text-text-primary">{user?.name ?? 'User'}</span>
               <span className="ml-2 text-xs font-medium text-ink/40 uppercase tracking-wide">
                 {roleLabel}
               </span>

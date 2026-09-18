@@ -53,8 +53,8 @@ export default function OtherInput({
               disabled={disabled}
               placeholder={placeholder}
               className={`
-                w-full rounded-lg border border-ink/20 bg-paper p-3 text-sm text-ink outline-none transition-colors
-                placeholder:text-ink/40
+                w-full rounded-lg border border-ink/20 bg-paper p-3 text-sm text-text-primary outline-none transition-colors
+                placeholder:text-text-tertiary
                 focus:border-signal focus:ring-1 focus:ring-signal
                 disabled:cursor-not-allowed disabled:opacity-50
               `}

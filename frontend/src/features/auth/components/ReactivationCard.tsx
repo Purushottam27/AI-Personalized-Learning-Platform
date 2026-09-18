@@ -56,7 +56,7 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose,isLoading]);
+  }, [onClose, isLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,7 +132,7 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
               onClick={onClose}
               disabled={isLoading}
               aria-label="Close reactivation dialog"
-              className="absolute top-5 right-5 p-1.5 rounded-lg text-ink/30 hover:text-ink hover:bg-ink/5 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="absolute top-5 right-5 p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 disabled:text-text-disabled disabled:cursor-not-allowed"
             >
               <X className="w-4 h-4" />
             </button>
@@ -145,7 +145,7 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
               <div>
                 <h2
                   id="reactivation-title"
-                  className="font-serif text-xl font-semibold text-ink leading-tight"
+                  className="font-serif text-xl font-semibold text-text-primary leading-tight"
                 >
                   Restore your account
                 </h2>
@@ -154,11 +154,11 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
             </div>
 
             {/* Explainer */}
-            <p className="text-sm text-ink/70 mb-3 leading-relaxed">
+            <p className="text-sm text-text-secondary mb-3 leading-relaxed">
               Your account is currently deactivated. Your learning progress and profile are still preserved.
               
             </p>
-            <p className="text-sm text-ink/60 mb-4 leading-relaxed">
+            <p className="text-sm text-text-secondary mb-4 leading-relaxed">
                Reactivating restores your access to your learning journey.
             </p>
            
@@ -173,7 +173,6 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
                 value={prefillEmail}
                 readOnly
                 disabled
-                className="opacity-60"
               />
 
               {/* Password */}
@@ -197,7 +196,7 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
                     type="button"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowPassword((v) => !v)}
-                    className="text-ink/40 hover:text-ink transition-colors duration-150 focus-visible:outline-none"
+                    className="text-text-tertiary hover:text-text-primary transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 rounded"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -216,7 +215,7 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
                   >
                     <div className={`flex items-start gap-2.5 px-3.5 py-3 rounded-lg border ${
                       isSuspended
-                        ? 'bg-ink/5 border-ink/15 text-ink'
+                        ? 'bg-ink/5 border-ink/15 text-text-primary'
                         : 'bg-signal/8 border-signal/20 text-signal'
                     }`}>
                       {isSuspended ? (

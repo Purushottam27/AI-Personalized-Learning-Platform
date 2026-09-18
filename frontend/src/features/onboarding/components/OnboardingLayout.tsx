@@ -34,7 +34,7 @@ export default function OnboardingLayout({
   // and we use AnimatePresence with mode="wait" for step transitions.
   
   return (
-    <div className="min-h-screen bg-paper flex flex-col font-sans text-ink selection:bg-signal/20 selection:text-ink">
+    <div className="min-h-screen bg-paper flex flex-col font-sans text-text-primary selection:bg-signal/20 selection:text-text-primary">
       
       {/* Top Navigation & Progress */}
       <header className="sticky top-0 z-10 bg-paper/80 backdrop-blur-md border-b border-ink/5">
@@ -45,7 +45,7 @@ export default function OnboardingLayout({
               <button
                 onClick={onBack}
                 disabled={isSaving}
-                className="group flex items-center gap-2 text-sm font-medium text-ink/60 hover:text-ink transition-colors disabled:opacity-50"
+                className="group flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
                 aria-label="Go back"
               >
                 <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
@@ -55,7 +55,7 @@ export default function OnboardingLayout({
           </div>
           
           <div className="flex-1 flex justify-center">
-            <span className="text-xs font-semibold tracking-widest text-ink/40 uppercase">
+            <span className="text-xs font-semibold tracking-widest text-text-tertiary uppercase">
               Step {currentStep} of {totalSteps}
             </span>
           </div>
@@ -90,11 +90,11 @@ export default function OnboardingLayout({
             >
               {/* Step Header */}
               <div className="text-center space-y-3">
-                <h1 className="text-2xl sm:text-3xl font-serif text-ink tracking-tight">
+                <h1 className="text-2xl sm:text-3xl font-serif text-text-primary tracking-tight">
                   {title}
                 </h1>
                 {description && (
-                  <p className="text-ink/60 text-base max-w-md mx-auto">
+                  <p className="text-text-secondary text-base max-w-md mx-auto">
                     {description}
                   </p>
                 )}

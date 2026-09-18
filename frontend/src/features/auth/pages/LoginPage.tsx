@@ -292,13 +292,13 @@ const LoginPage: React.FC = () => {
               <div className="lg:hidden mb-8">
                 <Link to="/">
                   <span className="font-serif text-2xl font-semibold tracking-tight text-ink">Adaptive</span>
-                  <span className="font-serif text-2xl font-light text-ink/40 ml-1">Learning</span>
+                  <span className="font-serif text-2xl font-light text-text-tertiary ml-1">Learning</span>
                 </Link>
               </div>
 
               <div className="mb-8">
                 <h1 className="font-serif text-2xl font-semibold text-ink mb-1.5">Welcome back</h1>
-                <p className="text-sm text-ink/50">Sign in to continue your learning journey.</p>
+                <p className="text-sm text-text-secondary">Sign in to continue your learning journey.</p>
               </div>
 
               {/* Signup success banner */}
@@ -315,7 +315,7 @@ const LoginPage: React.FC = () => {
                       <CheckCircle2 className="w-4 h-4 text-sage flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-semibold text-ink">Account created successfully</p>
-                        <p className="text-xs text-ink/50 mt-0.5">Please sign in to continue to onboarding.</p>
+                        <p className="text-xs text-text-secondary mt-0.5">Please sign in to continue to onboarding.</p>
                       </div>
                     </div>
                   </motion.div>
@@ -336,7 +336,7 @@ const LoginPage: React.FC = () => {
                       <Lock className="w-4 h-4 text-ink flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-semibold text-ink">Account suspended</p>
-                        <p className="text-xs text-ink/50 mt-0.5 leading-relaxed">
+                        <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
                           This account has been suspended. Please contact support if you
                           believe this is an error.
                         </p>
@@ -393,7 +393,7 @@ const LoginPage: React.FC = () => {
                       type="button"
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                       onClick={() => setShowPassword((v) => !v)}
-                      className="text-ink/40 hover:text-ink transition-colors duration-150 focus-visible:outline-none"
+                      className="text-text-tertiary hover:text-text-primary transition-colors duration-150 focus-visible:outline-none"
                       tabIndex={0}
                     >
                       {showPassword ? (
@@ -417,11 +417,11 @@ const LoginPage: React.FC = () => {
                 </Button>
               </form>
 
-              <p className="text-sm text-ink/40 text-center mt-7">
+              <p className="text-sm text-text-secondary text-center mt-7">
                 Don&apos;t have an account?{' '}
                 <Link
                   to="/signup"
-                  className="text-ink font-semibold underline underline-offset-2 hover:text-signal transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 rounded"
+                  className="text-ink font-semibold underline underline-offset-2 hover:text-signal transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 rounded"
                 >
                   Create one
                 </Link>

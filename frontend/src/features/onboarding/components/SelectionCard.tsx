@@ -74,11 +74,11 @@ export default function SelectionCard({
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className={`text-sm font-medium ${selected ? 'text-signal' : 'text-ink'}`}>
+        <span className={`text-sm font-medium ${selected ? 'text-signal' : 'text-text-primary'}`}>
           {label}
         </span>
         {description && (
-          <span className="text-sm text-ink/60">
+          <span className="text-sm text-text-secondary">
             {description}
           </span>
         )}
