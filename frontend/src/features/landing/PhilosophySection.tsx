@@ -21,7 +21,7 @@ const PhilosophySection: React.FC = () => {
   ];
 
   return (
-    <section className="py-32 max-w-5xl mx-auto px-6">
+    <section className="py-24 max-w-5xl mx-auto px-6 ">
       {/* Editorial eyebrow + headline */}
       <div className="mb-20 md:mb-24">
         <motion.div

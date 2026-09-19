@@ -1,177 +1,484 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  BarChart3,
+  BookOpen,
+  Check,
+  Database,
+  Layers3,
+  TriangleAlert,
+} from 'lucide-react';
 
 const AdaptationSection: React.FC = () => {
   return (
-    <section className="py-24 max-w-6xl mx-auto px-6 overflow-hidden">
-      <div className="text-center mb-20">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-signal font-semibold tracking-wider text-sm mb-4"
-        >
-          THE ADAPTATION MOMENT
-        </motion.div>
-        <motion.h2 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.1 }}
-          className="font-display text-4xl md:text-5xl mb-6 text-ink"
-        >
-          Your path changes when you do.
-        </motion.h2>
-        <motion.p 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.2 }}
-          className="text-lg text-muted max-w-2xl mx-auto"
-        >
-          Instead of moving everyone forward, the platform responds to what you need.
-        </motion.p>
-      </div>
+    <section className="overflow-hidden bg-background py-24 border-b">
+      <div className="mx-auto max-w-6xl px-6">
+        {/* -------------------------------------------------------------
+            SECTION HEADER
+           ------------------------------------------------------------- */}
 
-      <div className="relative max-w-3xl mx-auto">
-        {/* The visual flow */}
-        <div className="flex flex-col items-center">
-          
-          {/* START */}
-          <motion.div 
+        <div className="mb-20 text-center">
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="flex flex-col items-center z-10"
+            transition={{ duration: 0.5 }}
+            className="mb-4 text-sm font-semibold tracking-wider text-signal"
           >
-            <div className="text-xs font-bold text-muted uppercase tracking-wider mb-2">Start</div>
-            <div className="bg-paper border-2 border-muted/20 px-6 py-3 rounded-full font-medium shadow-sm text-ink">
-              Database Systems
-            </div>
+            THE ADAPTATION MOMENT
           </motion.div>
 
-          <motion.div 
-            initial={{ height: 0 }}
-            whileInView={{ height: 40 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.3 }}
-            className="w-0.5 bg-muted/30"
-          />
-
-          {/* ASSESS */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.5 }}
-            className="flex flex-col items-center z-10"
-          >
-            <div className="text-xs font-bold text-muted uppercase tracking-wider mb-2">Assess</div>
-            <div className="bg-surface border border-muted/10 px-6 py-3 rounded-lg font-medium text-ink shadow-sm">
-              Performance
-            </div>
-          </motion.div>
-
-          <motion.div 
-            initial={{ height: 0 }}
-            whileInView={{ height: 40 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.7 }}
-            className="w-0.5 bg-muted/30"
-          />
-
-          {/* RESULT */}
-          <motion.div 
+          <motion.h2
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: 0.9 }}
-            className="flex flex-col items-center bg-white/50 border border-muted/20 p-4 rounded-xl shadow-sm z-10 w-56"
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="mb-6 font-display text-4xl text-text-primary md:text-5xl"
           >
-            <div className="text-xs font-bold text-muted uppercase tracking-wider mb-3">Result</div>
-            <div className="flex justify-between w-full text-sm mb-1">
-              <span className="text-ink">Entity-Relationship</span> <span className="text-sage">✓</span>
-            </div>
-            <div className="flex justify-between w-full text-sm mb-1">
-              <span className="text-ink">Transactions</span> <span className="text-sage">✓</span>
-            </div>
-            <div className="flex justify-between w-full text-sm font-medium">
-              <span className="text-ink">Normalization</span> <span className="text-signal">⚠</span>
-            </div>
-          </motion.div>
+            Your path changes when you do.
+          </motion.h2>
 
-          {/* Branching */}
-          <div className="flex w-full max-w-md justify-between mt-0 relative h-32">
-            <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-              {/* General Path */}
-              <motion.path 
-                d="M 50,0 C 50,50 20,50 20,100"
-                fill="transparent"
-                stroke="var(--color-muted)"
-                strokeOpacity="0.3"
-                strokeWidth="0.5"
-                initial={{ pathLength: 0 }}
-                whileInView={{ pathLength: 1, opacity: 0.3 }}
-                viewport={{ once: true }}
-                transition={{ duration: 1, delay: 1.1 }}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mx-auto max-w-2xl text-lg text-text-secondary"
+          >
+            Instead of moving everyone forward, the platform responds to what
+            you need.
+          </motion.p>
+        </div>
+
+        {/* -------------------------------------------------------------
+            DIAGRAM
+           ------------------------------------------------------------- */}
+
+        <div className="mx-auto max-w-5xl">
+          {/* ===========================================================
+              CENTRAL FLOW
+             =========================================================== */}
+
+          <div className="flex flex-col items-center">
+            {/* START */}
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col items-center"
+            >
+              <div className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-text-primary">
+                Start
+              </div>
+
+              <div className="flex w-full max-w-[280px] items-center gap-4 rounded-2xl border border-border bg-surface px-6 py-4 shadow-sm">
+                <Database
+                  className="h-7 w-7 shrink-0 text-text-primary"
+                  strokeWidth={1.6}
+                  aria-hidden="true"
+                />
+
+                <div className="text-left">
+                  <div className="font-medium text-text-primary">
+                    Database Systems
+                  </div>
+
+                  <div className="text-sm text-text-tertiary">
+                    (Topic)
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* START → ASSESS */}
+            <div className="flex flex-col items-center py-3">
+              <ArrowDown
+                className="h-5 w-5 text-signal"
+                aria-hidden="true"
               />
-              {/* Personalized Path */}
-              <motion.path 
-                d="M 50,0 C 50,50 80,50 80,100"
-                fill="transparent"
-                stroke="var(--color-signal)"
-                strokeWidth="1"
-                initial={{ pathLength: 0 }}
-                whileInView={{ pathLength: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 1, delay: 1.3 }}
+
+              <span className="my-1 text-xs font-bold uppercase tracking-[0.16em] text-text-primary">
+                Assess
+              </span>
+            </div>
+
+            {/* PERFORMANCE */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="flex w-full max-w-60 items-center gap-4 rounded-2xl border border-border bg-surface px-6 py-4 shadow-sm"
+            >
+              <BarChart3
+                className="h-7 w-7 shrink-0 text-text-primary"
+                strokeWidth={1.6}
+                aria-hidden="true"
+              />
+
+              <div>
+                <div className="font-medium text-text-primary">
+                  Performance
+                </div>
+
+                <div className="text-sm text-text-tertiary">
+                  (Assessment)
+                </div>
+              </div>
+            </motion.div>
+
+            {/* PERFORMANCE → RESULT */}
+            <div className="py-3">
+              <ArrowDown
+                className="h-5 w-5 text-signal"
+                aria-hidden="true"
+              />
+            </div>
+
+            {/* RESULT */}
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="flex h-18.5 w-full max-w-60 items-center justify-center rounded-2xl border border-border bg-surface-elevated shadow-sm"
+            >
+              <span className="text-sm font-bold uppercase tracking-[0.14em] text-text-primary">
+                Result
+              </span>
+            </motion.div>
+          </div>
+
+          {/* ===========================================================
+              BRANCHING AREA
+
+              IMPORTANT:
+              This starts AFTER the RESULT box.
+              Therefore the learner-result connectors cannot overlap
+              Performance → Result.
+             =========================================================== */}
+
+          <div className="relative mt-8 md:mt-2">
+            {/* Desktop branch connectors */}
+            <svg
+              className="pointer-events-none absolute inset-x-0 top-0 z-0 hidden h-[115px] w-full md:block"
+              viewBox="0 0 1000 115"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              {/* Left branch */}
+              <path
+                d="M500 0 C500 48 305 48 180 108"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeDasharray="7 7"
+                className="text-text-tertiary"
+              />
+
+              {/* Right branch */}
+              <path
+                d="M500 0 C500 48 695 48 820 108"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeDasharray="7 7"
+                className="text-signal"
               />
             </svg>
-          </div>
 
-          <div className="flex w-full max-w-2xl justify-between px-4 z-10">
-            {/* General Path Endpoint */}
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 0.5, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 1.8 }}
-              className="flex flex-col items-center w-48 text-center"
-            >
-              <div className="bg-surface border border-muted/20 p-4 rounded-xl text-ink font-medium shadow-sm mb-2 w-full">
-                Advanced Indexing
-              </div>
-              <div className="text-xs text-muted">For other learners</div>
-            </motion.div>
+            {/* ---------------------------------------------------------
+                LEARNER RESULT CARDS
+               --------------------------------------------------------- */}
 
-            {/* Personalized Path Endpoint */}
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 2.0 }}
-              className="flex flex-col items-center w-48 text-center relative"
-            >
-              <div className="bg-signal text-paper p-4 rounded-xl font-medium shadow-md mb-2 w-full">
-                Normalization Practice
-              </div>
-              <div className="text-xs font-bold text-signal">For you</div>
+            <div className="relative z-10 grid grid-cols-1 gap-12 md:grid-cols-3 md:gap-8">
+              {/* =======================================================
+                  LEARNER A RESULT
+                 ======================================================= */}
 
-              <motion.div 
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: 2.5 }}
-                className="absolute top-0 -right-48 w-40 text-left hidden md:block"
+                transition={{ duration: 0.5, delay: 0.5 }}
+                className="flex flex-col items-center pt-0 md:pt-[76px]"
               >
-                <div className="font-display italic text-sm text-signal">Different learners. Different next steps.</div>
-                <svg className="w-8 h-8 mt-1 text-signal" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </motion.div>
-            </motion.div>
-          </div>
+                {/* Mobile branch indicator */}
+                <div className="mb-4 flex flex-col items-center md:hidden">
+                  <ArrowDown
+                    className="h-5 w-5 text-text-tertiary"
+                    aria-hidden="true"
+                  />
+                </div>
 
+                <div className="w-full max-w-[320px] rounded-2xl border border-border bg-surface px-6 py-5 shadow-sm">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm text-text-primary">
+                        Entity-Relationship
+                      </span>
+
+                      <Check
+                        className="h-5 w-5 shrink-0 text-sage"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm text-text-primary">
+                        Transactions
+                      </span>
+
+                      <Check
+                        className="h-5 w-5 shrink-0 text-sage"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm text-text-primary">
+                        Normalization
+                      </span>
+
+                      <Check
+                        className="h-5 w-5 shrink-0 text-sage"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* =======================================================
+                  CENTER MESSAGE
+                 ======================================================= */}
+
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.65 }}
+                className="order-last flex items-center justify-center md:order-0 md:pt-29.5"
+              >
+                <div className="text-center">
+                  <div className="font-display text-2xl italic text-signal">
+                    Personalized learning
+                  </div>
+
+                  <div className="mt-2 font-display text-lg italic leading-7 text-text-secondary">
+                    Different learners.
+                    <br />
+                    Different next steps.
+                  </div>
+
+                  {/* Mobile directional arrows */}
+                  <div className="mt-5 flex items-center justify-center gap-6 md:hidden">
+                    <ArrowLeft
+                      className="h-6 w-6 text-signal"
+                      aria-hidden="true"
+                    />
+
+                    <ArrowRight
+                      className="h-6 w-6 text-signal"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* =======================================================
+                  LEARNER B RESULT
+                 ======================================================= */}
+
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.5 }}
+                className="flex flex-col items-center pt-0 md:pt-[76px]"
+              >
+                {/* Mobile branch indicator */}
+                <div className="mb-4 flex flex-col items-center md:hidden">
+                  <ArrowDown
+                    className="h-5 w-5 text-signal"
+                    aria-hidden="true"
+                  />
+                </div>
+
+                <div className="w-full max-w-[320px] rounded-2xl border border-signal/40 bg-signal-soft px-6 py-5 shadow-sm">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm text-text-primary">
+                        Entity-Relationship
+                      </span>
+
+                      <Check
+                        className="h-5 w-5 shrink-0 text-sage"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm text-text-primary">
+                        Transactions
+                      </span>
+
+                      <Check
+                        className="h-5 w-5 shrink-0 text-sage"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm text-text-primary">
+                        Normalization
+                      </span>
+
+                      <TriangleAlert
+                        className="h-5 w-5 shrink-0 text-signal"
+                        strokeWidth={1.8}
+                        aria-hidden="true"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* ===========================================================
+                NEXT STEPS
+
+                These are deliberately separated from the result cards.
+               =========================================================== */}
+
+            <div className="mt-8 grid grid-cols-1 gap-12 md:mt-0 md:grid-cols-3 md:gap-8">
+              {/* LEARNER A NEXT */}
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.8 }}
+                className="flex flex-col items-center"
+              >
+                
+                <div className="mb-4 flex flex-col items-center">
+                  <ArrowDown
+                    className="h-5 w-5 text-text-tertiary"
+                    aria-hidden="true"
+                  />
+                  <span className="mb-2 mt-2 text-xs font-bold uppercase tracking-[0.16em] text-text-primary">
+                    Next
+                  </span>
+
+                  <ArrowDown
+                    className="h-5 w-5 text-text-tertiary"
+                    aria-hidden="true"
+                  />
+                </div>
+
+                <div className="w-full max-w-[320px] rounded-2xl border border-border bg-surface px-6 py-5 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <Layers3
+                      className="h-8 w-8 shrink-0 text-text-primary"
+                      strokeWidth={1.5}
+                      aria-hidden="true"
+                    />
+
+                    <div>
+                      <div className="font-medium text-text-primary">
+                        Advanced Indexing
+                      </div>
+
+                      <div className="text-sm text-text-tertiary">
+                        (Next Topic)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 text-center">
+                  <div className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-signal">
+                    Learner A
+                  </div>
+
+                  <p className="max-w-[300px] text-sm leading-6 text-text-secondary">
+                    Already strong in core concepts.
+                    <br />
+                    Ready for more advanced topics.
+                  </p>
+                </div>
+              </motion.div>
+
+              {/* CENTER EMPTY SPACE */}
+              <div className="hidden md:block" />
+
+              {/* LEARNER B NEXT */}
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.9 }}
+                className="flex flex-col items-center"
+              >
+
+                <div className="mb-4 flex flex-col items-center">
+                  <ArrowDown
+                    className="h-5 w-5 text-signal"
+                    aria-hidden="true"
+                  />
+                  <span className="mb-2 mt-2 text-xs font-bold uppercase tracking-[0.16em] text-text-primary">
+                    Next
+                  </span>
+
+                  <ArrowDown
+                    className="h-5 w-5 text-signal"
+                    aria-hidden="true"
+                  />
+                </div>
+
+                <div className="w-full max-w-[320px] rounded-2xl bg-signal px-6 py-5 shadow-md">
+                  <div className="flex items-center gap-4">
+                    <BookOpen
+                      className="h-8 w-8 shrink-0 text-paper"
+                      strokeWidth={1.5}
+                      aria-hidden="true"
+                    />
+
+                    <div>
+                      <div className="font-medium text-paper">
+                        Normalization Practice
+                      </div>
+
+                      <div className="text-sm text-paper/80">
+                        (Targeted Practice)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 text-center">
+                  <div className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-signal">
+                    Learner B
+                  </div>
+
+                  <p className="max-w-[300px] text-sm leading-6 text-text-secondary">
+                    Needs more practice on normalization.
+                    <br />
+                    Gets a personalized next step.
+                  </p>
+                </div>
+              </motion.div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

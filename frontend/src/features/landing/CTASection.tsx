@@ -116,7 +116,7 @@ const CTASection: React.FC = () => {
           >
             <a
               href="/signup"
-              className="group inline-flex items-center justify-center gap-2 bg-ink text-paper px-8 py-4 rounded-full hover:bg-ink/90 active:bg-ink/80 transition-all font-medium text-lg shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+              className="group inline-flex items-center justify-center gap-2 bg-signal text-paper px-8 py-4 rounded-full hover:bg-signal/90 active:bg-signal/80  transition-all font-medium text-lg shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
             >
               Create your learning profile
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

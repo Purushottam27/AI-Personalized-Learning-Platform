@@ -19,13 +19,13 @@ export default function OtherInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const id = useId();
 
-  // Focus the input when it becomes visible
+  // Focus the input when it becomes visible.
   useEffect(() => {
     if (isVisible && inputRef.current) {
-      // Small delay to allow the animation to start
       const timeout = setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
+
       return () => clearTimeout(timeout);
     }
   }, [isVisible]);
@@ -41,9 +41,13 @@ export default function OtherInput({
           className="overflow-hidden"
         >
           <div className="relative">
-            <label htmlFor={id} className="sr-only">
-              {placeholder}
+            <label
+              htmlFor={id}
+              className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-text-tertiary"
+            >
+              Your answer
             </label>
+
             <input
               ref={inputRef}
               id={id}
@@ -52,12 +56,27 @@ export default function OtherInput({
               onChange={(e) => onChange(e.target.value)}
               disabled={disabled}
               placeholder={placeholder}
-              className={`
-                w-full rounded-lg border border-ink/20 bg-paper p-3 text-sm text-text-primary outline-none transition-colors
-                placeholder:text-text-tertiary
-                focus:border-signal focus:ring-1 focus:ring-signal
-                disabled:cursor-not-allowed disabled:opacity-50
-              `}
+              className={[
+                'w-full rounded-xl border px-4 py-3',
+                'bg-surface text-sm text-text-primary',
+                'placeholder:text-text-tertiary',
+                'outline-none transition-all duration-150',
+
+                disabled
+                  ? [
+                      'cursor-not-allowed',
+                      'border-border-muted',
+                      'bg-surface-disabled',
+                      'text-text-disabled',
+                      'placeholder:text-text-disabled',
+                    ].join(' ')
+                  : [
+                      'border-border',
+                      'hover:border-text-tertiary',
+                      'focus:border-focus',
+                      'focus:ring-2 focus:ring-focus/20',
+                    ].join(' '),
+              ].join(' ')}
             />
           </div>
         </motion.div>

@@ -111,8 +111,7 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ backgroundColor: 'rgba(26,20,14,0.5)', backdropFilter: 'blur(6px)' }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 backdrop-blur-md"
         aria-modal="true"
         role="dialog"
         aria-labelledby="reactivation-title"
@@ -132,20 +131,26 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
               onClick={onClose}
               disabled={isLoading}
               aria-label="Close reactivation dialog"
-              className="absolute top-5 right-5 p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 disabled:text-text-disabled disabled:cursor-not-allowed"
+              className={[
+                'absolute right-5 top-5 rounded-lg p-1.5',
+                'text-text-tertiary transition-colors duration-150',
+                'hover:bg-surface hover:text-text-primary',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+                'disabled:cursor-not-allowed disabled:text-text-disabled',
+              ].join(' ')}
             >
               <X className="w-4 h-4" />
             </button>
 
             {/* Icon + heading */}
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-signal/10 flex items-center justify-center flex-shrink-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-signal-soft">
                 <RefreshCw className="w-5 h-5 text-signal" />
               </div>
               <div>
                 <h2
                   id="reactivation-title"
-                  className="font-serif text-xl font-semibold text-text-primary leading-tight"
+                  className="font-display text-xl font-semibold text-text-primary leading-tight"
                 >
                   Restore your account
                 </h2>
@@ -162,7 +167,7 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
                Reactivating restores your access to your learning journey.
             </p>
            
-            <hr></hr>
+            <hr className="border-0 border-t border-border-muted" />
             
             <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4 mt-5">
               {/* Email (read-only) */}
@@ -196,7 +201,13 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
                     type="button"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowPassword((v) => !v)}
-                    className="text-text-tertiary hover:text-text-primary transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 rounded"
+                    className={[
+                      'rounded-md text-text-tertiary',
+                      'transition-colors duration-150',
+                      'hover:text-text-primary',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+                      'focus-visible:ring-offset-2 focus-visible:ring-offset-surface cursor-pointer',
+                    ].join(' ')}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -213,16 +224,20 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className={`flex items-start gap-2.5 px-3.5 py-3 rounded-lg border ${
-                      isSuspended
-                        ? 'bg-ink/5 border-ink/15 text-text-primary'
-                        : 'bg-signal/8 border-signal/20 text-signal'
-                    }`}>
+                    <div
+                      className={[
+                        'flex items-start gap-2.5 px-3.5 py-3 rounded-lg border',
+                        isSuspended
+                          ? 'bg-warning-soft border-warning text-warning'
+                          : 'bg-error-soft border-error text-error',
+                      ].join(' ')}
+                    >
                       {isSuspended ? (
-                        <Lock className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <Lock className="w-4 h-4 shrink-0 mt-0.5" />
                       ) : (
-                        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                       )}
+
                       <p className="text-xs leading-relaxed">{errorMessage}</p>
                     </div>
                   </motion.div>
@@ -235,7 +250,7 @@ const ReactivationCard: React.FC<ReactivationCardProps> = ({ prefillEmail, onClo
                 size="md"
                 loading={isLoading}
                 disabled={isSuspended}
-                className="w-full mt-1"
+                className="w-full mt-1 cursor-pointer"
               >
                 Restore Account Access →
               </Button>

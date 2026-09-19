@@ -13,7 +13,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, GraduationCap, BookOpen, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Eye, EyeOff, GraduationCap, BookOpen, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../useAuth';
 import { isApiError } from '../../../lib/axios';
 import { getRoleDashboard } from '../utils/getRoleDashboard';
@@ -57,30 +57,57 @@ const ROLE_META: Record<SignupRole, { label: string; description: string; icon: 
 
 const RoleCard: React.FC<RoleCardProps> = ({ role, selected, onSelect }) => {
   const meta = ROLE_META[role];
+
   return (
     <button
       type="button"
       aria-pressed={selected}
       onClick={() => onSelect(role)}
       className={[
-        'flex items-start gap-3 p-4 rounded-xl border text-left w-full transition-all duration-200',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40',
+        'flex w-full items-start gap-3 rounded-xl border p-4 text-left',
+        'transition-all duration-150',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 cursor-pointer',
         selected
-          ? 'border-signal bg-signal/5 ring-1 ring-signal/20 text-ink'
-          : 'border-ink/10 bg-white/40 text-ink hover:border-ink/20 hover:bg-white/60',
+          ? [
+              'border-signal bg-signal-soft',
+              'shadow-sm shadow-signal/5',
+            ].join(' ')
+          : [
+              'border-border bg-surface',
+              'hover:border-text-tertiary hover:bg-surface-elevated',
+              'hover:shadow-sm hover:shadow-ink/5',
+              'active:bg-surface-disabled',
+            ].join(' '),
       ].join(' ')}
     >
       <div
         className={[
-          'w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-200',
-          selected ? 'bg-signal/15 text-signal' : 'bg-ink/5 text-text-tertiary',
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+          'transition-colors duration-150',
+          selected
+            ? 'bg-signal text-paper'
+            : 'bg-surface-elevated text-text-tertiary',
         ].join(' ')}
       >
         {meta.icon}
       </div>
-      <div>
-        <p className={`font-semibold text-sm ${selected ? 'text-signal' : 'text-ink'}`}>{meta.label}</p>
-        <p className={`text-xs leading-relaxed mt-0.5 ${selected ? 'text-text-secondary' : 'text-text-tertiary'}`}>
+
+      <div className="min-w-0">
+        <p
+          className={[
+            'text-sm font-semibold',
+            selected ? 'text-signal' : 'text-text-primary',
+          ].join(' ')}
+        >
+          {meta.label}
+        </p>
+
+        <p
+          className={[
+            'mt-0.5 text-xs leading-relaxed',
+            selected ? 'text-text-secondary' : 'text-text-tertiary',
+          ].join(' ')}
+        >
           {meta.description}
         </p>
       </div>
@@ -174,7 +201,7 @@ const SignupPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-paper flex items-center justify-center p-4 md:p-8">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 md:p-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -184,14 +211,14 @@ const SignupPage: React.FC = () => {
         {/* Wordmark */}
         <div className="mb-8 text-center">
           <Link to="/" className="inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 rounded">
-            <span className="font-serif text-2xl font-semibold tracking-tight text-ink">Adaptive</span>
+            <span className="font-display text-2xl font-semibold tracking-tight text-text-primary">Adaptive</span>
             <span className="font-serif text-2xl font-light text-text-tertiary ml-1">Learning</span>
           </Link>
         </div>
 
         <GlassPanel className="p-8 md:p-10">
           <div className="mb-7">
-            <h1 className="font-serif text-2xl font-semibold text-ink mb-1.5">Create your account</h1>
+            <h1 className="font-display text-2xl font-semibold text-text-primary mb-1.5">Create your account</h1>
             <p className="text-sm text-text-secondary">Start your personalized learning journey today.</p>
           </div>
 
@@ -203,9 +230,9 @@ const SignupPage: React.FC = () => {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="flex items-start gap-2 px-4 py-3 rounded-xl bg-signal/8 border border-signal/20 mb-5 overflow-hidden"
+                className="flex items-start gap-2 px-4 py-3 rounded-xl bg-error-soft border border-error mb-5 overflow-hidden"
               >
-                <AlertTriangle className="w-4 h-4 text-signal flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="w-4 h-4 text-error shrink-0 mt-0.5" />
                 <p className="text-sm text-signal">{fieldErrors.general}</p>
               </motion.div>
             )}
@@ -255,7 +282,13 @@ const SignupPage: React.FC = () => {
                   type="button"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   onClick={() => setShowPassword((v) => !v)}
-                  className="text-text-tertiary hover:text-text-primary transition-colors duration-150 focus-visible:outline-none"
+                  className={[
+                    'rounded-md text-text-tertiary',
+                    'transition-colors duration-150',
+                    'hover:text-text-primary',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+                    'focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
+                  ].join(' ')}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -278,7 +311,13 @@ const SignupPage: React.FC = () => {
                   type="button"
                   aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                   onClick={() => setShowConfirmPassword((v) => !v)}
-                  className="text-text-tertiary hover:text-text-primary transition-colors duration-150 focus-visible:outline-none"
+                  className={[
+                    'rounded-md text-text-tertiary',
+                    'transition-colors duration-150',
+                    'hover:text-text-primary',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+                    'focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
+                  ].join(' ')}
                 >
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -295,7 +334,7 @@ const SignupPage: React.FC = () => {
                 <RoleCard role="INSTRUCTOR" selected={role === 'INSTRUCTOR'} onSelect={setRole} />
               </div>
               {fieldErrors.role && (
-                <p role="alert" className="text-xs text-signal font-medium">{fieldErrors.role}</p>
+                <p role="alert" className="text-xs text-error font-medium">{fieldErrors.role}</p>
               )}
             </div>
 
@@ -304,7 +343,7 @@ const SignupPage: React.FC = () => {
               variant="primary"
               size="md"
               loading={isSubmitting || isResolving}
-              className="w-full mt-1"
+              className="w-full mt-1 cursor-pointer"
               id="signup-submit"
             >
               {isSubmitting ? 'Creating account…' : 'Create Account'}
@@ -315,7 +354,11 @@ const SignupPage: React.FC = () => {
             Already have an account?{' '}
             <Link
               to="/login"
-              className="text-ink font-semibold underline underline-offset-2 hover:text-signal transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 rounded"
+              className={[
+                'rounded text-text-primary font-semibold underline underline-offset-2',
+                'transition-colors duration-150 hover:text-signal',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+              ].join(' ')}
             >
               Sign in
             </Link>

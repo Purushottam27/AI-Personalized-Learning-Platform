@@ -49,7 +49,7 @@ const ComparisonSection: React.FC = () => {
             <div className="flex flex-col items-center w-full max-w-[200px] space-y-4">
               {['Lesson 1', 'Lesson 2', 'Lesson 3', 'Lesson 4', 'Lesson 5'].map((lesson, idx) => (
                 <React.Fragment key={lesson}>
-                  <div className="w-full bg-white/50 border border-muted/20 p-4 rounded-lg text-center text-muted font-medium">
+                  <div className="w-full  border border-muted/20 p-4 rounded-lg text-center text-muted font-medium">
                     {lesson}
                   </div>
                   {idx < 4 && <ArrowDown className="text-muted/30" />}

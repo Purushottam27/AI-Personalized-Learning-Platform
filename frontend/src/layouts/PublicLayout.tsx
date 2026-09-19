@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { BookOpen, Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ThemeToggle from '../components/ui/ThemeToggle';
 
 const PublicLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -13,7 +14,9 @@ const PublicLayout: React.FC = () => {
         setMobileMenuOpen(false);
       }
     };
+
     window.addEventListener('resize', handleResize);
+
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -24,56 +27,97 @@ const PublicLayout: React.FC = () => {
     } else {
       document.body.style.overflow = 'unset';
     }
+
     return () => {
       document.body.style.overflow = 'unset';
     };
   }, [mobileMenuOpen]);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="w-full max-w-6xl mx-auto px-6 py-6 flex items-center justify-between relative z-50">
-        <Link 
-          to="/" 
-          className="flex items-center gap-2 font-display font-semibold text-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal rounded-md"
-        >
-          <BookOpen className="w-6 h-6 text-signal" />
-          <span>Learnova</span>
-        </Link>
+    <div className="min-h-screen flex flex-col bg-background text-text-primary">
+      <header className="sticky top-0 z-50 w-full border-b border-border-muted bg-background/95 backdrop-blur-4xl rounded-2xl">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
+          {/* Logo */}
+          <Link
+            to="/"
+            className={[
+              'flex items-center gap-2 font-display font-semibold text-xl',
+              'text-text-primary',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+              'rounded-md',
+            ].join(' ')}
+          >
+            <BookOpen
+              className="w-6 h-6 text-signal"
+              aria-hidden="true"
+            />
+            <span>Learnova</span>
+          </Link>
 
-        {/* Desktop & Tablet Navigation */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-          {/* Main Links (Hidden on Tablet, visible on Desktop) */}
-          <div className="hidden lg:flex items-center gap-6">
-            <a href="#how-it-works" className="text-muted hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal rounded-sm">How it works</a>
-            <a href="#for-learners" className="text-muted hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal rounded-sm">For Learners</a>
-            <div className="h-4 w-px bg-muted/30 mx-2"></div>
+          {/* Desktop & Tablet Navigation */}
+          <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
+            <div className="hidden items-center gap-6 lg:flex">
+              <a
+                href="#how-it-works"
+                className="rounded-sm text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              >
+                How it works
+              </a>
+
+              <a
+                href="#for-learners"
+                className="rounded-sm text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              >
+                For Learners
+              </a>
+
+              <div className="mx-2 h-4 w-px bg-border-muted" />
+            </div>
+
+            <ThemeToggle />
+
+            <Link
+              to="/login"
+              className="rounded-sm text-text-primary transition-colors hover:text-signal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              Sign in
+            </Link>
+
+            <Link
+              to="/signup"
+              className="rounded-full bg-signal px-5 py-2.5 text-paper shadow-sm transition-all hover:bg-signal-hover hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-signal-active"
+            >
+              Get started
+            </Link>
+          </nav>
+
+          {/* Mobile Hamburger */}
+          <div className="flex items-center gap-2 md:hidden">
+            <ThemeToggle />
+
+            <button
+              type="button"
+              className={[
+                'rounded-lg p-2',
+                'text-text-primary',
+                'transition-colors duration-150',
+                'hover:bg-surface hover:text-text-primary',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+              ].join(' ')}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-expanded={mobileMenuOpen}
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="h-6 w-6" aria-hidden="true" />
+              ) : (
+                <Menu className="h-6 w-6" aria-hidden="true" />
+              )}
+            </button>
           </div>
-          
-          {/* Auth Links (Visible on both Tablet and Desktop) */}
-          <Link 
-            to="/login" 
-            className="text-ink hover:text-signal transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal rounded-sm"
-          >
-            Sign in
-          </Link>
-          <Link 
-            to="/signup" 
-            className="bg-ink text-paper px-5 py-2.5 rounded-full hover:bg-ink/90 active:bg-ink/80 transition-all shadow-sm hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
-          >
-            Get started
-          </Link>
-        </nav>
-
-        {/* Mobile Hamburger */}
-        <button
-          className="md:hidden p-2 -mr-2 text-ink hover:bg-surface/50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-expanded={mobileMenuOpen}
-          aria-label="Toggle navigation menu"
-        >
-          {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        </div>
       </header>
+
 
       {/* Mobile Menu Overlay */}
       <AnimatePresence>
@@ -83,34 +127,63 @@ const PublicLayout: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-40 bg-paper pt-24 px-6 md:hidden overflow-y-auto"
+            className="fixed inset-0 z-40 overflow-y-auto bg-background px-6 pt-24 md:hidden"
           >
             <nav className="flex flex-col gap-6 text-lg font-medium">
-              <a 
-                href="#how-it-works" 
-                className="py-3 border-b border-muted/10 text-ink hover:text-signal transition-colors"
+              <a
+                href="#how-it-works"
+                className={[
+                  'border-b border-border-muted py-3',
+                  'text-text-primary',
+                  'transition-colors duration-150',
+                  'hover:text-signal',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+                ].join(' ')}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 How it works
               </a>
-              <a 
-                href="#for-learners" 
-                className="py-3 border-b border-muted/10 text-ink hover:text-signal transition-colors"
+
+              <a
+                href="#for-learners"
+                className={[
+                  'border-b border-border-muted py-3',
+                  'text-text-primary',
+                  'transition-colors duration-150',
+                  'hover:text-signal',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+                ].join(' ')}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 For Learners
               </a>
+
+              {/* Mobile Theme Toggle */}
+
               <div className="pt-4 flex flex-col gap-4">
-                <Link 
+                <Link
                   to="/login"
-                  className="py-3 text-center border border-muted/20 rounded-full hover:bg-surface/50 transition-colors"
+                  className={[
+                    'rounded-full border border-border py-3 text-center',
+                    'text-text-primary',
+                    'transition-colors duration-150',
+                    'hover:bg-surface-elevated',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+                  ].join(' ')}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Sign in
                 </Link>
-                <Link 
+
+                <Link
                   to="/signup"
-                  className="py-3 text-center bg-ink text-paper rounded-full hover:bg-ink/90 active:bg-ink/80 transition-colors"
+                  className={[
+                    'rounded-full bg-signal py-3 text-center text-paper',
+                    'transition-colors duration-150',
+                    'hover:bg-signal-hover',
+                    'active:bg-signal-active',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+                  ].join(' ')}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Get started
@@ -120,40 +193,106 @@ const PublicLayout: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       <main className="flex-grow relative z-10">
         <Outlet />
       </main>
 
-      <footer className="border-t border-muted/20 py-16 mt-24 bg-surface/10 relative z-10">
+      <footer className="relative z-10 mt-24 border-t border-border py-16 bg-surface">
         <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           <div className="col-span-1 lg:col-span-2">
-            <Link to="/" className="flex items-center gap-2 font-display font-semibold text-xl mb-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal rounded-md w-max">
-              <BookOpen className="w-6 h-6 text-signal" />
+            <Link
+              to="/"
+              className={[
+                'flex w-max items-center gap-2 mb-4',
+                'font-display font-semibold text-xl text-text-primary',
+                'focus-visible:outline-none focus-visible:ring-2',
+                'focus-visible:ring-focus/25 rounded-md',
+              ].join(' ')}
+            >
+              <BookOpen
+                className="w-6 h-6 text-signal"
+                aria-hidden="true"
+              />
               <span>Learnova</span>
             </Link>
-            <p className="text-muted text-sm max-w-sm">
-              A personalized learning platform that adapts to your performance, providing a unique path for every learner.
+
+            <p className="text-text-secondary text-sm max-w-sm">
+              A personalized learning platform that adapts to your performance,
+              providing a unique path for every learner.
             </p>
           </div>
-          
+
           <div>
-            <div className="font-semibold mb-4 text-ink">Platform</div>
-            <nav className="flex flex-col gap-3 text-sm text-muted">
-              <a href="#how-it-works" className="hover:text-signal hover:translate-x-1 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal rounded-sm w-max">How it works</a>
-              <a href="#for-learners" className="hover:text-signal hover:translate-x-1 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal rounded-sm w-max">For Learners</a>
+            <div className="font-semibold mb-4 text-text-primary">
+              Platform
+            </div>
+
+            <nav className="flex flex-col gap-3 text-sm">
+              <a
+                href="#how-it-works"
+                className={[
+                  'w-max rounded-sm text-text-secondary',
+                  'transition-all duration-150',
+                  'hover:text-signal hover:translate-x-1',
+                  'focus-visible:outline-none focus-visible:ring-2',
+                  'focus-visible:ring-focus/25',
+                ].join(' ')}
+              >
+                How it works
+              </a>
+
+              <a
+                href="#for-learners"
+                className={[
+                  'w-max rounded-sm text-text-secondary',
+                  'transition-all duration-150',
+                  'hover:text-signal hover:translate-x-1',
+                  'focus-visible:outline-none focus-visible:ring-2',
+                  'focus-visible:ring-focus/25',
+                ].join(' ')}
+              >
+                For Learners
+              </a>
             </nav>
           </div>
-          
+
           <div>
-            <div className="font-semibold mb-4 text-ink">Account</div>
-            <nav className="flex flex-col gap-3 text-sm text-muted">
-              <Link to="/login" className="hover:text-signal hover:translate-x-1 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal rounded-sm w-max">Sign in</Link>
-              <Link to="/signup" className="hover:text-signal hover:translate-x-1 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal rounded-sm w-max">Create account</Link>
+            <div className="font-semibold mb-4 text-text-primary">
+              Account
+            </div>
+
+            <nav className="flex flex-col gap-3 text-sm">
+              <Link
+                to="/login"
+                className={[
+                  'w-max rounded-sm text-text-secondary',
+                  'transition-all duration-150',
+                  'hover:text-signal hover:translate-x-1',
+                  'focus-visible:outline-none focus-visible:ring-2',
+                  'focus-visible:ring-focus/25',
+                ].join(' ')}
+              >
+                Sign in
+              </Link>
+
+              <Link
+                to="/signup"
+                className={[
+                  'w-max rounded-sm text-text-secondary',
+                  'transition-all duration-150',
+                  'hover:text-signal hover:translate-x-1',
+                  'focus-visible:outline-none focus-visible:ring-2',
+                  'focus-visible:ring-focus/25',
+                ].join(' ')}
+              >
+                Create account
+              </Link>
             </nav>
           </div>
         </div>
-        <div className="max-w-6xl mx-auto px-6 mt-16 pt-8 border-t border-muted/10 text-sm text-muted/60">
+
+        <div className="max-w-6xl mx-auto px-6 mt-16 pt-8 border-t border-border-muted text-sm text-text-tertiary">
           &copy; {new Date().getFullYear()} Learnova. All rights reserved.
         </div>
       </footer>

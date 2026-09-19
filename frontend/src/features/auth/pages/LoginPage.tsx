@@ -52,7 +52,7 @@ const LearningPathIllustration: React.FC = () => (
     viewBox="0 0 280 220"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    className="w-full max-w-[280px] opacity-60"
+    className="w-full max-w-70 opacity-60"
     aria-hidden="true"
   >
     {/* Path line */}
@@ -274,7 +274,7 @@ const LoginPage: React.FC = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-paper flex items-center justify-center p-4 md:p-8">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 md:p-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -286,18 +286,18 @@ const LoginPage: React.FC = () => {
             <LeftPanel />
 
             {/* Form panel */}
-            <div className="bg-paper/95 backdrop-blur-sm p-8 md:p-10 flex flex-col justify-center min-h-[580px] border border-ink/5 rounded-2xl lg:rounded-l-none">
+            <div className="bg-surface p-8 md:p-10 flex flex-col justify-center min-h-145 border border-border rounded-2xl lg:rounded-l-none">
 
               {/* Mobile wordmark */}
               <div className="lg:hidden mb-8">
                 <Link to="/">
-                  <span className="font-serif text-2xl font-semibold tracking-tight text-ink">Adaptive</span>
+                  <span className="font-display text-2xl font-semibold tracking-tight text-text-primary">Adaptive</span>
                   <span className="font-serif text-2xl font-light text-text-tertiary ml-1">Learning</span>
                 </Link>
               </div>
 
               <div className="mb-8">
-                <h1 className="font-serif text-2xl font-semibold text-ink mb-1.5">Welcome back</h1>
+                <h1 className="font-display text-2xl font-semibold text-text-primary mb-1.5">Welcome back</h1>
                 <p className="text-sm text-text-secondary">Sign in to continue your learning journey.</p>
               </div>
 
@@ -311,10 +311,10 @@ const LoginPage: React.FC = () => {
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden mb-5"
                   >
-                    <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-sage/10 border border-sage/20">
-                      <CheckCircle2 className="w-4 h-4 text-sage flex-shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-sage-soft border border-sage">
+                      <CheckCircle2 className="w-4 h-4 text-sage shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-semibold text-ink">Account created successfully</p>
+                        <p className="text-sm font-semibold text-text-primary">Account created successfully</p>
                         <p className="text-xs text-text-secondary mt-0.5">Please sign in to continue to onboarding.</p>
                       </div>
                     </div>
@@ -332,10 +332,10 @@ const LoginPage: React.FC = () => {
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden mb-5"
                   >
-                    <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-ink/5 border border-ink/10">
-                      <Lock className="w-4 h-4 text-ink flex-shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-warning-soft border border-warning">
+                      <Lock className="w-4 h-4 text-warning shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-semibold text-ink">Account suspended</p>
+                        <p className="text-sm font-semibold text-text-primary">Account suspended</p>
                         <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
                           This account has been suspended. Please contact support if you
                           believe this is an error.
@@ -356,9 +356,9 @@ const LoginPage: React.FC = () => {
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden mb-5"
                   >
-                    <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-signal/8 border border-signal/20">
-                      <AlertTriangle className="w-4 h-4 text-signal flex-shrink-0 mt-0.5" />
-                      <p className="text-sm text-signal">{fieldErrors.general}</p>
+                    <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-error-soft border border-error">
+                      <AlertTriangle className="w-4 h-4 text-error shrink-0 mt-0.5" />
+                      <p className="text-sm text-error">{fieldErrors.general}</p>
                     </div>
                   </motion.div>
                 )}
@@ -393,7 +393,13 @@ const LoginPage: React.FC = () => {
                       type="button"
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                       onClick={() => setShowPassword((v) => !v)}
-                      className="text-text-tertiary hover:text-text-primary transition-colors duration-150 focus-visible:outline-none"
+                      className={[
+                        'rounded-md text-text-tertiary',
+                        'transition-colors duration-150',
+                        'hover:text-text-primary',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+                        'focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
+                      ].join(' ')}
                       tabIndex={0}
                     >
                       {showPassword ? (
@@ -410,7 +416,7 @@ const LoginPage: React.FC = () => {
                   variant="primary"
                   size="md"
                   loading={isSubmitting || isResolving}
-                  className="w-full mt-1"
+                  className="w-full mt-1 cursor-pointer"
                   id="login-submit"
                 >
                   {isResolving ? 'Signing in…' : 'Sign in'}
@@ -421,7 +427,11 @@ const LoginPage: React.FC = () => {
                 Don&apos;t have an account?{' '}
                 <Link
                   to="/signup"
-                  className="text-ink font-semibold underline underline-offset-2 hover:text-signal transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25 rounded"
+                  className={[
+                    'rounded text-text-primary font-semibold underline underline-offset-2',
+                    'transition-colors duration-150 hover:text-signal',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/25',
+                  ].join(' ')}
                 >
                   Create one
                 </Link>

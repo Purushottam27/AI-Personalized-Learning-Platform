@@ -19,22 +19,30 @@ export default function SelectionCard({
   disabled = false,
 }: SelectionCardProps) {
   const id = useId();
+  const isMultiple = type === 'multiple';
 
   return (
     <label
       htmlFor={id}
-      className={`
-        relative flex cursor-pointer items-start gap-4 rounded-xl border p-4 transition-all duration-200
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-sage/10 hover:border-ink/20'}
-        ${
-          selected
-            ? 'border-signal bg-signal/5 ring-1 ring-signal/20'
-            : 'border-ink/10 bg-paper'
-        }
-      `}
+      className={[
+        'group relative flex items-start gap-4 rounded-xl border p-4 sm:p-5',
+        'transition-all duration-150',
+        'select-none',
+        disabled
+          ? 'cursor-not-allowed border-border-muted bg-surface-disabled'
+          : selected
+            ? 'cursor-pointer border-signal bg-signal-soft shadow-sm shadow-signal/5'
+            : [
+                'cursor-pointer border-border bg-surface',
+                'hover:border-border hover:bg-surface-elevated',
+                'hover:shadow-sm hover:shadow-ink/5',
+              ].join(' '),
+        'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus/25',
+        'has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-surface',
+      ].join(' ')}
     >
       <input
-        type={type === 'multiple' ? 'checkbox' : 'radio'}
+        type={isMultiple ? 'checkbox' : 'radio'}
         id={id}
         name={type === 'single' ? 'selection' : undefined}
         checked={selected}
@@ -42,29 +50,48 @@ export default function SelectionCard({
         disabled={disabled}
         className="peer sr-only"
       />
-      
-      {/* Custom visual indicator */}
+
+      {/* Selection indicator */}
       <div
-        className={`
-          mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all duration-200
-          ${
-            selected
+        className={[
+          'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center',
+          'border transition-all duration-150',
+          isMultiple ? 'rounded-md' : 'rounded-full',
+          disabled
+            ? 'border-border-muted bg-surface-disabled'
+            : selected
               ? 'border-signal bg-signal text-paper'
-              : 'border-ink/30 bg-transparent peer-focus-visible:ring-2 peer-focus-visible:ring-signal/50'
-          }
-          ${type === 'multiple' ? 'rounded-md' : 'rounded-full'}
-        `}
+              : [
+                  'border-text-tertiary bg-transparent',
+                  'group-hover:border-text-secondary',
+                  'peer-focus-visible:border-focus',
+                ].join(' '),
+        ].join(' ')}
         aria-hidden="true"
       >
         {selected && (
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            transition={{
+              type: 'spring',
+              stiffness: 320,
+              damping: 22,
+            }}
           >
-            {type === 'multiple' ? (
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            {isMultiple ? (
+              <svg
+                className="h-3 w-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={3}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             ) : (
               <div className="h-2 w-2 rounded-full bg-paper" />
@@ -73,16 +100,47 @@ export default function SelectionCard({
         )}
       </div>
 
-      <div className="flex flex-col gap-1">
-        <span className={`text-sm font-medium ${selected ? 'text-signal' : 'text-text-primary'}`}>
+      {/* Content */}
+      <div className="min-w-0 flex-1">
+        <span
+          className={[
+            'block text-sm font-semibold leading-5',
+            'transition-colors duration-150',
+            disabled
+              ? 'text-text-disabled'
+              : selected
+                ? 'text-signal'
+                : 'text-text-primary',
+          ].join(' ')}
+        >
           {label}
         </span>
+
         {description && (
-          <span className="text-sm text-text-secondary">
+          <span
+            className={[
+              'mt-1 block text-sm leading-5',
+              disabled ? 'text-text-disabled' : 'text-text-secondary',
+            ].join(' ')}
+          >
             {description}
           </span>
         )}
       </div>
+
+      {/* Selected state marker */}
+      {selected && !disabled && (
+        <motion.div
+          layoutId={`selection-marker-${type}`}
+          className="absolute right-3 top-3 h-1.5 w-1.5 rounded-full bg-signal"
+          transition={{
+            type: 'spring',
+            stiffness: 350,
+            damping: 30,
+          }}
+          aria-hidden="true"
+        />
+      )}
     </label>
   );
 }
