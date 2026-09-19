@@ -10,6 +10,7 @@ import { authRouter } from './modules/identity/routes/auth.route.js';
 import { userRouter } from './modules/users/routes/user.route.js';
 import { learnerRouter } from './modules/learner/routes/learnerProfile.route.js';
 import { instructorRouter } from './modules/instructor/routes/instructorProfile.route.js';
+import { courseRouter } from './modules/course/routes/course.route.js';
 
 const app = express();
 const logger = pino();
@@ -32,7 +33,7 @@ app.use('/api/v1/auth',authRouter)
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/learner-profile',learnerRouter);
 app.use('/api/v1/instructor-profile',instructorRouter);
-
+app.use('/api/v1/courses',courseRouter)
 
 // Global Error-handling response Middleware
 app.use(errorMiddleware);

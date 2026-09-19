@@ -1,3 +1,4 @@
+import { ApiError } from "../../../shared/errors/ApiError.js"
 import { ApiResponse } from "../../../shared/responses/ApiResponse.js"
 import { User } from "../models/user.model.js"
 import { loginService, logoutService, passwordService, reactivateService, refreshService, signupService } from "../services/auth.service.js"
@@ -88,7 +89,6 @@ const currentUser = async(req,res)=>{
             "User not found"
         );
     }
-
     
     return res.status(200).json(
         new ApiResponse(
