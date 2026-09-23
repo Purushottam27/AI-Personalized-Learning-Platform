@@ -11,6 +11,7 @@ import { userRouter } from './modules/users/routes/user.route.js';
 import { learnerRouter } from './modules/learner/routes/learnerProfile.route.js';
 import { instructorRouter } from './modules/instructor/routes/instructorProfile.route.js';
 import { courseRouter } from './modules/course/routes/course.route.js';
+import { topicRouter } from './modules/topic/routes/topic.route.js';
 
 const app = express();
 const logger = pino();
@@ -34,6 +35,7 @@ app.use('/api/v1/users', userRouter);
 app.use('/api/v1/learner-profile',learnerRouter);
 app.use('/api/v1/instructor-profile',instructorRouter);
 app.use('/api/v1/courses',courseRouter)
+app.use('/api/v1',topicRouter)
 
 // Global Error-handling response Middleware
 app.use(errorMiddleware);

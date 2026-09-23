@@ -4,7 +4,12 @@ const validateSignup = (req,res,next)=>{
     const result = signupSchema.safeParse(req.body);
 
     if(!result.success){
-        return next(result.error)
+        throw new ApiError(
+            400,
+            "VALIDATION_ERROR",
+            "Invalid request body",
+            result.error.format()
+        );
     }
 
     req.body = result.data
@@ -15,7 +20,12 @@ const validateLogin = (req,res,next)=>{
     const result = loginSchema.safeParse(req.body);
 
     if(!result.success){
-        return next(result.error)
+        throw new ApiError(
+            400,
+            "VALIDATION_ERROR",
+            "Invalid request body",
+            result.error.format()
+        );
     }
 
     req.body = result.data
@@ -26,7 +36,12 @@ const validateReactivation = (req,res,next)=>{
     const result = reactivateSchema.safeParse(req.body);
 
     if(!result.success){
-        return next(result.error)
+        throw new ApiError(
+            400,
+            "VALIDATION_ERROR",
+            "Invalid request body",
+            result.error.format()
+        );
     }
 
     req.body = result.data
@@ -37,7 +52,12 @@ const validateChangedPassword = (req,res,next)=>{
     const result = changePasswordSchema.safeParse(req.body);
 
     if(!result.success){
-        return next(result.error)
+        throw new ApiError(
+            400,
+            "VALIDATION_ERROR",
+            "Invalid request body",
+            result.error.format()
+        );
     }
 
     req.body = result.data
