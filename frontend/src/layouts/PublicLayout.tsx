@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { BookOpen, Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import ThemeToggle from '../components/ui/ThemeToggle';
+import ThemeToggle from '../components/ui/ThemeToggle.tsx';
 
 const PublicLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -194,7 +194,7 @@ const PublicLayout: React.FC = () => {
         )}
       </AnimatePresence>
 
-      <main className="flex-grow relative z-10">
+      <main className="grow relative z-10">
         <Outlet />
       </main>
 

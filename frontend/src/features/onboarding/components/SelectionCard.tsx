@@ -25,44 +25,80 @@ export default function SelectionCard({
     <label
       htmlFor={id}
       className={[
-        'group relative flex items-start gap-4 rounded-xl border p-4 sm:p-5',
-        'transition-all duration-150',
+        'group relative flex items-start gap-4',
+        'rounded-xl border p-4 sm:p-5',
         'select-none',
+        'transition-all duration-200',
+        'has-focus-visible:ring-2',
+        'has-focus-visible:ring-focus/25',
+        'has-focus-visible:ring-offset-2',
+        'has-focus-visible:ring-offset-surface',
+
         disabled
-          ? 'cursor-not-allowed border-border-muted bg-surface-disabled'
+          ? [
+              'cursor-not-allowed',
+              'border-border-muted',
+              'bg-surface-disabled',
+            ].join(' ')
           : selected
-            ? 'cursor-pointer border-signal bg-signal-soft shadow-sm shadow-signal/5'
+            ? [
+                'cursor-pointer',
+                'border-signal',
+                'bg-signal-soft',
+                'shadow-sm shadow-signal/10',
+              ].join(' ')
             : [
-                'cursor-pointer border-border bg-surface',
-                'hover:border-border hover:bg-surface-elevated',
-                'hover:shadow-sm hover:shadow-ink/5',
+                'cursor-pointer',
+                'border-border',
+                'bg-surface',
+                'hover:-translate-y-0.5',
+                'hover:border-text-tertiary',
+                'hover:bg-surface-elevated',
+                'hover:shadow-md hover:shadow-ink/5',
               ].join(' '),
-        'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus/25',
-        'has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-surface',
       ].join(' ')}
     >
       <input
         type={isMultiple ? 'checkbox' : 'radio'}
         id={id}
-        name={type === 'single' ? 'selection' : undefined}
+        name={
+          type === 'single'
+            ? 'selection'
+            : undefined
+        }
         checked={selected}
         onChange={onChange}
         disabled={disabled}
         className="peer sr-only"
       />
 
-      {/* Selection indicator */}
+      {/* =========================================================
+          SELECTION INDICATOR
+          ========================================================= */}
       <div
         className={[
-          'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center',
-          'border transition-all duration-150',
-          isMultiple ? 'rounded-md' : 'rounded-full',
+          'mt-0.5 flex h-5 w-5 shrink-0',
+          'items-center justify-center',
+          'border transition-all duration-200',
+          isMultiple
+            ? 'rounded-md'
+            : 'rounded-full',
+
           disabled
-            ? 'border-border-muted bg-surface-disabled'
+            ? [
+                'border-border-muted',
+                'bg-surface-disabled',
+              ].join(' ')
             : selected
-              ? 'border-signal bg-signal text-paper'
+              ? [
+                  'border-signal',
+                  'bg-signal',
+                  'text-paper',
+                  'shadow-sm shadow-signal/20',
+                ].join(' ')
               : [
-                  'border-text-tertiary bg-transparent',
+                  'border-text-tertiary',
+                  'bg-transparent',
                   'group-hover:border-text-secondary',
                   'peer-focus-visible:border-focus',
                 ].join(' '),
@@ -100,12 +136,15 @@ export default function SelectionCard({
         )}
       </div>
 
-      {/* Content */}
+      {/* =========================================================
+          CONTENT
+          ========================================================= */}
       <div className="min-w-0 flex-1">
         <span
           className={[
             'block text-sm font-semibold leading-5',
             'transition-colors duration-150',
+
             disabled
               ? 'text-text-disabled'
               : selected
@@ -120,7 +159,9 @@ export default function SelectionCard({
           <span
             className={[
               'mt-1 block text-sm leading-5',
-              disabled ? 'text-text-disabled' : 'text-text-secondary',
+              disabled
+                ? 'text-text-disabled'
+                : 'text-text-secondary',
             ].join(' ')}
           >
             {description}
@@ -128,7 +169,9 @@ export default function SelectionCard({
         )}
       </div>
 
-      {/* Selected state marker */}
+      {/* =========================================================
+          SELECTED MARKER
+          ========================================================= */}
       {selected && !disabled && (
         <motion.div
           layoutId={`selection-marker-${type}`}

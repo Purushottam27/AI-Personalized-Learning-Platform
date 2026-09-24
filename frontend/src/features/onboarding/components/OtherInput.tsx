@@ -1,5 +1,8 @@
 import { useId, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+  motion,
+  AnimatePresence,
+} from 'framer-motion';
 
 export interface OtherInputProps {
   isVisible: boolean;
@@ -16,7 +19,9 @@ export default function OtherInput({
   placeholder = 'Please specify...',
   disabled = false,
 }: OtherInputProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef =
+    useRef<HTMLInputElement>(null);
+
   const id = useId();
 
   // Focus the input when it becomes visible.
@@ -34,16 +39,31 @@ export default function OtherInput({
     <AnimatePresence>
       {isVisible && (
         <motion.div
-          initial={{ height: 0, opacity: 0, marginTop: 0 }}
-          animate={{ height: 'auto', opacity: 1, marginTop: 12 }}
-          exit={{ height: 0, opacity: 0, marginTop: 0 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
+          initial={{
+            height: 0,
+            opacity: 0,
+            marginTop: 0,
+          }}
+          animate={{
+            height: 'auto',
+            opacity: 1,
+            marginTop: 12,
+          }}
+          exit={{
+            height: 0,
+            opacity: 0,
+            marginTop: 0,
+          }}
+          transition={{
+            duration: 0.2,
+            ease: 'easeOut',
+          }}
           className="overflow-hidden"
         >
           <div className="relative">
             <label
               htmlFor={id}
-              className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-text-tertiary"
+              className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-text-tertiary"
             >
               Your answer
             </label>
@@ -53,14 +73,17 @@ export default function OtherInput({
               id={id}
               type="text"
               value={value}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={(e) =>
+                onChange(e.target.value)
+              }
               disabled={disabled}
               placeholder={placeholder}
               className={[
                 'w-full rounded-xl border px-4 py-3',
                 'bg-surface text-sm text-text-primary',
                 'placeholder:text-text-tertiary',
-                'outline-none transition-all duration-150',
+                'outline-none',
+                'transition-all duration-150',
 
                 disabled
                   ? [
@@ -75,6 +98,7 @@ export default function OtherInput({
                       'hover:border-text-tertiary',
                       'focus:border-focus',
                       'focus:ring-2 focus:ring-focus/20',
+                      'focus:bg-surface-elevated',
                     ].join(' '),
               ].join(' ')}
             />
