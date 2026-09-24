@@ -40,8 +40,8 @@ const HeroLearningVisual: React.FC<HeroLearningVisualProps> = ({
     max-[479px]:max-w-97.5
 
     lg:max-w-130
-    xl:max-w-[550px]
-    2xl:max-w-[580px]
+    xl:max-w-137.5
+    2xl:max-w-145
   "
 >
       {/* Soft ambient background */}
