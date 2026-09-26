@@ -5,7 +5,7 @@
 import type { Role } from '../api/auth.api';
 
 const ROLE_DASHBOARDS: Record<Role, string> = {
-  LEARNER: '/learner-dashboard',
+  LEARNER: '/learner/dashboard',
   INSTRUCTOR: '/instructor-dashboard',
   ADMIN: '/admin-dashboard',
 };

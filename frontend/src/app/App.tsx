@@ -1,10 +1,9 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout';
 import LandingPage from '../pages/LandingPage';
 import LoginPage from '../features/auth/pages/LoginPage';
 import SignupPage from '../features/auth/pages/SignupPage';
 import {
-  LearnerDashboard,
   InstructorDashboard,
   AdminDashboard,
 } from '../pages/dashboards/PlaceholderDashboards';
@@ -15,6 +14,11 @@ import OnboardingRoute from '../routes/OnboardingRoute';
 import OnboardingGuard from '../routes/OnboardingGuard';
 import { ThemeProvider } from './ThemeProvider';
 import '../App.css';
+
+// Learner App
+import LearnerLayout from '../layouts/LearnerLayout';
+import { LearnerDashboardPage } from '../features/learner/pages/LearnerDashboardPage';
+import { PlaceholderPage } from '../features/learner/pages/PlaceholderPage';
 
 function App() {
   return (
@@ -41,10 +45,20 @@ function App() {
             {/* Protected dashboard routes — onboarding must be complete */}
             <Route element={<ProtectedRoute />}>
               <Route element={<OnboardingGuard />}>
-                <Route
-                  path="/learner-dashboard"
-                  element={<LearnerDashboard />}
-                />
+                
+                {/* Legacy paths for backward compat */}
+                <Route path="/learner-dashboard" element={<Navigate to="/learner/dashboard" replace />} />
+                
+                {/* Learner Application Shell */}
+                <Route path="/learner" element={<LearnerLayout />}>
+                  <Route path="dashboard" element={<LearnerDashboardPage />} />
+                  <Route path="courses" element={<PlaceholderPage title="My Courses" description="View and manage your active and completed courses." />} />
+                  <Route path="explore" element={<PlaceholderPage title="Explore" description="Discover new courses tailored to your interests and level." />} />
+                  <Route path="recommended" element={<PlaceholderPage title="Recommended" description="AI-powered learning recommendations based on your profile." />} />
+                  <Route path="analytics" element={<PlaceholderPage title="Analytics" description="Deep insights into your learning progress and mastery." />} />
+                  <Route path="profile" element={<PlaceholderPage title="Profile & Settings" description="Manage your account, preferences, and learning profile." />} />
+                </Route>
+
                 <Route
                   path="/instructor-dashboard"
                   element={<InstructorDashboard />}
@@ -52,10 +66,6 @@ function App() {
                 <Route path="/admin-dashboard" element={<AdminDashboard />} />
 
                 {/* Legacy paths for backward compat */}
-                <Route
-                  path="/learner/dashboard"
-                  element={<LearnerDashboard />}
-                />
                 <Route
                   path="/instructor/dashboard"
                   element={<InstructorDashboard />}
