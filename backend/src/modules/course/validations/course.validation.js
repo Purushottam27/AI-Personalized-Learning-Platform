@@ -23,8 +23,18 @@ const estimatedDurationUpdateSchema = z.object({
 }).strict().optional();
 
 const prerequisitesSchema = z.object({
-    courses: z.array(objectIdStringSchema).optional(),
-    knowledge: z.array(z.string().trim().min(1, "Knowledge prerequisite cannot be empty")).optional()
+    courses: z.array(objectIdStringSchema)
+        .refine(
+            (courses) => new Set(courses).size === courses.length,
+            {
+                message: "Duplicate prerequisite courses are not allowed"
+            }
+        )
+        .optional(),
+
+    knowledge: z.array(
+        z.string().trim().min(1)
+    ).optional()
 }).strict().optional();
 
 const diagnosticPolicySchema = z.object({
