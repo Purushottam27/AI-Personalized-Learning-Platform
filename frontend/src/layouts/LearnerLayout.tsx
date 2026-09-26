@@ -8,7 +8,17 @@ const LearnerLayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background font-sans text-text-primary selection:bg-signal/20 flex">
+    <div className="min-h-screen bg-background font-sans text-text-primary selection:bg-signal/20 flex relative">
+      {/* Ambient background effect for dark mode */}
+      <div 
+        className="fixed inset-0 pointer-events-none z-0 transition-opacity duration-500 overflow-hidden"
+        style={{ opacity: 'var(--ambient-opacity, 0)' }}
+        aria-hidden="true"
+      >
+        <div className="absolute -top-[20%] -right-[10%] w-[60%] h-[60%] bg-signal/5 rounded-full blur-[160px]"></div>
+        <div className="absolute -bottom-[20%] -left-[10%] w-[60%] h-[60%] bg-sage/5 rounded-full blur-[160px]"></div>
+      </div>
+      
       <LearnerSidebar />
       <MobileSidebar 
         isOpen={isMobileMenuOpen} 

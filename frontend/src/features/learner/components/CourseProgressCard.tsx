@@ -25,7 +25,7 @@ export const CourseProgressCard: React.FC<CourseProgressCardProps> = ({ progress
       
       <div className="h-3 w-full bg-surface-disabled rounded-full overflow-hidden mb-4">
         <div 
-          className="h-full bg-sage transition-all duration-500 ease-out" 
+          className="h-full bg-signal transition-all duration-500 ease-out" 
           style={{ width: `${progress.progressPercentage}%` }}
         ></div>
       </div>

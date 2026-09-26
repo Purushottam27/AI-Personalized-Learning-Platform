@@ -30,7 +30,10 @@ export const NextBestAction: React.FC<NextBestActionProps> = ({ action }) => {
   };
 
   return (
-    <div className="rounded-2xl border border-signal/20 bg-signal-soft/30 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-l-4 border-l-signal">
+    <div 
+      className="rounded-2xl border border-signal/20 bg-signal-soft/30 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-l-4 border-l-signal transition-shadow duration-300"
+      style={{ boxShadow: 'var(--shadow-premium-card)' }}
+    >
       <div className="flex items-start sm:items-center gap-4 flex-1">
         <div className="hidden sm:flex h-10 w-10 rounded-full bg-surface items-center justify-center border border-signal/10 shrink-0">
           {getIcon()}

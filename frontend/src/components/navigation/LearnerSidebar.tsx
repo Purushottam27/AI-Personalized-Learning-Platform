@@ -22,15 +22,18 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ to, icon: Icon, label, onClic
       to={to}
       onClick={onClick}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+        `relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus overflow-hidden ${
           isActive
-            ? 'bg-signal-soft text-signal'
-            : 'text-text-secondary hover:bg-surface hover:text-text-primary'
+            ? 'bg-signal-soft/50 text-signal'
+            : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
         }`
       }
     >
       {({ isActive }) => (
         <>
+          {isActive && (
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-signal rounded-r-full" aria-hidden="true" />
+          )}
           <Icon className={`h-5 w-5 ${isActive ? 'text-signal' : 'text-text-tertiary'}`} />
           {label}
         </>
@@ -71,13 +74,24 @@ export const SidebarNav: React.FC<{ onItemClick?: () => void }> = ({ onItemClick
 
 export const LearnerSidebar: React.FC = () => {
   return (
-    <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 bg-surface border-r border-border-muted z-30">
-      <div className="h-16 flex items-center px-8 border-b border-border-muted">
-        <span className="font-display text-2xl font-semibold tracking-tight text-text-primary">
+    <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 bg-surface border-r border-border-muted z-30 overflow-hidden">
+      {/* Subtle ambient effect in sidebar */}
+      <div 
+        className="absolute inset-0 pointer-events-none transition-opacity duration-500" 
+        style={{ opacity: 'var(--sidebar-ambient-opacity, 0)' }}
+        aria-hidden="true"
+      >
+        <div className="absolute top-0 left-0 w-full h-48 bg-signal/5 blur-[60px]"></div>
+      </div>
+      
+      <div className="relative h-16 flex items-center px-8 border-b border-border-muted z-10">
+        <span className="font-display text-xl font-medium tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-signal via-signal to-sage">
           LEARNOVA
         </span>
       </div>
-      <SidebarNav />
+      <div className="relative flex-1 overflow-hidden flex flex-col z-10">
+        <SidebarNav />
+      </div>
     </aside>
   );
 };

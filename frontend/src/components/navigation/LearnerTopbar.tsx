@@ -24,7 +24,7 @@ export const LearnerTopbar: React.FC<LearnerTopbarProps> = ({ onMenuClick, title
           {title ? (
             <h1 className="text-lg font-semibold text-text-primary">{title}</h1>
           ) : (
-            <span className="lg:hidden font-display text-xl font-semibold text-text-primary">
+            <span className="lg:hidden font-display text-lg font-medium tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-signal via-signal to-sage">
               LEARNOVA
             </span>
           )}

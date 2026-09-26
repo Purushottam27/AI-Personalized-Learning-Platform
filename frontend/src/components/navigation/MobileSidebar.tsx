@@ -40,7 +40,7 @@ export const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose })
       />
       <aside className="fixed inset-y-0 left-0 w-3/4 max-w-sm bg-surface z-50 flex flex-col shadow-2xl transform transition-transform duration-300 lg:hidden border-r border-border-muted">
         <div className="h-16 flex items-center justify-between px-6 border-b border-border-muted">
-          <span className="font-display text-xl font-semibold tracking-tight text-text-primary">
+          <span className="font-display text-lg font-medium tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-signal via-signal to-sage">
             LEARNOVA
           </span>
           <button

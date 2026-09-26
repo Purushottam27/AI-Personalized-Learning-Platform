@@ -44,13 +44,17 @@ const Button: React.FC<ButtonProps> = ({
   <button
     disabled={disabled || loading}
     className={[
-      'inline-flex items-center justify-center gap-2 font-semibold transition-colors duration-150',
+      'inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-paper',
       'disabled:cursor-not-allowed select-none',
       variantClasses[variant],
       sizeClasses[size],
       className,
     ].join(' ')}
+    style={{
+      boxShadow: variant === 'primary' && !disabled ? 'var(--shadow-premium-btn)' : undefined,
+      ...rest.style,
+    }}
     aria-busy={loading}
     {...rest}
   >

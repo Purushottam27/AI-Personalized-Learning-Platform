@@ -41,9 +41,9 @@ const UserMenu: React.FC = () => {
     return name ? name.charAt(0).toUpperCase() : 'U';
   };
 
-  const roleLabel = user?.role === 'LEARNER' ? 'Learner' : 
-                    user?.role === 'INSTRUCTOR' ? 'Instructor' : 
-                    user?.role === 'ADMIN' ? 'Admin' : 'User';
+  const roleLabel = user?.role === 'LEARNER' ? 'Learner' :
+    user?.role === 'INSTRUCTOR' ? 'Instructor' :
+      user?.role === 'ADMIN' ? 'Admin' : 'User';
 
   return (
     <div className="relative" ref={menuRef}>
@@ -55,7 +55,7 @@ const UserMenu: React.FC = () => {
       >
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-signal text-paper font-semibold text-sm">
           {user?.avatar ? (
-             <img src={user.avatar} alt={user?.name || 'User'} className="w-full h-full rounded-full object-cover" />
+            <img src={user.avatar} alt={user?.name || 'User'} className="w-full h-full rounded-full object-cover" />
           ) : (
             getInitial(user?.name)
           )}

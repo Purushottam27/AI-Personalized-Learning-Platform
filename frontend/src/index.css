@@ -95,6 +95,11 @@
 
   /* Accessibility */
   --color-focus: #B94F35;
+
+  /* Depth & Ambient (Light) */
+  --ambient-opacity: 0;
+  --shadow-premium-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  --shadow-premium-btn: none;
 }
 
 /* ─────────────────────────────────────────
@@ -140,6 +145,11 @@
 
   /* Accessibility */
   --color-focus: #D06447;
+
+  /* Depth & Ambient (Dark) */
+  --ambient-opacity: 0.6;
+  --shadow-premium-card: 0 10px 25px -5px rgba(208, 100, 71, 0.05), 0 8px 10px -6px rgba(208, 100, 71, 0.02);
+  --shadow-premium-btn: 0 4px 8px -2px rgba(208, 100, 71, 0.15);
 }
 
 /* ─────────────────────────────────────────
