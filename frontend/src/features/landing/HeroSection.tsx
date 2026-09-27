@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ArrowRight, MoveRight, CornerRightDown } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import HeroLearningVisual from './HeroLearningVisual';
 
 // Module-level constant: evaluated once at load, never changes during session

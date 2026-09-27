@@ -20,6 +20,9 @@ import LearnerLayout from '../layouts/LearnerLayout';
 import { LearnerDashboardPage } from '../features/learner/pages/LearnerDashboardPage';
 import { PlaceholderPage } from '../features/learner/pages/PlaceholderPage';
 
+// Instructor App
+import InstructorLayout from '../features/instructor/layouts/InstructorLayout';
+
 function App() {
   return (
     <BrowserRouter>
@@ -48,6 +51,7 @@ function App() {
                 
                 {/* Legacy paths for backward compat */}
                 <Route path="/learner-dashboard" element={<Navigate to="/learner/dashboard" replace />} />
+                <Route path="/instructor-dashboard" element={<Navigate to="/instructor/dashboard" replace />} />
                 
                 {/* Learner Application Shell */}
                 <Route path="/learner" element={<LearnerLayout />}>
@@ -59,21 +63,20 @@ function App() {
                   <Route path="profile" element={<PlaceholderPage title="Profile & Settings" description="Manage your account, preferences, and learning profile." />} />
                 </Route>
 
-                <Route
-                  path="/instructor-dashboard"
-                  element={<InstructorDashboard />}
-                />
-                <Route path="/admin-dashboard" element={<AdminDashboard />} />
+                {/* Instructor Application Shell */}
+                <Route path="/instructor" element={<InstructorLayout />}>
+                  <Route path="dashboard" element={<InstructorDashboard />} />
+                  <Route path="courses" element={<PlaceholderPage title="My Courses" description="Manage your courses and course content." />} />
+                  <Route path="courses/create" element={<PlaceholderPage title="Create Course" description="Create a new course." />} />
+                  <Route path="learners" element={<PlaceholderPage title="Learners" description="Manage learners enrolled in your courses." />} />
+                  <Route path="analytics" element={<PlaceholderPage title="Analytics" description="Insights into learner performance and course metrics." />} />
+                  <Route path="profile" element={<PlaceholderPage title="Profile & Settings" description="Manage your instructor profile and account settings." />} />
+                </Route>
 
-                {/* Legacy paths for backward compat */}
-                <Route
-                  path="/instructor/dashboard"
-                  element={<InstructorDashboard />}
-                />
-                <Route
-                  path="/admin/dashboard"
-                  element={<AdminDashboard />}
-                />
+                {/* Admin paths */}
+                <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
               </Route>
             </Route>
           </Routes>
