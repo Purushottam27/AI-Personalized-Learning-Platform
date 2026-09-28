@@ -14,12 +14,14 @@ interface SidebarItemProps {
   icon: React.ElementType;
   label: string;
   onClick?: () => void;
+  end?: boolean;
 }
 
-const SidebarItem: React.FC<SidebarItemProps> = ({ to, icon: Icon, label, onClick }) => {
+const SidebarItem: React.FC<SidebarItemProps> = ({ to, icon: Icon, label, onClick, end }) => {
   return (
     <NavLink
       to={to}
+      end={end}
       onClick={onClick}
       className={({ isActive }) =>
         `relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus overflow-hidden ${
@@ -49,24 +51,24 @@ export const SidebarNav: React.FC<{ onItemClick?: () => void }> = ({ onItemClick
         <h3 className="px-4 text-xs font-semibold uppercase tracking-wider text-text-disabled mb-3">
           Teaching
         </h3>
-        <SidebarItem to="/instructor/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onItemClick} />
-        <SidebarItem to="/instructor/courses" icon={BookOpen} label="My Courses" onClick={onItemClick} />
-        <SidebarItem to="/instructor/courses/create" icon={PlusCircle} label="Create Course" onClick={onItemClick} />
+        <SidebarItem to="/instructor/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onItemClick} end />
+        <SidebarItem to="/instructor/courses" icon={BookOpen} label="My Courses" onClick={onItemClick} end />
+        <SidebarItem to="/instructor/courses/create" icon={PlusCircle} label="Create Course" onClick={onItemClick} end />
       </div>
 
       <div className="space-y-1">
         <h3 className="px-4 text-xs font-semibold uppercase tracking-wider text-text-disabled mb-3">
           Insights
         </h3>
-        <SidebarItem to="/instructor/learners" icon={Users} label="Learners" onClick={onItemClick} />
-        <SidebarItem to="/instructor/analytics" icon={BarChart3} label="Analytics" onClick={onItemClick} />
+        <SidebarItem to="/instructor/learners" icon={Users} label="Learners" onClick={onItemClick} end />
+        <SidebarItem to="/instructor/analytics" icon={BarChart3} label="Analytics" onClick={onItemClick} end />
       </div>
 
       <div className="space-y-1">
         <h3 className="px-4 text-xs font-semibold uppercase tracking-wider text-text-disabled mb-3">
           Account
         </h3>
-        <SidebarItem to="/instructor/profile" icon={UserRoundCog} label="Profile & Settings" onClick={onItemClick} />
+        <SidebarItem to="/instructor/profile" icon={UserRoundCog} label="Profile & Settings" onClick={onItemClick} end />
       </div>
     </nav>
   );

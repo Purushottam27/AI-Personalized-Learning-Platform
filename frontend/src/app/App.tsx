@@ -4,7 +4,6 @@ import LandingPage from '../pages/LandingPage';
 import LoginPage from '../features/auth/pages/LoginPage';
 import SignupPage from '../features/auth/pages/SignupPage';
 import {
-  InstructorDashboard,
   AdminDashboard,
 } from '../pages/dashboards/PlaceholderDashboards';
 import { AuthProvider } from '../features/auth/AuthContext';
@@ -22,6 +21,7 @@ import { PlaceholderPage } from '../features/learner/pages/PlaceholderPage';
 
 // Instructor App
 import InstructorLayout from '../features/instructor/layouts/InstructorLayout';
+import { InstructorDashboardPage } from '../features/instructor/pages/InstructorDashboardPage';
 
 function App() {
   return (
@@ -65,7 +65,7 @@ function App() {
 
                 {/* Instructor Application Shell */}
                 <Route path="/instructor" element={<InstructorLayout />}>
-                  <Route path="dashboard" element={<InstructorDashboard />} />
+                  <Route path="dashboard" element={<InstructorDashboardPage />} />
                   <Route path="courses" element={<PlaceholderPage title="My Courses" description="Manage your courses and course content." />} />
                   <Route path="courses/create" element={<PlaceholderPage title="Create Course" description="Create a new course." />} />
                   <Route path="learners" element={<PlaceholderPage title="Learners" description="Manage learners enrolled in your courses." />} />
