@@ -1,7 +1,7 @@
-import 'dotenv/config';
-import app from './app.js';
-import pino from 'pino';
-import { connectDB, disconnectDB } from './config/database.js';
+import "dotenv/config";
+import app from "./app.js";
+import pino from "pino";
+import { connectDB, disconnectDB } from "./config/database.js";
 
 const logger = pino();
 const port = process.env.PORT || 3000;
@@ -10,27 +10,23 @@ let isShuttingDown = false;
 
 connectDB()
   .then(() => {
-
     server = app.listen(port, () => {
       logger.info(`Backend listening on port ${port}`);
-      console.log(`Server is running at port: http://localhost:${port}`)
-    })
+      console.log(`Server is running at port: http://localhost:${port}`);
+    });
 
-    server.on('error', (error) => {
-      logger.error('Server error: ', error)
-      console.error('Server error: ', error)
-    })
-
+    server.on("error", (error) => {
+      logger.error("Server error: ", error);
+      console.error("Server error: ", error);
+    });
   })
   .catch((error) => {
-    logger.error("Application error : ", error)
-    console.error("MongoDB error : ", error)
+    logger.error("Application error : ", error);
+    console.error("MongoDB error : ", error);
     process.exit(1);
-  })
-
+  });
 
 async function gracefulShutdown(signal) {
-
   if (isShuttingDown) {
     return;
   }
@@ -40,21 +36,17 @@ async function gracefulShutdown(signal) {
   console.log(`Received ${signal}. Starting graceful shutdown...`);
 
   try {
-
     if (server) {
       await new Promise((resolve, reject) => {
-
         server.close((error) => {
-
           if (error) {
             reject(error);
             return;
           }
 
-          console.log('HTTP server closed. Cleaning up resources...');
+          console.log("HTTP server closed. Cleaning up resources...");
           resolve();
         });
-
       });
     }
     console.log("Before disconnectDB");
@@ -65,9 +57,7 @@ async function gracefulShutdown(signal) {
     logger.info("Database disconnected");
 
     process.exit(0);
-
   } catch (error) {
-
     logger.error("Error during graceful shutdown", error);
     console.error("Error during cleanup:", error);
 
@@ -76,10 +66,9 @@ async function gracefulShutdown(signal) {
 }
 
 process.on("SIGTERM", () => {
-  gracefulShutdown("SIGTERM")
-})
+  gracefulShutdown("SIGTERM");
+});
 
 process.on("SIGINT", () => {
-  gracefulShutdown("SIGINT")
-})
-
+  gracefulShutdown("SIGINT");
+});
