@@ -24,9 +24,9 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ to, icon: Icon, label, onClic
       end={end}
       onClick={onClick}
       className={({ isActive }) =>
-        `relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus overflow-hidden ${
+        `relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus overflow-hidden ${
           isActive
-            ? 'bg-signal-soft/50 text-signal'
+            ? 'bg-signal-soft text-signal'
             : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
         }`
       }

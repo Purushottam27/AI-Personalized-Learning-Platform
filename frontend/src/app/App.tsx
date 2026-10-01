@@ -22,6 +22,8 @@ import { PlaceholderPage } from '../features/learner/pages/PlaceholderPage';
 // Instructor App
 import InstructorLayout from '../features/instructor/layouts/InstructorLayout';
 import { InstructorDashboardPage } from '../features/instructor/pages/InstructorDashboardPage';
+import { CreateCoursePage } from '../features/instructor/pages/CreateCoursePage';
+import { CourseWorkspacePage } from '../features/instructor/pages/CourseWorkspacePage';
 
 function App() {
   return (
@@ -67,7 +69,9 @@ function App() {
                 <Route path="/instructor" element={<InstructorLayout />}>
                   <Route path="dashboard" element={<InstructorDashboardPage />} />
                   <Route path="courses" element={<PlaceholderPage title="My Courses" description="Manage your courses and course content." />} />
-                  <Route path="courses/create" element={<PlaceholderPage title="Create Course" description="Create a new course." />} />
+                  {/* Static route must come before dynamic :courseId to avoid conflict */}
+                  <Route path="courses/create" element={<CreateCoursePage />} />
+                  <Route path="courses/:courseId" element={<CourseWorkspacePage />} />
                   <Route path="learners" element={<PlaceholderPage title="Learners" description="Manage learners enrolled in your courses." />} />
                   <Route path="analytics" element={<PlaceholderPage title="Analytics" description="Insights into learner performance and course metrics." />} />
                   <Route path="profile" element={<PlaceholderPage title="Profile & Settings" description="Manage your instructor profile and account settings." />} />

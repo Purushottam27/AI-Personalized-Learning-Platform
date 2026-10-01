@@ -32,7 +32,7 @@ const StatCard = ({
 const StatusBadge = ({ status }: { status: CourseStatus }) => {
   if (status === 'PUBLISHED') {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider uppercase bg-sage/10 text-sage border border-sage/20">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider uppercase bg-sage-soft text-sage border border-sage/20">
         Published
       </span>
     );
@@ -189,7 +189,7 @@ export const InstructorDashboardPage: React.FC = () => {
           {courses.slice(0, 4).map(course => (
             <div
               key={course._id}
-              className="p-5 rounded-xl border border-border bg-surface hover:bg-surface-elevated transition-colors flex flex-col sm:flex-row gap-4 justify-between group shadow-sm"
+              className="p-5 rounded-xl border border-border bg-surface hover:bg-surface-elevated hover:border-text-tertiary transition-all duration-200 hover:-translate-y-0.5 flex flex-col sm:flex-row gap-4 justify-between group shadow-sm hover:shadow-md"
             >
               <div className="space-y-2 flex-1">
                 <div className="flex items-center gap-2 mb-1">
@@ -200,7 +200,7 @@ export const InstructorDashboardPage: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <h3 className="font-semibold text-text-primary group-hover:text-signal transition-colors">
+                <h3 className="font-semibold text-text-primary group-hover:text-signal transition-colors duration-150">
                   {course.title}
                 </h3>
                 {course.domain && (

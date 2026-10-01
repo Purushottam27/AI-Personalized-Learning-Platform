@@ -97,8 +97,9 @@
   --color-focus: #B94F35;
 
   /* Depth & Ambient (Light) */
-  --ambient-opacity: 0;
-  --shadow-premium-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  --ambient-opacity: 0.5;
+  --sidebar-ambient-opacity: 0;
+  --shadow-premium-card: 0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.04);
   --shadow-premium-btn: none;
 }
 
@@ -148,6 +149,7 @@
 
   /* Depth & Ambient (Dark) */
   --ambient-opacity: 0.6;
+  --sidebar-ambient-opacity: 0.8;
   --shadow-premium-card: 0 10px 25px -5px rgba(208, 100, 71, 0.05), 0 8px 10px -6px rgba(208, 100, 71, 0.02);
   --shadow-premium-btn: 0 4px 8px -2px rgba(208, 100, 71, 0.15);
 }
