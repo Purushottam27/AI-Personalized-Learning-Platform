@@ -79,7 +79,7 @@ const DIFFICULTY_LABELS: Record<CourseDifficulty, string> = {
 
 const MetaItem: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
   <div className="flex flex-col gap-0.5">
-    <span className="text-xs font-semibold uppercase tracking-widest text-text-disabled">
+    <span className="text-xs font-semibold uppercase tracking-widest text-text-tertiary">
       {label}
     </span>
     <span className="text-sm text-text-secondary">{value}</span>
@@ -93,13 +93,13 @@ const ComingSoonBlock: React.FC<{
   title: string;
   description: string;
 }> = ({ icon: Icon, title, description }) => (
-  <div className="flex flex-col items-center justify-center text-center py-10 px-6 rounded-xl border border-dashed border-border bg-surface select-none cursor-default">
+  <div className="flex flex-col items-center justify-center text-center py-10 px-6 rounded-xl border border-dashed border-border bg-linear-to-br from-surface to-surface-elevated select-none cursor-default group transition-all duration-300 hover:-translate-y-1 hover:border-signal/30 hover:shadow-(--shadow-premium-card)">
     <div className="w-12 h-12 rounded-xl bg-surface-elevated border border-border flex items-center justify-center mb-4">
-      <Icon className="w-6 h-6 text-text-disabled" strokeWidth={1.5} />
+      <Icon className="w-6 h-6 text-text-tertiary transition-colors duration-300 group-hover:text-signal" strokeWidth={1.5} />
     </div>
     <h3 className="text-sm font-semibold text-text-primary mb-1">{title}</h3>
     <p className="text-xs text-text-tertiary max-w-xs leading-relaxed">{description}</p>
-    <span className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-text-disabled px-2 py-1 rounded bg-surface-disabled border border-border-muted">
+    <span className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary px-2 py-1 rounded bg-surface-disabled border border-border-muted">
       Coming soon
     </span>
   </div>
@@ -144,7 +144,7 @@ export const CourseWorkspacePage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-5xl space-y-8 pb-16">
+    <div className=" max-w-5xl space-y-8 pb-16">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -181,7 +181,7 @@ export const CourseWorkspacePage: React.FC = () => {
             <FileText className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
             <div>
               <p className="text-sm font-medium">Your course is saved as a draft.</p>
-              <p className="text-xs mt-0.5 text-signal/70">
+              <p className="text-xs mt-0.5 text-signal/85">
                 Continue building its learning structure. Publishing will be available once Topics,
                 Resources, and Assessments are ready.
               </p>
@@ -196,7 +196,7 @@ export const CourseWorkspacePage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
         aria-label="Course details"
-        className="p-6 rounded-xl border border-border bg-surface space-y-5"
+        className="p-6 rounded-xl border border-border bg-linear-to-br from-surface to-surface-elevated space-y-5 shadow-sm transition-all duration-300 hover:border-signal/20 hover:shadow-(--shadow-premium-card)"
       >
         <h2 className="text-sm font-semibold text-text-primary">Course details</h2>
 

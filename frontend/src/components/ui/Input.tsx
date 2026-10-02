@@ -27,7 +27,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           disabled={disabled}
           className={[
             'w-full px-4 py-3 rounded-lg text-sm font-sans bg-surface',
-            'border transition-colors  duration-150 outline-none',
+            'border transition-all duration-200 outline-none',
             error
               ? 'border-error text-text-primary bg-error-soft/40 placeholder:text-text-tertiary focus-visible:border-error focus-visible:ring-2 focus-visible:ring-error/25'
               : 'border-border text-text-primary placeholder:text-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25',

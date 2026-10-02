@@ -18,7 +18,7 @@ const StatCard = ({
   value: number;
   icon?: React.ReactNode;
 }) => (
-  <div className="p-5 rounded-xl border border-border bg-surface-elevated flex flex-col justify-between h-full shadow-sm">
+  <div className="p-5 rounded-xl border border-border bg-linear-to-br from-surface-elevated to-surface flex flex-col justify-between h-full shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-signal/30 hover:shadow-(--shadow-premium-card)">
     <div className="flex items-center justify-between mb-3">
       <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">{title}</span>
       {icon && <div>{icon}</div>}
@@ -131,7 +131,7 @@ export const InstructorDashboardPage: React.FC = () => {
   const archived = courses.filter(c => c.status === 'ARCHIVED').length;
 
   return (
-    <div className="space-y-10 pb-12 max-w-5xl">
+    <div className="space-y-10 pb-12 max-w-6xl">
       {/* Hero */}
       <motion.section
         initial={{ opacity: 0, y: 12 }}
@@ -189,7 +189,7 @@ export const InstructorDashboardPage: React.FC = () => {
           {courses.slice(0, 4).map(course => (
             <div
               key={course._id}
-              className="p-5 rounded-xl border border-border bg-surface hover:bg-surface-elevated hover:border-text-tertiary transition-all duration-200 hover:-translate-y-0.5 flex flex-col sm:flex-row gap-4 justify-between group shadow-sm hover:shadow-md"
+              className="p-5 rounded-xl border border-border bg-linear-to-br from-surface to-surface-elevated hover:border-signal/30 transition-all duration-300 hover:-translate-y-1 flex flex-col sm:flex-row gap-4 justify-between group shadow-sm hover:shadow-(--shadow-premium-card)"
             >
               <div className="space-y-2 flex-1">
                 <div className="flex items-center gap-2 mb-1">
@@ -200,7 +200,7 @@ export const InstructorDashboardPage: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <h3 className="font-semibold text-text-primary group-hover:text-signal transition-colors duration-150">
+                <h3 className="font-semibold text-text-primary group-hover:text-signal transition-colors duration-300">
                   {course.title}
                 </h3>
                 {course.domain && (
