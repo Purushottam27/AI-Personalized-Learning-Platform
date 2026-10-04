@@ -16,6 +16,7 @@ import { enrollmentRouter } from './modules/enrollment/routes/enrollment.route.j
 import { lessonRouter } from './modules/lesson/routes/lesson.route.js';
 import { resourceRouter } from './modules/resource/routes/resource.route.js';
 import { questionBankRouter } from './modules/questionBank/routes/questionBank.route.js';
+import { questionRouter } from './modules/question/routes/question.route.js';
 
 const app = express();
 const logger = pino();
@@ -44,6 +45,7 @@ app.use('/api/v1',enrollmentRouter)
 app.use('/api/v1',lessonRouter)
 app.use('/api/v1',resourceRouter)
 app.use('/api/v1',questionBankRouter)
+app.use('/api/v1',questionRouter)
 
 // Global Error-handling response Middleware
 app.use(errorMiddleware);
