@@ -55,7 +55,7 @@ export const createCourseSchema = z.object({
     domain: z.string().trim().min(1),
     category: z.string().trim().min(1),
     difficulty: difficultySchema,
-    objectives: objectivesSchema,
+    objectives: z.array( z.string().trim().min(1, "Objective cannot be empty")).max(10).default([]),
     estimatedDuration: estimatedDurationCreateSchema,
     prerequisites: prerequisitesSchema,
     diagnosticPolicy: diagnosticPolicySchema,

@@ -3,6 +3,7 @@ import { QuestionBank } from "../../questionBank/models/questionBank.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
 import { Course } from "../../course/models/course.model.js";
 import { Lesson } from "../../lesson/models/lesson.model.js";
+import { normalizeQuestionText } from "../../../shared/utils/textNormalization.js";
 
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
@@ -188,6 +189,9 @@ function ensureQuestionBankActive(questionBank) {
 */
 
 async function validateQuestionState(questionData) {
+    if (questionData.questionText) {
+        questionData.normalizedQuestionText = normalizeQuestionText(questionData.questionText);
+    }
     const question = new Question(questionData);
 
     await question.validate();
@@ -353,6 +357,7 @@ export async function updateQuestionService( instructorId, questionId, updateDat
     const validatedQuestion = await validateQuestionState(nextState);
 
     question.questionText = validatedQuestion.questionText;
+    question.normalizedQuestionText = validatedQuestion.normalizedQuestionText;
     question.type = validatedQuestion.type;
     question.options = validatedQuestion.options;
     question.correctAnswer = validatedQuestion.correctAnswer;

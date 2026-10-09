@@ -105,6 +105,12 @@ const questionSchema = new mongoose.Schema({
         maxlength: 1000
     },
 
+    normalizedQuestionText: {
+        type: String,
+        required: true,
+        index: true
+    },
+
     type: {
         type: String,
         enum: QUESTION_TYPES,
