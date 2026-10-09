@@ -1,10 +1,8 @@
-// ─── Shared enums ─────────────────────────────────────────────────────────────
-
+// Shared enums
 export type CourseStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type CourseDifficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
 
-// ─── Sub-document types ────────────────────────────────────────────────────────
-
+// Sub-document types
 export interface EstimatedDuration {
   source: 'MANUAL';
   hours?: number | null;
@@ -12,7 +10,7 @@ export interface EstimatedDuration {
 }
 
 export interface Prerequisites {
-  courses: string[]; // Course ObjectId strings
+  courses: string[];
   knowledge: string[];
 }
 
@@ -27,8 +25,7 @@ export interface ProgressionPolicy {
   lockingEnabled: boolean;
 }
 
-// ─── Full Course shape (matches backend model) ─────────────────────────────────
-
+// Full Course shape (matches the backend model)
 export interface Course {
   _id: string;
   title: string;
@@ -47,8 +44,7 @@ export interface Course {
   updatedAt: string;
 }
 
-// ─── Simplified list item (from /courses/instructor/courses) ──────────────────
-
+// Simplified list item returned by GET /courses/instructor/courses
 export interface InstructorCourse {
   _id: string;
   title: string;
@@ -57,14 +53,13 @@ export interface InstructorCourse {
   domain?: string;
   category?: string;
   difficulty?: CourseDifficulty;
+  estimatedDuration?: EstimatedDuration;
   createdAt?: string;
   updatedAt?: string;
 }
 
-// ─── Create course payload ────────────────────────────────────────────────────
 // Exactly what POST /api/v1/courses accepts.
-// Do NOT include: _id, createdBy, status, createdAt, updatedAt
-
+// Do not include _id, createdBy, status, createdAt, or updatedAt.
 export interface CreateCoursePayload {
   title: string;
   description: string;
@@ -88,8 +83,7 @@ export interface CreateCoursePayload {
   };
 }
 
-// ─── API response shapes ──────────────────────────────────────────────────────
-
+// API response shapes
 export interface InstructorCoursesResponse {
   success: boolean;
   data: InstructorCourse[];
@@ -100,4 +94,3 @@ export interface CourseResponse {
   data: Course;
   message: string;
 }
-
