@@ -22,7 +22,7 @@ import { ApiError } from "../../../shared/errors/ApiError.js";
 |
 */
 
-async function getOwnedQuestionBankContext(instructorId, questionBankId) {
+export async function getOwnedQuestionBankContext(instructorId, questionBankId) {
     const questionBank = await QuestionBank.findById(questionBankId);
 
     if (!questionBank) {
