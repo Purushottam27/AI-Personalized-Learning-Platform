@@ -1,50 +1,17 @@
 /**
-
- * CourseWorkspacePage — Minimal Course Workspace / Editor shell.
-
+ * CourseWorkspacePage — Course details and structure workspace.
  *
-
  * Route: /instructor/courses/:courseId
-
- * Rendered inside: InstructorLayout (sidebar + topbar already present)
-
+ * Rendered inside InstructorLayout (the application sidebar and topbar already exist).
  *
-
- * This is the foundation for the future Course Editor vertical slice.
-
- *
-
- * Currently shows:
-
- * - Real course data fetched from GET /api/v1/courses/:courseId
-
- * - Course title, DRAFT status badge
-
- * - Core metadata summary
-
- * - Placeholder areas for future Topic, Resource, Assessment management
-
- *
-
- * Does NOT implement:
-
- * - Topic management
-
- * - Lesson management
-
- * - Resource management
-
- * - Practice builder
-
- * - Question bank
-
- * - Assessment builder
-
- * - Publishing workflow
-
+ * Current scope:
+ * - Fetch and display the saved course.
+ * - Preserve the draft setup continuation action.
+ * - Manage Topics and the selected Topic's Lessons.
+ * - Keep Resource, Practice, Question Bank, Assessment, and publishing tools out of scope for this slice.
  */
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -63,9 +30,7 @@ import {
   Globe,
 
   Archive,
-
-  Layers,
-
+  BookOpen,
   ClipboardList,
 
   Clock,
@@ -77,6 +42,9 @@ import {
 import { useCourse } from '../hooks/useCourse';
 
 import Button from '../../../components/ui/Button';
+import TopicManagement from '../components/TopicManagement/TopicManagement';
+import LessonManagement from '../components/LessonManagement/LessonManagement';
+import type { Topic } from '../types/topic.types';
 
 import type { CourseStatus, CourseDifficulty } from '../types/instructor.types';
 
@@ -223,6 +191,16 @@ export const CourseWorkspacePage: React.FC = () => {
   const navigate = useNavigate();
 
   const { course, isLoading, error } = useCourse(courseId);
+  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
+  const lessonPanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!selectedTopic) return;
+    const frameId = window.requestAnimationFrame(() => {
+      lessonPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [selectedTopic?._id]);
 
 
 
@@ -540,9 +518,9 @@ export const CourseWorkspacePage: React.FC = () => {
 
           <p className="text-sm text-text-secondary mt-1">
 
-            Build the learning structure of your course. Topics, Resources, Practice, and
+            Manage the ordered learning stages of your course here. Lessons and learning resources
 
-            Assessments will be managed here.
+            will be added to each Topic in the next implementation phase.
 
           </p>
 
@@ -552,15 +530,36 @@ export const CourseWorkspacePage: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-          <ComingSoonBlock
+          <div className="sm:col-span-2">
+            <TopicManagement
+              courseId={course._id}
+              courseStatus={course.status}
+              selectedTopicId={selectedTopic?._id ?? null}
+              onManageLessons={setSelectedTopic}
+              onTopicUpdated={(updatedTopic) => {
+                setSelectedTopic((current) => current?._id === updatedTopic._id ? updatedTopic : current);
+              }}
+            />
+          </div>
 
-            icon={Layers}
-
-            title="Topics &amp; Lessons"
-
-            description="Organize your course into Topics. Add Lessons and learning resources under each Topic."
-
-          />
+          <div className="sm:col-span-2 scroll-mt-24" ref={lessonPanelRef}>
+            {selectedTopic ? (
+              <LessonManagement
+                key={selectedTopic._id}
+                topicId={selectedTopic._id}
+                topicTitle={selectedTopic.title}
+                courseStatus={course.status}
+              />
+            ) : (
+              <div className="rounded-2xl border border-dashed border-border bg-surface p-6 text-center">
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-elevated text-text-tertiary">
+                  <BookOpen className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <h3 className="text-sm font-semibold text-text-primary">Select a topic to manage its lessons</h3>
+                <p className="mx-auto mt-1 max-w-lg text-sm text-text-secondary">Use the Manage Lessons action on a topic above. Lessons are created inside a topic and cannot be moved to another topic.</p>
+              </div>
+            )}
+          </div>
 
           <ComingSoonBlock
 
@@ -583,12 +582,21 @@ export const CourseWorkspacePage: React.FC = () => {
           />
 
           <ComingSoonBlock
+
             icon={Users}
+
             title="Enrolled Learners"
+
             description="View and manage learners enrolled in this course once it is published."
+
           />
+
         </div>
+
       </motion.section>
+
     </div>
+
   );
+
 };
