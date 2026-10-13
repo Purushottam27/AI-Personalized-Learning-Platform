@@ -833,6 +833,55 @@ test("Question Import Service Integration Tests", async (t) => {
         );
     });
 
+    await t.test(
+    "Rejects MCQ options that do not start at A",
+    async () => {
+        const row = makeRow({
+            questionText: "Options starting at B should fail",
+            type: "MCQ_SINGLE",
+            // optionA intentionally omitted
+            optionB: "Option B",
+            optionC: "Option C",
+            correctAnswer: "B",
+            marks: "5",
+            difficulty: "EASY",
+        });
+
+        const result = await processQuestionImportPreview(
+            csvBuffer([HEADERS_LINE, row]),
+            "data.csv",
+            questionBank._id,
+            instructorId
+        );
+
+        assert.equal(result.summary.totalRows, 1);
+        assert.equal(result.summary.validRows, 0);
+        assert.equal(result.summary.invalidRows, 1);
+        assert.equal(result.summary.duplicateRows, 0);
+        assert.equal(result.summary.importableRows, 0);
+
+        assert.equal(result.previewData.length, 1);
+        assert.equal(result.previewData[0].isValid, false);
+
+        assert.ok(
+            result.previewData[0].rowErrors.some((error) =>
+                error.toLowerCase().includes("contiguous")
+            ),
+            "The row should explain that options must be contiguous"
+        );
+
+        const questionCount = await Question.countDocuments({
+            questionBankId: questionBank._id,
+        });
+
+        assert.equal(
+            questionCount,
+            0,
+            "Preview must not create Question documents"
+        );
+    }
+);
+
     await t.test("Strict marks validation rejects non-integer strings", async () => {
         const cases = [
             { marks: "1.5", label: "float" },
