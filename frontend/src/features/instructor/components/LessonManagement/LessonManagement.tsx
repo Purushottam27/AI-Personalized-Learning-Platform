@@ -1,34 +1,42 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
   BookOpen,
   Code2,
-  FileText,
-  Image as ImageIcon,
+  Eye,
+  EyeOff,
+  Heading2,
+  Lightbulb,
   List,
+  ListOrdered,
   Pencil,
   Plus,
   RefreshCw,
   Save,
   Trash2,
+  Type,
   Video,
   X,
-} from 'lucide-react';
-import Button from '../../../../components/ui/Button';
-import { createLesson, deleteLesson, reorderTopicLessons, updateLesson } from '../../api/lesson.api';
-import { useTopicLessons } from '../../hooks/useTopicLessons';
-import { isApiError } from '../../../../lib/axios';
-import type { CourseStatus } from '../../types/instructor.types';
+} from "lucide-react";
+import Button from "../../../../components/ui/Button";
+import {
+  createLesson,
+  deleteLesson,
+  reorderTopicLessons,
+  updateLesson,
+} from "../../api/lesson.api";
+import { useTopicLessons } from "../../hooks/useTopicLessons";
+import { isApiError } from "../../../../lib/axios";
+import type { CourseStatus } from "../../types/instructor.types";
 import type {
   Lesson,
   LessonCalloutVariant,
   LessonContentBlock,
-  LessonHeadingLevel,
   LessonListStyle,
   LessonPayload,
-} from '../../types/lesson.types';
+} from "../../types/lesson.types";
 
 interface LessonManagementProps {
   topicId: string;
@@ -39,227 +47,423 @@ interface LessonManagementProps {
 interface LessonFormState {
   title: string;
   description: string;
-  content: LessonContentBlock[];
+  markdown: string;
 }
 
-type NewBlockType = LessonContentBlock['type'];
+type PreservedMediaBlock = Extract<
+  LessonContentBlock,
+  { type: "IMAGE" | "VIDEO" }
+>;
+type MediaMap = Record<string, PreservedMediaBlock>;
 
 const EMPTY_FORM: LessonFormState = {
-  title: '',
-  description: '',
-  content: [{ type: 'TEXT', content: '' }],
+  title: "",
+  description: "",
+  markdown: "",
 };
+const interactive =
+  "cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none";
+const fieldClass =
+  "w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm leading-relaxed text-text-primary outline-none transition-colors placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25";
 
-const BLOCK_OPTIONS: Array<{ value: NewBlockType; label: string }> = [
-  { value: 'TEXT', label: 'Text paragraph' },
-  { value: 'HEADING', label: 'Heading' },
-  { value: 'CODE', label: 'Code example' },
-  { value: 'IMAGE', label: 'Image' },
-  { value: 'VIDEO', label: 'Video' },
-  { value: 'CALLOUT', label: 'Callout' },
-  { value: 'LIST', label: 'Bulleted or numbered list' },
-];
-
-const getErrorMessage = (error: unknown): string => {
+function getErrorMessage(error: unknown): string {
   if (isApiError(error)) return error.message;
-  return 'Something went wrong. Please try again.';
-};
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  )
+    return error.message;
+  return "Something went wrong. Please try again.";
+}
 
-const createBlock = (type: NewBlockType): LessonContentBlock => {
-  switch (type) {
-    case 'TEXT':
-      return { type: 'TEXT', content: '' };
-    case 'HEADING':
-      return { type: 'HEADING', level: 2, content: '' };
-    case 'CODE':
-      return { type: 'CODE', language: 'javascript', content: '' };
-    case 'IMAGE':
-      return { type: 'IMAGE', url: '', alt: '' };
-    case 'VIDEO':
-      return { type: 'VIDEO', url: '', title: '' };
-    case 'CALLOUT':
-      return { type: 'CALLOUT', variant: 'INFO', content: '' };
-    case 'LIST':
-      return { type: 'LIST', style: 'BULLETED', items: [''] };
-  }
-};
+function mediaMarker(block: PreservedMediaBlock, index: number): string {
+  return block.type === "IMAGE"
+    ? `[[Existing image #${index}]]`
+    : `[[Existing video #${index}]]`;
+}
 
-const blockLabel = (block: LessonContentBlock): string => {
-  switch (block.type) {
-    case 'TEXT': return 'Text paragraph';
-    case 'HEADING': return `Heading · H${block.level}`;
-    case 'CODE': return 'Code example';
-    case 'IMAGE': return 'Image';
-    case 'VIDEO': return 'Video';
-    case 'CALLOUT': return `Callout · ${block.variant.toLowerCase()}`;
-    case 'LIST': return block.style === 'NUMBERED' ? 'Numbered list' : 'Bulleted list';
-  }
-};
+function serializeLessonContent(content: LessonContentBlock[]): {
+  markdown: string;
+  media: MediaMap;
+} {
+  const media: MediaMap = {};
+  let mediaIndex = 0;
+  const chunks = content.map((block) => {
+    switch (block.type) {
+      case "TEXT":
+        return block.content;
+      case "HEADING":
+        return `${block.level === 3 ? "###" : "##"} ${block.content}`;
+      case "CODE":
+        return `\`\`\`${block.language || "text"}\n${block.content}\n\`\`\``;
+      case "CALLOUT":
+        return `> [!${block.variant}]\n${block.content
+          .split("\n")
+          .map((line) => `> ${line}`)
+          .join("\n")}`;
+      case "LIST":
+        return block.items
+          .map((item, index) =>
+            block.style === "NUMBERED" ? `${index + 1}. ${item}` : `- ${item}`,
+          )
+          .join("\n");
+      case "IMAGE":
+      case "VIDEO": {
+        mediaIndex += 1;
+        const marker = mediaMarker(block, mediaIndex);
+        media[marker] = block;
+        return marker;
+      }
+    }
+  });
+  return { markdown: chunks.join("\n\n").trim(), media };
+}
 
-const validateForm = (form: LessonFormState): string | null => {
-  const title = form.title.trim();
-  if (title.length < 4 || title.length > 150) {
-    return 'Lesson title must be between 4 and 150 characters.';
-  }
-  if (form.description.trim().length > 500) {
-    return 'Description cannot exceed 500 characters.';
-  }
-  if (form.content.length < 1 || form.content.length > 100) {
-    return 'A lesson must contain between 1 and 100 content blocks.';
+function parseMarkdown(
+  markdown: string,
+  preservedMedia: MediaMap,
+): LessonContentBlock[] {
+  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const blocks: LessonContentBlock[] = [];
+  let index = 0;
+
+  const isSpecialStart = (line: string) => {
+    const value = line.trim();
+    return (
+      /^```/.test(value) ||
+      /^#{1,3}\s+/.test(value) ||
+      /^[-*+]\s+/.test(value) ||
+      /^\d+[.)]\s+/.test(value) ||
+      /^>\s*\[!(INFO|TIP|WARNING|IMPORTANT)\]/i.test(value) ||
+      /^\[\[Existing (image|video) #\d+\]\]$/.test(value) ||
+      /^@\[video:\s*.+?\]\(https?:\/\/[^\s)]+\)$/i.test(value)
+    );
+  };
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed) {
+      index += 1;
+      continue;
+    }
+
+    const mediaBlock = preservedMedia[trimmed];
+    if (mediaBlock) {
+      blocks.push(mediaBlock);
+      index += 1;
+      continue;
+    }
+
+    const videoSyntax = trimmed.match(
+      /^@\[video:\s*(.+?)\]\((https?:\/\/[^\s)]+)\)$/i,
+    );
+    if (videoSyntax) {
+      blocks.push({
+        type: "VIDEO",
+        title: videoSyntax[1].trim(),
+        url: videoSyntax[2],
+      });
+      index += 1;
+      continue;
+    }
+
+    const codeStart = trimmed.match(/^```\s*([\w#+.-]*)\s*$/);
+    if (codeStart) {
+      const language = codeStart[1] || "text";
+      index += 1;
+      const codeLines: string[] = [];
+      while (index < lines.length && !/^\s*```\s*$/.test(lines[index])) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) index += 1;
+      const code = codeLines.join("\n");
+      if (code.trim())
+        blocks.push({
+          type: "CODE",
+          language: language.slice(0, 50),
+          content: code,
+        });
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      const level: 2 | 3 = heading[1].length >= 3 ? 3 : 2;
+      blocks.push({ type: "HEADING", level, content: heading[2].trim() });
+      index += 1;
+      continue;
+    }
+
+    const calloutStart = trimmed.match(
+      /^>\s*\[!(INFO|TIP|WARNING|IMPORTANT)\]\s*$/i,
+    );
+    if (calloutStart) {
+      const variant = calloutStart[1].toUpperCase() as LessonCalloutVariant;
+      index += 1;
+      const calloutLines: string[] = [];
+      while (index < lines.length && /^\s*>/.test(lines[index])) {
+        calloutLines.push(lines[index].replace(/^\s*>\s?/, ""));
+        index += 1;
+      }
+      const content = calloutLines.join("\n").trim();
+      if (content) blocks.push({ type: "CALLOUT", variant, content });
+      continue;
+    }
+
+    const bullet = trimmed.match(/^[-*+]\s+(.+)$/);
+    const numbered = trimmed.match(/^\d+[.)]\s+(.+)$/);
+    if (bullet || numbered) {
+      const style: LessonListStyle = bullet ? "BULLETED" : "NUMBERED";
+      const items: string[] = [];
+      while (index < lines.length) {
+        const itemLine = lines[index].trim();
+        const itemMatch =
+          style === "BULLETED"
+            ? itemLine.match(/^[-*+]\s+(.+)$/)
+            : itemLine.match(/^\d+[.)]\s+(.+)$/);
+        if (!itemMatch) break;
+        items.push(itemMatch[1].trim());
+        index += 1;
+      }
+      if (items.length) blocks.push({ type: "LIST", style, items });
+      continue;
+    }
+
+    const paragraphLines = [line];
+    index += 1;
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !isSpecialStart(lines[index])
+    ) {
+      paragraphLines.push(lines[index]);
+      index += 1;
+    }
+    const paragraph = paragraphLines.join("\n").trim();
+    if (paragraph) blocks.push({ type: "TEXT", content: paragraph });
   }
 
-  for (let index = 0; index < form.content.length; index += 1) {
-    const block = form.content[index];
+  return blocks;
+}
+
+function validateLesson(
+  titleValue: string,
+  descriptionValue: string,
+  blocks: LessonContentBlock[],
+): string | null {
+  const title = titleValue.trim();
+  if (title.length < 4 || title.length > 150)
+    return "Lesson title must be between 4 and 150 characters.";
+  if (descriptionValue.trim().length > 500)
+    return "Description cannot exceed 500 characters.";
+  if (blocks.length < 1 || blocks.length > 100)
+    return "Add lesson content. A lesson must contain between 1 and 100 content blocks.";
+
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index];
     const prefix = `Content block ${index + 1}: `;
     switch (block.type) {
-      case 'TEXT':
-        if (!block.content.trim() || block.content.length > 20000) return `${prefix}text is required (maximum 20,000 characters).`;
+      case "TEXT":
+        if (!block.content.trim() || block.content.length > 20000)
+          return `${prefix}text is required and must be under 20,000 characters.`;
         break;
-      case 'HEADING':
-        if (!block.content.trim() || block.content.trim().length > 200) return `${prefix}heading is required (maximum 200 characters).`;
+      case "HEADING":
+        if (!block.content.trim() || block.content.trim().length > 200)
+          return `${prefix}heading must be 1–200 characters.`;
         break;
-      case 'CODE':
-        if (!block.language.trim() || block.language.trim().length > 50) return `${prefix}enter a language (maximum 50 characters).`;
-        if (!block.content.trim() || block.content.length > 30000) return `${prefix}code is required (maximum 30,000 characters).`;
+      case "CODE":
+        if (
+          !block.language.trim() ||
+          block.language.trim().length > 50 ||
+          !block.content.trim() ||
+          block.content.length > 30000
+        )
+          return `${prefix}code and a language are required (language up to 50 characters, code up to 30,000).`;
         break;
-      case 'IMAGE': {
-        try {
-          const url = new URL(block.url);
-          if (!['http:', 'https:'].includes(url.protocol)) return `${prefix}image URL must use HTTP or HTTPS.`;
-        } catch {
-          return `${prefix}enter a valid image URL.`;
-        }
-        if (!block.alt.trim() || block.alt.trim().length > 300) return `${prefix}alternative text is required (maximum 300 characters).`;
+      case "CALLOUT":
+        if (!block.content.trim() || block.content.trim().length > 2000)
+          return `${prefix}callout text must be 1–2,000 characters.`;
         break;
-      }
-      case 'VIDEO': {
-        try {
-          const url = new URL(block.url);
-          if (!['http:', 'https:'].includes(url.protocol)) return `${prefix}video URL must use HTTP or HTTPS.`;
-        } catch {
-          return `${prefix}enter a valid video URL.`;
-        }
-        if (!block.title.trim() || block.title.trim().length > 200) return `${prefix}video title is required (maximum 200 characters).`;
-        break;
-      }
-      case 'CALLOUT':
-        if (!block.content.trim() || block.content.trim().length > 2000) return `${prefix}callout text is required (maximum 2,000 characters).`;
-        break;
-      case 'LIST':
-        if (block.items.length < 1 || block.items.length > 50 || block.items.some((item) => !item.trim() || item.trim().length > 500)) {
+      case "LIST":
+        if (
+          block.items.length < 1 ||
+          block.items.length > 50 ||
+          block.items.some((item) => !item.trim() || item.trim().length > 500)
+        )
           return `${prefix}add 1–50 non-empty list items, each up to 500 characters.`;
-        }
+        break;
+      case "IMAGE":
+        if (!block.url || !block.alt.trim())
+          return `${prefix}an existing image is incomplete. Keep its marker in the editor to preserve it.`;
+        break;
+      case "VIDEO":
+        if (!block.url || !block.title.trim())
+          return `${prefix}an existing video is incomplete. Keep its marker in the editor to preserve it.`;
         break;
     }
   }
   return null;
-};
+}
 
-const toPayload = (form: LessonFormState): LessonPayload => ({
-  title: form.title.trim(),
-  description: form.description.trim(),
-  // Explicitly construct server-supported fields; local editor metadata must never be sent.
-  content: form.content.map((block) => {
-    switch (block.type) {
-      case 'TEXT': return { type: 'TEXT', content: block.content.trim() };
-      case 'HEADING': return { type: 'HEADING', level: block.level, content: block.content.trim() };
-      case 'CODE': return { type: 'CODE', language: block.language.trim(), content: block.content };
-      case 'IMAGE': return { type: 'IMAGE', url: block.url.trim(), alt: block.alt.trim() };
-      case 'VIDEO': return { type: 'VIDEO', url: block.url.trim(), title: block.title.trim() };
-      case 'CALLOUT': return { type: 'CALLOUT', variant: block.variant, content: block.content.trim() };
-      case 'LIST': return { type: 'LIST', style: block.style, items: block.items.map((item) => item.trim()) };
-    }
-  }),
-});
+function toPayload(
+  title: string,
+  description: string,
+  content: LessonContentBlock[],
+): LessonPayload {
+  return {
+    title: title.trim(),
+    description: description.trim(),
+    content: content.map((block) => {
+      switch (block.type) {
+        case "TEXT":
+          return { type: "TEXT", content: block.content.trim() };
+        case "HEADING":
+          return {
+            type: "HEADING",
+            level: block.level,
+            content: block.content.trim(),
+          };
+        case "CODE":
+          return {
+            type: "CODE",
+            language: block.language.trim(),
+            content: block.content,
+          };
+        case "CALLOUT":
+          return {
+            type: "CALLOUT",
+            variant: block.variant,
+            content: block.content.trim(),
+          };
+        case "LIST":
+          return {
+            type: "LIST",
+            style: block.style,
+            items: block.items.map((item) => item.trim()),
+          };
+        case "IMAGE":
+          return { type: "IMAGE", url: block.url, alt: block.alt.trim() };
+        case "VIDEO":
+          return { type: "VIDEO", url: block.url, title: block.title.trim() };
+      }
+    }),
+  };
+}
 
-const LessonManagement: React.FC<LessonManagementProps> = ({ topicId, topicTitle, courseStatus }) => {
-  const { lessons, setLessons, isLoading, error, refetch } = useTopicLessons(topicId);
-  const isEditable = courseStatus === 'DRAFT';
+const LessonManagement: React.FC<LessonManagementProps> = ({
+  topicId,
+  topicTitle,
+  courseStatus,
+}) => {
+  const { lessons, setLessons, isLoading, error, refetch } =
+    useTopicLessons(topicId);
+  const isEditable = courseStatus === "DRAFT";
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
   const [form, setForm] = useState<LessonFormState>(EMPTY_FORM);
+  const [preservedMedia, setPreservedMedia] = useState<MediaMap>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [reorderingLessonId, setReorderingLessonId] = useState<string | null>(null);
-  const [newBlockType, setNewBlockType] = useState<NewBlockType>('TEXT');
+  const [reorderingLessonId, setReorderingLessonId] = useState<string | null>(
+    null,
+  );
+  const [showPreview, setShowPreview] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const markdownRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const parsedBlocks = useMemo(
+    () => parseMarkdown(form.markdown, preservedMedia),
+    [form.markdown, preservedMedia],
+  );
 
   useEffect(() => {
     if (!isFormOpen) return;
-    const frameId = window.requestAnimationFrame(() => {
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    return () => window.cancelAnimationFrame(frameId);
+    const frame = window.requestAnimationFrame(() =>
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+    return () => window.cancelAnimationFrame(frame);
   }, [isFormOpen]);
+
+  const resetForm = () => {
+    setIsFormOpen(false);
+    setEditingLessonId(null);
+    setForm(EMPTY_FORM);
+    setPreservedMedia({});
+    setFormError(null);
+    setShowPreview(false);
+  };
 
   const openCreateForm = () => {
     setEditingLessonId(null);
-    setForm({ ...EMPTY_FORM, content: [{ type: 'TEXT', content: '' }] });
+    setForm(EMPTY_FORM);
+    setPreservedMedia({});
     setFormError(null);
     setActionError(null);
-    setNewBlockType('TEXT');
+    setShowPreview(false);
     setIsFormOpen(true);
   };
 
   const openEditForm = (lesson: Lesson) => {
+    const serialized = serializeLessonContent(lesson.content);
     setEditingLessonId(lesson._id);
     setForm({
       title: lesson.title,
-      description: lesson.description ?? '',
-      content: lesson.content.map((block) => ({ ...block })) as LessonContentBlock[],
+      description: lesson.description ?? "",
+      markdown: serialized.markdown,
     });
+    setPreservedMedia(serialized.media);
     setFormError(null);
     setActionError(null);
-    setNewBlockType('TEXT');
+    setShowPreview(false);
     setIsFormOpen(true);
   };
 
   const closeForm = () => {
     if (isSaving) return;
-    setIsFormOpen(false);
-    setEditingLessonId(null);
-    setForm(EMPTY_FORM);
-    setFormError(null);
+    resetForm();
   };
 
-  const updateContentBlock = (index: number, block: LessonContentBlock) => {
-    setForm((current) => ({
-      ...current,
-      content: current.content.map((item, itemIndex) => itemIndex === index ? block : item),
-    }));
-  };
-
-  const addContentBlock = () => {
-    if (form.content.length >= 100) return;
-    setForm((current) => ({ ...current, content: [...current.content, createBlock(newBlockType)] }));
-  };
-
-  const removeContentBlock = (index: number) => {
-    if (form.content.length <= 1) {
-      setFormError('A lesson must contain at least one content block.');
-      return;
-    }
-    setForm((current) => ({ ...current, content: current.content.filter((_, i) => i !== index) }));
-    setFormError(null);
-  };
-
-  const moveContentBlock = (index: number, direction: -1 | 1) => {
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= form.content.length) return;
-    setForm((current) => {
-      const content = [...current.content];
-      [content[index], content[targetIndex]] = [content[targetIndex], content[index]];
-      return { ...current, content };
+  const insertSnippet = (snippet: string) => {
+    const textarea = markdownRef.current;
+    const start = textarea?.selectionStart ?? form.markdown.length;
+    const end = textarea?.selectionEnd ?? form.markdown.length;
+    const before = form.markdown.slice(0, start);
+    const after = form.markdown.slice(end);
+    const needsLeadingBreak =
+      before.length > 0 && !before.endsWith("\n\n")
+        ? before.endsWith("\n")
+          ? "\n"
+          : "\n\n"
+        : "";
+    const cleanSnippet = snippet.trim();
+    const needsTrailingBreak =
+      after.length > 0 && !after.startsWith("\n\n") ? "\n\n" : "";
+    const insertion = `${needsLeadingBreak}${cleanSnippet}${needsTrailingBreak}`;
+    const next = `${before}${insertion}${after}`;
+    setForm((current) => ({ ...current, markdown: next }));
+    setShowPreview(false);
+    window.requestAnimationFrame(() => {
+      if (!markdownRef.current) return;
+      const cursor =
+        before.length + needsLeadingBreak.length + cleanSnippet.length;
+      markdownRef.current.focus();
+      markdownRef.current.setSelectionRange(cursor, cursor);
     });
   };
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!isEditable) return;
-    const validationError = validateForm(form);
-    if (validationError) {
-      setFormError(validationError);
+    const blocks = parseMarkdown(form.markdown, preservedMedia);
+    const validation = validateLesson(form.title, form.description, blocks);
+    if (validation) {
+      setFormError(validation);
+      setShowPreview(false);
       return;
     }
 
@@ -267,17 +471,21 @@ const LessonManagement: React.FC<LessonManagementProps> = ({ topicId, topicTitle
     setFormError(null);
     setActionError(null);
     try {
-      const payload = toPayload(form);
+      const payload = toPayload(form.title, form.description, blocks);
       if (editingLessonId) {
         const updated = await updateLesson(editingLessonId, payload);
-        setLessons((current) => current.map((lesson) => lesson._id === updated._id ? updated : lesson).sort((a, b) => a.order - b.order));
+        setLessons((current) =>
+          current
+            .map((lesson) => (lesson._id === updated._id ? updated : lesson))
+            .sort((a, b) => a.order - b.order),
+        );
       } else {
         const created = await createLesson(topicId, payload);
-        setLessons((current) => [...current, created].sort((a, b) => a.order - b.order));
+        setLessons((current) =>
+          [...current, created].sort((a, b) => a.order - b.order),
+        );
       }
-      setIsFormOpen(false);
-      setEditingLessonId(null);
-      setForm(EMPTY_FORM);
+      resetForm();
     } catch (err: unknown) {
       setFormError(getErrorMessage(err));
     } finally {
@@ -285,16 +493,22 @@ const LessonManagement: React.FC<LessonManagementProps> = ({ topicId, topicTitle
     }
   };
 
-  const handleMove = async (index: number, direction: -1 | 1) => {
+  const moveLesson = async (index: number, direction: -1 | 1) => {
     if (!isEditable || isFormOpen || isSaving || reorderingLessonId) return;
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= lessons.length) return;
+    const target = index + direction;
+    if (target < 0 || target >= lessons.length) return;
     const reordered = [...lessons];
-    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+    [reordered[index], reordered[target]] = [
+      reordered[target],
+      reordered[index],
+    ];
     setReorderingLessonId(lessons[index]._id);
     setActionError(null);
     try {
-      const saved = await reorderTopicLessons(topicId, reordered.map((lesson) => lesson._id));
+      const saved = await reorderTopicLessons(
+        topicId,
+        reordered.map((lesson) => lesson._id),
+      );
       setLessons([...saved].sort((a, b) => a.order - b.order));
     } catch (err: unknown) {
       setActionError(getErrorMessage(err));
@@ -304,9 +518,11 @@ const LessonManagement: React.FC<LessonManagementProps> = ({ topicId, topicTitle
   };
 
   const handleDelete = async (lesson: Lesson) => {
-    if (!isEditable || isSaving || reorderingLessonId) return;
-    const confirmed = window.confirm(`Delete “${lesson.title}”? This action cannot be undone.`);
-    if (!confirmed) return;
+    if (!isEditable || isSaving || reorderingLessonId || isFormOpen) return;
+    if (
+      !window.confirm(`Delete “${lesson.title}”? This action cannot be undone.`)
+    )
+      return;
     setActionError(null);
     try {
       await deleteLesson(lesson._id);
@@ -316,80 +532,674 @@ const LessonManagement: React.FC<LessonManagementProps> = ({ topicId, topicTitle
     }
   };
 
-  const renderBlockFields = (block: LessonContentBlock, index: number) => {
+  const renderPreviewBlock = (block: LessonContentBlock, index: number) => {
     switch (block.type) {
-      case 'TEXT':
+      case "TEXT":
         return (
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-widest text-text-secondary" htmlFor={`lesson-block-${index}-text`}>Paragraph text</label>
-            <textarea id={`lesson-block-${index}-text`} value={block.content} maxLength={20000} rows={5} onChange={(event) => updateContentBlock(index, { ...block, content: event.target.value })} placeholder="Explain the concept in a clear, learner-friendly way." className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2.5 text-sm leading-relaxed text-text-primary outline-none transition-colors placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" />
-            <p className="text-right text-xs text-text-tertiary">{block.content.length}/20,000</p>
+          <p
+            key={index}
+            className="whitespace-pre-wrap text-sm leading-7 text-text-secondary"
+          >
+            {block.content}
+          </p>
+        );
+      case "HEADING":
+        return block.level === 3 ? (
+          <h4
+            key={index}
+            className="font-serif text-lg font-semibold text-text-primary"
+          >
+            {block.content}
+          </h4>
+        ) : (
+          <h3
+            key={index}
+            className="font-serif text-xl font-semibold text-text-primary"
+          >
+            {block.content}
+          </h3>
+        );
+      case "CODE":
+        return (
+          <div
+            key={index}
+            className="overflow-hidden rounded-xl border border-border bg-[#191816] text-[#F4F0E8]"
+          >
+            <div className="border-b border-white/10 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-[#C7C1B8]">
+              {block.language}
+            </div>
+            <pre className="overflow-x-auto p-4 text-xs leading-6">
+              <code>{block.content}</code>
+            </pre>
           </div>
         );
-      case 'HEADING':
-        return (
-          <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
-            <div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-level`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Level</label><select id={`lesson-block-${index}-level`} value={block.level} onChange={(event) => updateContentBlock(index, { ...block, level: Number(event.target.value) as LessonHeadingLevel })} className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25"><option value={2}>Heading 2</option><option value={3}>Heading 3</option></select></div>
-            <div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-heading`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Heading text</label><input id={`lesson-block-${index}-heading`} value={block.content} maxLength={200} onChange={(event) => updateContentBlock(index, { ...block, content: event.target.value })} placeholder="Enter a section heading" className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" /></div>
-          </div>
+      
+case 'CALLOUT': {
+  const calloutStyles = {
+    INFO: {
+      container: 'border-border bg-surface-elevated',
+      label: 'text-text-secondary',
+      icon: 'text-text-secondary',
+    },
+    TIP: {
+      container: 'border-sage/30 bg-sage-soft',
+      label: 'text-sage',
+      icon: 'text-sage',
+    },
+    WARNING: {
+      container: 'border-error/30 bg-error-soft',
+      label: 'text-error',
+      icon: 'text-error',
+    },
+    IMPORTANT: {
+      container: 'border-signal/30 bg-signal-soft',
+      label: 'text-signal',
+      icon: 'text-signal',
+    },
+  } satisfies Record<
+    LessonCalloutVariant,
+    { container: string; label: string; icon: string }
+  >;
+
+  const style = calloutStyles[block.variant];
+
+  return (
+    <aside
+      key={index}
+      className={`rounded-xl border p-4 ${style.container}`}
+    >
+      <div className="mb-1 flex items-center gap-2">
+        <Lightbulb
+          className={`h-4 w-4 ${style.icon}`}
+          aria-hidden="true"
+        />
+        <p
+          className={`text-[10px] font-bold uppercase tracking-wider ${style.label}`}
+        >
+          {block.variant}
+        </p>
+      </div>
+
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-primary">
+        {block.content}
+      </p>
+    </aside>
+  );
+}
+
+      case "LIST":
+        return block.style === "NUMBERED" ? (
+          <ol
+            key={index}
+            className="list-decimal space-y-1.5 pl-6 text-sm leading-relaxed text-text-secondary"
+          >
+            {block.items.map((item, itemIndex) => (
+              <li key={itemIndex}>{item}</li>
+            ))}
+          </ol>
+        ) : (
+          <ul
+            key={index}
+            className="list-disc space-y-1.5 pl-6 text-sm leading-relaxed text-text-secondary"
+          >
+            {block.items.map((item, itemIndex) => (
+              <li key={itemIndex}>{item}</li>
+            ))}
+          </ul>
         );
-      case 'CODE':
+      case "IMAGE":
         return (
-          <div className="space-y-3"><div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-language`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Language</label><input id={`lesson-block-${index}-language`} value={block.language} maxLength={50} onChange={(event) => updateContentBlock(index, { ...block, language: event.target.value })} placeholder="javascript, python, bash…" className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" /></div><div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-code`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Code</label><textarea id={`lesson-block-${index}-code`} value={block.content} maxLength={30000} rows={7} spellCheck={false} onChange={(event) => updateContentBlock(index, { ...block, content: event.target.value })} placeholder={'const greeting = "Hello, learner!";'} className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text-primary outline-none placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" /><p className="text-right text-xs text-text-tertiary">{block.content.length}/30,000</p></div></div>
+          <figure
+            key={index}
+            className="rounded-xl border border-border bg-surface-elevated p-3"
+          >
+            <img
+              src={block.url}
+              alt={block.alt}
+              className="mx-auto max-h-72 rounded-lg object-contain"
+            />
+            <figcaption className="mt-2 text-center text-xs text-text-secondary">
+              {block.alt}
+            </figcaption>
+          </figure>
         );
-      case 'IMAGE':
+      case "VIDEO":
         return (
-          <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-image-url`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Image URL</label><input id={`lesson-block-${index}-image-url`} type="url" value={block.url} onChange={(event) => updateContentBlock(index, { ...block, url: event.target.value })} placeholder="https://example.com/image.png" className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" /></div><div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-image-alt`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Alternative text</label><input id={`lesson-block-${index}-image-alt`} value={block.alt} maxLength={300} onChange={(event) => updateContentBlock(index, { ...block, alt: event.target.value })} placeholder="Describe the image for accessibility" className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" /></div></div>
-        );
-      case 'VIDEO':
-        return (
-          <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-video-title`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Video title</label><input id={`lesson-block-${index}-video-title`} value={block.title} maxLength={200} onChange={(event) => updateContentBlock(index, { ...block, title: event.target.value })} placeholder="e.g. Visualizing gradient descent" className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" /></div><div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-video-url`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Video URL</label><input id={`lesson-block-${index}-video-url`} type="url" value={block.url} onChange={(event) => updateContentBlock(index, { ...block, url: event.target.value })} placeholder="https://…" className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" /></div></div>
-        );
-      case 'CALLOUT':
-        return (
-          <div className="space-y-3"><div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-callout-variant`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Callout style</label><select id={`lesson-block-${index}-callout-variant`} value={block.variant} onChange={(event) => updateContentBlock(index, { ...block, variant: event.target.value as LessonCalloutVariant })} className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25">{(['INFO', 'TIP', 'WARNING', 'IMPORTANT'] as const).map((variant) => <option key={variant} value={variant}>{variant.charAt(0) + variant.slice(1).toLowerCase()}</option>)}</select></div><div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-callout-content`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Callout text</label><textarea id={`lesson-block-${index}-callout-content`} value={block.content} maxLength={2000} rows={3} onChange={(event) => updateContentBlock(index, { ...block, content: event.target.value })} placeholder="Highlight a key idea, warning, or useful tip." className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" /></div></div>
-        );
-      case 'LIST':
-        return (
-          <div className="space-y-3"><div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-list-style`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">List style</label><select id={`lesson-block-${index}-list-style`} value={block.style} onChange={(event) => updateContentBlock(index, { ...block, style: event.target.value as LessonListStyle })} className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25"><option value="BULLETED">Bulleted</option><option value="NUMBERED">Numbered</option></select></div><div className="space-y-1.5"><label htmlFor={`lesson-block-${index}-list-items`} className="text-xs font-semibold uppercase tracking-widest text-text-secondary">List items</label><textarea id={`lesson-block-${index}-list-items`} value={block.items.join('\n')} rows={4} onChange={(event) => updateContentBlock(index, { ...block, items: event.target.value.split('\n') })} placeholder={'First item\nSecond item\nThird item'} className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" /><p className="text-xs text-text-tertiary">One item per line. Add between 1 and 50 items.</p></div></div>
+          <a
+            key={index}
+            href={block.url}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-3 rounded-xl border border-border bg-surface-elevated p-4 text-sm text-text-primary transition-colors hover:border-signal/40 hover:bg-signal-soft"
+          >
+            <BookOpen
+              className="h-5 w-5 shrink-0 text-signal"
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1">{block.title}</span>
+            <span className="text-xs font-semibold text-signal">
+              Open video ↗
+            </span>
+          </a>
         );
     }
   };
 
+  const isReadOnly = !isEditable;
+
   return (
     <section className="space-y-4" aria-labelledby="lesson-management-heading">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sage/25 bg-sage-soft text-sage"><BookOpen className="h-4 w-4" aria-hidden="true" /></div>
-          <div className="space-y-1"><h3 id="lesson-management-heading" className="text-base font-semibold text-text-primary">Lessons</h3><p className="text-sm text-text-secondary">Build the learning content inside <span className="font-medium text-text-primary">{topicTitle}</span>.</p></div>
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-sage/25 bg-sage-soft text-sage">
+            <BookOpen className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <h3
+              id="lesson-management-heading"
+              className="font-semibold text-text-primary"
+            >
+              Lessons
+            </h3>
+            <p className="mt-0.5 text-sm text-text-secondary">
+              Create clear, focused learning steps for{" "}
+              <span className="font-medium text-text-primary">
+                {topicTitle}
+              </span>
+              .
+            </p>
+          </div>
         </div>
-        {isEditable && !isFormOpen && <Button size="sm" onClick={openCreateForm} className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.98]"><Plus className="h-4 w-4" aria-hidden="true" />Add Lesson</Button>}
+        {isEditable && !isFormOpen && (
+          <Button size="sm" onClick={openCreateForm} className={interactive}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add Lesson
+          </Button>
+        )}
       </div>
 
-      {!isEditable && <div className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3 text-sm text-text-secondary"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" /><p>{courseStatus === 'PUBLISHED' ? 'This course is published. Lessons are shown in read-only mode in this workspace.' : 'This course is archived. Its lessons are read-only.'}</p></div>}
-
-      {isFormOpen && isEditable && <form ref={formRef} onSubmit={handleSave} className="scroll-mt-24 space-y-5 rounded-2xl border border-signal/25 bg-surface-elevated p-4 sm:p-6">
-        <div className="flex items-start justify-between gap-4"><div className="space-y-1"><p className="text-xs font-semibold uppercase tracking-widest text-signal">{editingLessonId ? 'Edit lesson' : 'New lesson'}</p><h4 className="text-lg font-semibold text-text-primary">{editingLessonId ? 'Update learning content' : 'Create a focused learning segment'}</h4><p className="text-sm text-text-secondary">Lessons belong to this topic. Add content blocks in the order learners should study them.</p></div><button type="button" onClick={closeForm} disabled={isSaving} aria-label="Close lesson form" className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent text-text-secondary transition-all duration-200 hover:-translate-y-0.5 hover:border-signal/35 hover:bg-signal-soft hover:text-signal hover:shadow-sm active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:text-text-disabled"><X className="h-4 w-4" aria-hidden="true" /></button></div>
-
-        <div className="space-y-1.5"><label htmlFor="lesson-title" className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Lesson title <span className="text-error">*</span></label><input id="lesson-title" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} minLength={4} maxLength={150} required placeholder="e.g. How a Perceptron Makes a Prediction" className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" /><div className="flex justify-between gap-3 text-xs text-text-tertiary"><span>Use 4–150 characters.</span><span>{form.title.length}/150</span></div></div>
-
-        <div className="space-y-1.5"><label htmlFor="lesson-description" className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Description <span className="font-normal normal-case tracking-normal">(optional)</span></label><textarea id="lesson-description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={500} rows={3} placeholder="Summarize what the learner will understand after this lesson." className="w-full resize-y rounded-lg border border-border bg-surface px-4 py-3 text-sm leading-relaxed text-text-primary outline-none transition-colors placeholder:text-text-tertiary hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" /><p className="text-right text-xs text-text-tertiary">{form.description.length}/500</p></div>
-
-        <div className="space-y-3"><div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"><div><h5 className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Lesson content <span className="text-error">*</span></h5><p className="mt-1 text-xs text-text-tertiary">At least one block is required. Reorder blocks to control the reading sequence.</p></div><span className="text-xs text-text-tertiary">{form.content.length}/100 blocks</span></div>
-          {form.content.map((block, index) => <article key={`${block.type}-${index}`} className="space-y-4 rounded-xl border border-border bg-surface p-4">
-            <div className="flex items-center justify-between gap-3 border-b border-border-muted pb-3"><div className="flex min-w-0 items-center gap-2"><span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-disabled text-text-secondary">{block.type === 'CODE' ? <Code2 className="h-4 w-4" /> : block.type === 'IMAGE' ? <ImageIcon className="h-4 w-4" /> : block.type === 'VIDEO' ? <Video className="h-4 w-4" /> : block.type === 'LIST' ? <List className="h-4 w-4" /> : <FileText className="h-4 w-4" />}</span><div><p className="text-xs font-semibold uppercase tracking-wider text-text-primary">Block {index + 1}</p><p className="text-xs text-text-secondary">{blockLabel(block)}</p></div></div><div className="flex shrink-0 items-center gap-1"><button type="button" onClick={() => moveContentBlock(index, -1)} disabled={index === 0 || isSaving} aria-label={`Move content block ${index + 1} up`} className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface text-text-secondary transition-all hover:border-signal/45 hover:bg-signal-soft hover:text-signal active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:text-text-disabled"><ArrowUp className="h-4 w-4" aria-hidden="true" /></button><button type="button" onClick={() => moveContentBlock(index, 1)} disabled={index === form.content.length - 1 || isSaving} aria-label={`Move content block ${index + 1} down`} className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface text-text-secondary transition-all hover:border-signal/45 hover:bg-signal-soft hover:text-signal active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:text-text-disabled"><ArrowDown className="h-4 w-4" aria-hidden="true" /></button><button type="button" onClick={() => removeContentBlock(index)} disabled={form.content.length <= 1 || isSaving} aria-label={`Remove content block ${index + 1}`} className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface text-text-secondary transition-all hover:border-error/40 hover:bg-error-soft hover:text-error active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:text-text-disabled"><Trash2 className="h-4 w-4" aria-hidden="true" /></button></div></div>
-            {renderBlockFields(block, index)}
-          </article>)}
-          <div className="flex flex-col gap-2 sm:flex-row"><select aria-label="Content block type" value={newBlockType} onChange={(event) => setNewBlockType(event.target.value as NewBlockType)} className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-primary outline-none hover:border-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25">{BLOCK_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><Button type="button" variant="secondary" onClick={addContentBlock} disabled={form.content.length >= 100 || isSaving} className="cursor-pointer hover:border-signal/40 hover:bg-signal-soft hover:text-signal active:scale-[0.98] disabled:cursor-not-allowed"><Plus className="h-4 w-4" aria-hidden="true" />Add content block</Button></div>
+      {isReadOnly && (
+        <div className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3 text-sm text-text-secondary">
+          <AlertCircle
+            className="mt-0.5 h-4 w-4 shrink-0 text-text-tertiary"
+            aria-hidden="true"
+          />
+          <p>
+            {courseStatus === "PUBLISHED"
+              ? "This course is published. Lessons are shown in read-only mode."
+              : "This course is archived. Its lessons are read-only."}
+          </p>
         </div>
+      )}
+      {actionError && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-xl border border-error/20 bg-error-soft p-3 text-sm text-error"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>{actionError}</p>
+        </div>
+      )}
 
-        {formError && <div role="alert" className="flex items-start gap-2 rounded-lg border border-error/20 bg-error-soft p-3 text-sm text-error"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p>{formError}</p></div>}
-        <div className="flex flex-col-reverse gap-2 border-t border-border-muted pt-4 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={closeForm} disabled={isSaving} className="cursor-pointer hover:border-text-tertiary hover:bg-surface-elevated hover:shadow-sm active:scale-[0.98]">Cancel</Button><Button type="submit" loading={isSaving} className="cursor-pointer hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.98]"><Save className="h-4 w-4" aria-hidden="true" />{editingLessonId ? 'Save Changes' : 'Create Lesson'}</Button></div>
-      </form>}
+      {isFormOpen && isEditable && (
+        <form
+          ref={formRef}
+          onSubmit={handleSave}
+          className="scroll-mt-24 overflow-hidden rounded-2xl border border-signal/30 bg-surface shadow-sm"
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-border-muted bg-surface-elevated p-4 sm:p-6">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-signal">
+                {editingLessonId ? "Edit lesson" : "New lesson"}
+              </p>
+              <h4 className="mt-1 font-serif text-xl font-semibold text-text-primary">
+                {editingLessonId
+                  ? "Refine this learning step"
+                  : "Create a lesson learners can follow"}
+              </h4>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-text-secondary">
+                Write naturally or paste your existing notes. Use the toolbar to
+                turn headings, lists, code, and callouts into structured lesson
+                content.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={closeForm}
+              disabled={isSaving}
+              aria-label="Close lesson editor"
+              className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-text-secondary hover:border-signal/40 hover:bg-signal-soft hover:text-signal ${interactive}`}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
 
-      {actionError && <div role="alert" className="flex items-start gap-2 rounded-lg border border-error/20 bg-error-soft p-3 text-sm text-error"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p>{actionError}</p></div>}
+          <div className="space-y-5 p-4 sm:p-6">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="lesson-title"
+                className="text-xs font-semibold uppercase tracking-wider text-text-secondary"
+              >
+                Lesson title <span className="text-error">*</span>
+              </label>
+              <input
+                id="lesson-title"
+                value={form.title}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
+                }
+                minLength={4}
+                maxLength={150}
+                required
+                placeholder="e.g. How a Perceptron Makes a Prediction"
+                className={fieldClass}
+              />
+              <div className="flex justify-between text-xs text-text-tertiary">
+                <span>4–150 characters</span>
+                <span>{form.title.length}/150</span>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label
+                htmlFor="lesson-description"
+                className="text-xs font-semibold uppercase tracking-wider text-text-secondary"
+              >
+                Short description{" "}
+                <span className="font-normal normal-case tracking-normal">
+                  (optional)
+                </span>
+              </label>
+              <textarea
+                id="lesson-description"
+                value={form.description}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+                maxLength={500}
+                rows={2}
+                placeholder="What will learners understand after this lesson?"
+                className={`${fieldClass} resize-y`}
+              />
+              <p className="text-right text-xs text-text-tertiary">
+                {form.description.length}/500
+              </p>
+            </div>
 
-      {isLoading ? <div className="space-y-3" aria-label="Loading lessons" aria-busy="true">{[0, 1].map((item) => <div key={item} className="animate-pulse rounded-xl border border-border bg-surface p-5"><div className="mb-3 h-3 w-20 rounded bg-surface-disabled" /><div className="mb-2 h-5 w-2/3 rounded bg-surface-disabled" /><div className="h-3 w-full max-w-lg rounded bg-surface-disabled" /></div>)}</div> : error ? <div className="rounded-2xl border border-error/20 bg-error-soft p-5"><div className="flex items-start gap-3"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-error" aria-hidden="true" /><div className="flex-1 space-y-1"><h4 className="font-semibold text-text-primary">Unable to load lessons</h4><p className="text-sm text-text-secondary">{error}</p><div className="pt-2"><Button variant="secondary" size="sm" onClick={() => void refetch()} className="cursor-pointer border-error/30 hover:border-error/55 hover:bg-surface-elevated hover:shadow-sm active:scale-[0.98]"><RefreshCw className="h-4 w-4" aria-hidden="true" />Try again</Button></div></div></div></div> : lessons.length === 0 && !isFormOpen ? <div className="rounded-2xl border border-dashed border-border bg-surface p-7 text-center sm:p-10"><div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-surface-elevated text-text-tertiary"><BookOpen className="h-6 w-6" aria-hidden="true" /></div><h4 className="text-base font-semibold text-text-primary">No lessons in this topic yet</h4><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-text-secondary">Create a focused learning segment and add text, headings, code examples, images, videos, callouts, or lists.</p>{isEditable && <div className="mt-5"><Button onClick={openCreateForm} className="cursor-pointer hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"><Plus className="h-4 w-4" aria-hidden="true" />Create First Lesson</Button></div>}</div> : lessons.length > 0 ? <div className="space-y-3"><div className="flex items-center justify-between gap-3 text-xs text-text-tertiary"><span>{lessons.length} {lessons.length === 1 ? 'lesson' : 'lessons'}</span>{isEditable && lessons.length > 1 && <span>Use arrows to change the learning order.</span>}</div>{lessons.map((lesson, index) => <article key={lesson._id} className="rounded-xl border border-border bg-surface p-4 sm:p-5"><div className="flex items-start gap-3 sm:gap-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sage/25 bg-sage-soft text-sm font-semibold text-sage">{String(lesson.order).padStart(2, '0')}</div><div className="min-w-0 flex-1 space-y-2"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0 space-y-1"><h4 className="break-words font-semibold text-text-primary">{lesson.title}</h4>{lesson.description && <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text-secondary">{lesson.description}</p>}</div>{isEditable && <div className="flex shrink-0 items-center gap-1 self-start"><button type="button" onClick={() => void handleMove(index, -1)} disabled={index === 0 || reorderingLessonId !== null || isFormOpen || isSaving} aria-label={`Move ${lesson.title} up`} title="Move lesson up" className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface text-text-secondary transition-all duration-200 hover:-translate-y-0.5 hover:border-signal/45 hover:bg-signal-soft hover:text-signal hover:shadow-sm active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:text-text-disabled"><ArrowUp className="h-4 w-4" aria-hidden="true" /></button><button type="button" onClick={() => void handleMove(index, 1)} disabled={index === lessons.length - 1 || reorderingLessonId !== null || isFormOpen || isSaving} aria-label={`Move ${lesson.title} down`} title="Move lesson down" className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface text-text-secondary transition-all duration-200 hover:-translate-y-0.5 hover:border-signal/45 hover:bg-signal-soft hover:text-signal hover:shadow-sm active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:text-text-disabled"><ArrowDown className="h-4 w-4" aria-hidden="true" /></button><button type="button" onClick={() => openEditForm(lesson)} disabled={reorderingLessonId !== null || isSaving || isFormOpen} aria-label={`Edit ${lesson.title}`} title="Edit lesson" className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface text-text-secondary transition-all duration-200 hover:-translate-y-0.5 hover:border-signal/45 hover:bg-signal-soft hover:text-signal hover:shadow-sm active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:text-text-disabled"><Pencil className="h-4 w-4" aria-hidden="true" /></button><button type="button" onClick={() => void handleDelete(lesson)} disabled={reorderingLessonId !== null || isSaving || isFormOpen} aria-label={`Delete ${lesson.title}`} title="Delete lesson" className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface text-text-secondary transition-all duration-200 hover:-translate-y-0.5 hover:border-error/40 hover:bg-error-soft hover:text-error hover:shadow-sm active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:text-text-disabled"><Trash2 className="h-4 w-4" aria-hidden="true" /></button></div>}</div><div className="flex flex-wrap items-center gap-2 border-t border-border-muted pt-3"><span className="rounded-full border border-border-muted bg-surface-elevated px-2.5 py-1 text-xs text-text-secondary">{lesson.content.length} {lesson.content.length === 1 ? 'content block' : 'content blocks'}</span>{lesson.content.slice(0, 4).map((block, blockIndex) => <span key={`${lesson._id}-block-${blockIndex}`} className="rounded-full bg-surface-disabled px-2.5 py-1 text-xs text-text-tertiary">{blockLabel(block)}</span>)}{lesson.content.length > 4 && <span className="text-xs text-text-tertiary">+{lesson.content.length - 4} more</span>}</div></div></div>{reorderingLessonId === lesson._id && <p className="mt-3 text-xs text-text-tertiary" role="status">Saving lesson order…</p>}</article>)}</div> : null}
+            <div className="space-y-3">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <label
+                    htmlFor="lesson-markdown"
+                    className="text-xs font-semibold uppercase tracking-wider text-text-secondary"
+                  >
+                    Lesson content <span className="text-error">*</span>
+                  </label>
+                  <p className="mt-1 text-xs text-text-tertiary">
+                    Paste notes or write directly. Structure is converted to the
+                    lesson blocks supported by the backend.
+                  </p>
+                </div>
+                <span className="text-xs text-text-tertiary">
+                  {parsedBlocks.length}/100 blocks
+                </span>
+              </div>
+              <div
+                className="flex flex-wrap items-center gap-1.5 rounded-t-xl border border-border bg-surface-elevated p-2"
+                aria-label="Lesson formatting toolbar"
+              >
+                <button
+                  type="button"
+                  onClick={() => insertSnippet("## Section heading")}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-semibold text-text-secondary hover:border-border hover:bg-surface hover:text-text-primary ${interactive}`}
+                >
+                  <Heading2 className="h-4 w-4" aria-hidden="true" />
+                  Heading
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertSnippet("- First point\n- Second point")}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-semibold text-text-secondary hover:border-border hover:bg-surface hover:text-text-primary ${interactive}`}
+                >
+                  <List className="h-4 w-4" aria-hidden="true" />
+                  Bullets
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertSnippet("1. First step\n2. Second step")}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-semibold text-text-secondary hover:border-border hover:bg-surface hover:text-text-primary ${interactive}`}
+                >
+                  <ListOrdered className="h-4 w-4" aria-hidden="true" />
+                  Numbered
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    insertSnippet(
+                      "```javascript\n// Add your example here\n```",
+                    )
+                  }
+                  className={`inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-semibold text-text-secondary hover:border-border hover:bg-surface hover:text-text-primary ${interactive}`}
+                >
+                  <Code2 className="h-4 w-4" aria-hidden="true" />
+                  Code
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    insertSnippet("> [!TIP]\n> Add a useful tip here.")
+                  }
+                  className={`inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-semibold text-text-secondary hover:border-border hover:bg-surface hover:text-text-primary ${interactive}`}
+                >
+                  <Lightbulb className="h-4 w-4" aria-hidden="true" />
+                  Tip callout
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    insertSnippet(
+                      "@[video: Video title](https://example.com/video)",
+                    )
+                  }
+                  className={`inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-semibold text-text-secondary hover:border-border hover:bg-surface hover:text-text-primary ${interactive}`}
+                >
+                  <Video className="h-4 w-4" aria-hidden="true" />
+                  Video link
+                </button>
+                <span className="ml-auto inline-flex items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+                  <Type className="h-3.5 w-3.5" aria-hidden="true" />
+                  Write
+                </span>
+              </div>
+              <textarea
+                ref={markdownRef}
+                id="lesson-markdown"
+                value={form.markdown}
+                onChange={(event) => {
+                  setForm((current) => ({
+                    ...current,
+                    markdown: event.target.value,
+                  }));
+                  setShowPreview(false);
+                }}
+                rows={14}
+                spellCheck
+                placeholder={
+                  "Start with a clear explanation…\n\n## How it works\nExplain the idea in your own words.\n\n- First key point\n- Second key point\n\n```javascript\n// Optional code example\n```"
+                }
+                className="block w-full resize-y rounded-b-xl border-x border-b border-border bg-surface px-4 py-4 font-mono text-sm leading-7 text-text-primary outline-none placeholder:font-sans placeholder:text-text-tertiary focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25"
+              />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-text-tertiary">
+                  Supports headings, paragraphs, lists, fenced code, callouts,
+                  and video links using the toolbar.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowPreview((current) => !current)}
+                  className={`inline-flex items-center justify-center gap-2 self-start rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-text-secondary hover:border-signal/35 hover:bg-signal-soft hover:text-signal sm:self-auto ${interactive}`}
+                >
+                  {showPreview ? (
+                    <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {showPreview ? "Hide preview" : "Preview lesson"}
+                </button>
+              </div>
+              {Object.keys(preservedMedia).length > 0 && (
+                <div className="rounded-xl border border-border bg-surface-elevated p-3 text-xs leading-relaxed text-text-secondary">
+                  <p className="font-semibold text-text-primary">
+                    Existing media is protected
+                  </p>
+                  <p className="mt-1">
+                    Markers such as{" "}
+                    <code className="rounded bg-surface-disabled px-1.5 py-0.5">
+                      [[Existing image #1]]
+                    </code>{" "}
+                    keep existing media attached without showing its URL. Keep
+                    each marker to preserve that media; removing a marker
+                    removes it from the lesson.
+                  </p>
+                </div>
+              )}
+              {showPreview && (
+                <div className="space-y-4 rounded-2xl border border-signal/20 bg-surface-elevated p-4 sm:p-6">
+                  <div className="flex items-center gap-2 border-b border-border-muted pb-3">
+                    <Eye className="h-4 w-4 text-signal" aria-hidden="true" />
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-text-secondary">
+                      Learner preview
+                    </p>
+                  </div>
+                  <div className="space-y-4">
+                    {parsedBlocks.length ? (
+                      parsedBlocks.map((block, index) =>
+                        renderPreviewBlock(block, index),
+                      )
+                    ) : (
+                      <p className="text-sm italic text-text-tertiary">
+                        Your formatted lesson preview will appear here.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {formError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-xl border border-error/20 bg-error-soft p-3 text-sm text-error"
+              >
+                <AlertCircle
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                  aria-hidden="true"
+                />
+                <p>{formError}</p>
+              </div>
+            )}
+            <div className="flex flex-col-reverse gap-2 border-t border-border-muted pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-text-tertiary">
+                Your lesson is saved to this topic when you submit.
+              </p>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={closeForm}
+                  disabled={isSaving}
+                  className={interactive}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  loading={isSaving}
+                  className={interactive}
+                >
+                  <Save className="h-4 w-4" aria-hidden="true" />
+                  {editingLessonId ? "Save Changes" : "Create Lesson"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {isLoading ? (
+        <div
+          className="space-y-3"
+          aria-label="Loading lessons"
+          aria-busy="true"
+        >
+          {[0, 1].map((item) => (
+            <div
+              key={item}
+              className="animate-pulse rounded-2xl border border-border bg-surface p-5"
+            >
+              <div className="mb-3 h-3 w-20 rounded bg-surface-disabled" />
+              <div className="mb-2 h-5 w-2/3 rounded bg-surface-disabled" />
+              <div className="h-3 w-full max-w-lg rounded bg-surface-disabled" />
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-error/20 bg-error-soft p-5">
+          <div className="flex items-start gap-3">
+            <AlertCircle
+              className="mt-0.5 h-5 w-5 shrink-0 text-error"
+              aria-hidden="true"
+            />
+            <div className="flex-1 space-y-1">
+              <h4 className="font-semibold text-text-primary">
+                Unable to load lessons
+              </h4>
+              <p className="text-sm text-text-secondary">{error}</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void refetch()}
+                className={`mt-2 ${interactive}`}
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                Try again
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : lessons.length === 0 && !isFormOpen ? (
+        <div className="rounded-2xl border border-dashed border-border bg-surface px-6 py-10 text-center sm:py-12">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-surface-elevated text-signal">
+            <BookOpen className="h-6 w-6" aria-hidden="true" />
+          </div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-tertiary">
+            A fresh start
+          </p>
+          <h4 className="mt-2 font-serif text-xl font-semibold text-text-primary">
+            No lessons in this topic yet
+          </h4>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-text-secondary">
+            Start with a short explanation, paste your notes, then add headings,
+            examples, and lists as needed.
+          </p>
+          {isEditable && (
+            <Button onClick={openCreateForm} className={`mt-5 ${interactive}`}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Create First Lesson
+            </Button>
+          )}
+        </div>
+      ) : lessons.length > 0 ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3 px-1 text-xs text-text-tertiary">
+            <span>
+              {lessons.length} {lessons.length === 1 ? "lesson" : "lessons"}
+            </span>
+            {isEditable && lessons.length > 1 && (
+              <span>Use arrows to change the learning order.</span>
+            )}
+          </div>
+          {lessons.map((lesson, index) => (
+            <article
+              key={lesson._id}
+              className="rounded-2xl border border-border bg-surface p-4 transition-all duration-200 hover:border-text-tertiary/50 sm:p-5"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sage/25 bg-sage-soft text-sm font-bold text-sage">
+                  {String(lesson.order).padStart(2, "0")}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <h4 className="break-words font-semibold text-text-primary">
+                        {lesson.title}
+                      </h4>
+                      {lesson.description && (
+                        <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-secondary">
+                          {lesson.description}
+                        </p>
+                      )}
+                    </div>
+                    {isEditable && (
+                      <div className="flex shrink-0 items-center gap-1 self-start">
+                        <button
+                          type="button"
+                          onClick={() => void moveLesson(index, -1)}
+                          disabled={
+                            index === 0 ||
+                            reorderingLessonId !== null ||
+                            isFormOpen ||
+                            isSaving
+                          }
+                          aria-label={`Move ${lesson.title} up`}
+                          title="Move lesson up"
+                          className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-text-secondary hover:border-signal/40 hover:bg-signal-soft hover:text-signal ${interactive}`}
+                        >
+                          <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void moveLesson(index, 1)}
+                          disabled={
+                            index === lessons.length - 1 ||
+                            reorderingLessonId !== null ||
+                            isFormOpen ||
+                            isSaving
+                          }
+                          aria-label={`Move ${lesson.title} down`}
+                          title="Move lesson down"
+                          className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-text-secondary hover:border-signal/40 hover:bg-signal-soft hover:text-signal ${interactive}`}
+                        >
+                          <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEditForm(lesson)}
+                          disabled={
+                            reorderingLessonId !== null ||
+                            isSaving ||
+                            isFormOpen
+                          }
+                          aria-label={`Edit ${lesson.title}`}
+                          title="Edit lesson"
+                          className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-text-secondary hover:border-signal/40 hover:bg-signal-soft hover:text-signal ${interactive}`}
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(lesson)}
+                          disabled={
+                            reorderingLessonId !== null ||
+                            isSaving ||
+                            isFormOpen
+                          }
+                          aria-label={`Delete ${lesson.title}`}
+                          title="Delete lesson"
+                          className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-text-secondary hover:border-error/40 hover:bg-error-soft hover:text-error ${interactive}`}
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
+                </div>
+              </div>
+              {reorderingLessonId === lesson._id && (
+                <p className="mt-3 text-xs text-text-secondary" role="status">
+                  Saving lesson order…
+                </p>
+              )}
+            </article>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 };

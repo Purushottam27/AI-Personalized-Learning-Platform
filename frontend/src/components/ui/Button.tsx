@@ -1,6 +1,6 @@
 /**
- * Button — branded button with hover, focus-visible, active, disabled, and
- * loading states. Supports primary, secondary, and ghost variants.
+ * Button — branded button with visible hover, focus-visible, pressed,
+ * disabled, and loading states.
  */
 import React from 'react';
 import { Loader2 } from 'lucide-react';
@@ -16,14 +16,9 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<Variant, string> = {
-  primary:
-    'bg-signal text-paper hover:bg-signal-hover active:bg-signal-active hover:shadow-(--shadow-premium-btn) focus-visible:ring-focus disabled:bg-surface-disabled disabled:text-text-disabled',
-
-  secondary:
-    'bg-transparent text-text-primary border border-border hover:bg-surface hover:border-border active:bg-surface-disabled focus-visible:ring-focus disabled:bg-surface-disabled disabled:text-text-disabled disabled:border-border-muted',
-
-  ghost:
-    'bg-transparent text-text-secondary hover:text-text-primary hover:bg-surface active:bg-surface-disabled focus-visible:ring-focus disabled:text-text-disabled',
+  primary: 'bg-signal text-paper hover:bg-signal-hover active:bg-signal-active hover:shadow-(--shadow-premium-btn) focus-visible:ring-focus disabled:bg-surface-disabled disabled:text-text-disabled',
+  secondary: 'bg-transparent text-text-primary border border-border hover:bg-surface hover:border-text-tertiary active:bg-surface-disabled focus-visible:ring-focus disabled:bg-surface-disabled disabled:text-text-disabled disabled:border-border-muted',
+  ghost: 'bg-transparent text-text-secondary hover:text-text-primary hover:bg-surface active:bg-surface-disabled focus-visible:ring-focus disabled:text-text-disabled',
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -44,21 +39,22 @@ const Button: React.FC<ButtonProps> = ({
   <button
     disabled={disabled || loading}
     className={[
-      'inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200',
+      'inline-flex cursor-pointer items-center justify-center gap-2 font-semibold select-none',
+      'transition-all duration-200 active:scale-[0.98]',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-paper',
-      'disabled:cursor-not-allowed select-none',
+      'disabled:cursor-not-allowed disabled:scale-100 disabled:shadow-none',
       variantClasses[variant],
       sizeClasses[size],
       className,
     ].join(' ')}
     style={{
-      boxShadow: variant === 'primary' && !disabled ? 'var(--shadow-premium-btn)' : undefined,
+      boxShadow: variant === 'primary' && !disabled && !loading ? 'var(--shadow-premium-btn)' : undefined,
       ...rest.style,
     }}
     aria-busy={loading}
     {...rest}
   >
-    {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+    {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
     {children}
   </button>
 );

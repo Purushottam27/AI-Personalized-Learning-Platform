@@ -1,602 +1,207 @@
-/**
- * CourseWorkspacePage — Course details and structure workspace.
- *
- * Route: /instructor/courses/:courseId
- * Rendered inside InstructorLayout (the application sidebar and topbar already exist).
- *
- * Current scope:
- * - Fetch and display the saved course.
- * - Preserve the draft setup continuation action.
- * - Manage Topics and the selected Topic's Lessons.
- * - Keep Resource, Practice, Question Bank, Assessment, and publishing tools out of scope for this slice.
- */
-
-import React, { useEffect, useRef, useState } from 'react';
-
-import { useParams, useNavigate } from 'react-router-dom';
-
+import React from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-
 import {
-
-  Loader2,
-
   AlertCircle,
-
-  ArrowLeft,
-
-  FileText,
-
-  Globe,
-
   Archive,
+  ArrowLeft,
   BookOpen,
-  ClipboardList,
-
-  Clock,
-
-  Users,
-
+  Clock3,
+  FileText,
+  Globe,
+  Layers3,
+  Loader2,
 } from 'lucide-react';
-
-import { useCourse } from '../hooks/useCourse';
-
 import Button from '../../../components/ui/Button';
+import { useCourse } from '../hooks/useCourse';
 import TopicManagement from '../components/TopicManagement/TopicManagement';
-import LessonManagement from '../components/LessonManagement/LessonManagement';
+import type { CourseDifficulty, CourseStatus } from '../types/instructor.types';
 import type { Topic } from '../types/topic.types';
 
-import type { CourseStatus, CourseDifficulty } from '../types/instructor.types';
-
-
-
-// ─── Status badge ─────────────────────────────────────────────────────────────
-
-
+const DIFFICULTY_LABELS: Record<CourseDifficulty, string> = {
+  BEGINNER: 'Beginner',
+  INTERMEDIATE: 'Intermediate',
+  ADVANCED: 'Advanced',
+};
 
 const StatusBadge: React.FC<{ status: CourseStatus }> = ({ status }) => {
-
-  if (status === 'PUBLISHED') {
-
-    return (
-
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase bg-sage-soft text-sage border border-sage/20">
-
-        <Globe className="w-3 h-3" aria-hidden="true" />
-
-        Published
-
-      </span>
-
-    );
-
-  }
-
-  if (status === 'DRAFT') {
-
-    return (
-
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase bg-signal-soft text-signal border border-signal/20">
-
-        <FileText className="w-3 h-3" aria-hidden="true" />
-
-        Draft
-
-      </span>
-
-    );
-
-  }
+  const config = status === 'PUBLISHED'
+    ? { label: 'Published', Icon: Globe, classes: 'border-sage/20 bg-sage-soft text-sage' }
+    : status === 'DRAFT'
+      ? { label: 'Draft', Icon: FileText, classes: 'border-signal/20 bg-signal-soft text-signal' }
+      : { label: 'Archived', Icon: Archive, classes: 'border-border bg-surface-disabled text-text-secondary' };
+  const Icon = config.Icon;
 
   return (
-
-    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase bg-surface-disabled text-text-tertiary border border-border">
-
-      <Archive className="w-3 h-3" aria-hidden="true" />
-
-      Archived
-
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-wider ${config.classes}`}>
+      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      {config.label}
     </span>
-
   );
-
 };
-
-
-
-// ─── Difficulty label ─────────────────────────────────────────────────────────
-
-
-
-const DIFFICULTY_LABELS: Record<CourseDifficulty, string> = {
-
-  BEGINNER: 'Beginner',
-
-  INTERMEDIATE: 'Intermediate',
-
-  ADVANCED: 'Advanced',
-
-};
-
-
-
-// ─── Metadata row ─────────────────────────────────────────────────────────────
-
-
 
 const MetaItem: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-
-  <div className="flex flex-col gap-0.5">
-
-    <span className="text-xs font-semibold uppercase tracking-widest text-text-tertiary">
-
-      {label}
-
-    </span>
-
-    <span className="text-sm text-text-secondary">{value}</span>
-
+  <div className="min-w-0 space-y-1">
+    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-tertiary">{label}</p>
+    <p className="break-words text-sm font-medium text-text-primary">{value}</p>
   </div>
-
 );
-
-
-
-// ─── Coming soon section ──────────────────────────────────────────────────────
-
-
-
-const ComingSoonBlock: React.FC<{
-
-  icon: React.ElementType;
-
-  title: string;
-
-  description: string;
-
-}> = ({ icon: Icon, title, description }) => (
-
-  <div className="flex flex-col items-center justify-center text-center py-10 px-6 rounded-xl border border-dashed border-border bg-linear-to-br from-surface to-surface-elevated select-none cursor-default group transition-all duration-300 hover:-translate-y-1 hover:border-signal/30 hover:shadow-(--shadow-premium-card)">
-
-    <div className="w-12 h-12 rounded-xl bg-surface-elevated border border-border flex items-center justify-center mb-4">
-
-      <Icon className="w-6 h-6 text-text-tertiary transition-colors duration-300 group-hover:text-signal" strokeWidth={1.5} />
-
-    </div>
-
-    <h3 className="text-sm font-semibold text-text-primary mb-1">{title}</h3>
-
-    <p className="text-xs text-text-tertiary max-w-xs leading-relaxed">{description}</p>
-
-    <span className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary px-2 py-1 rounded bg-surface-disabled border border-border-muted">
-
-      Coming soon
-
-    </span>
-
-  </div>
-
-);
-
-
-
-// ─── Page component ───────────────────────────────────────────────────────────
-
-
 
 export const CourseWorkspacePage: React.FC = () => {
-
   const { courseId } = useParams<{ courseId: string }>();
-
   const navigate = useNavigate();
-
   const { course, isLoading, error } = useCourse(courseId);
-  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
-  const lessonPanelRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!selectedTopic) return;
-    const frameId = window.requestAnimationFrame(() => {
-      lessonPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    return () => window.cancelAnimationFrame(frameId);
-  }, [selectedTopic?._id]);
-
-
-
-  // Loading state
 
   if (isLoading) {
-
     return (
-
-      <div className="w-full h-full min-h-[60vh] flex flex-col items-center justify-center">
-
-        <Loader2 className="w-8 h-8 text-signal animate-spin mb-4" />
-
-        <p className="text-sm text-text-secondary font-medium">Loading course workspace...</p>
-
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3" aria-live="polite">
+        <Loader2 className="h-8 w-8 animate-spin text-signal" aria-hidden="true" />
+        <p className="text-sm text-text-secondary">Loading course workspace…</p>
       </div>
-
     );
-
   }
-
-
-
-  // Error state
 
   if (error || !course) {
-
     return (
-
-      <div className="w-full h-full min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
-
-        <div className="w-16 h-16 rounded-full bg-surface-disabled flex items-center justify-center mb-4 border border-border">
-
-          <AlertCircle className="w-8 h-8 text-signal" />
-
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-error/20 bg-error-soft text-error">
+          <AlertCircle className="h-6 w-6" aria-hidden="true" />
         </div>
-
-        <h2 className="text-xl font-semibold text-text-primary mb-2">
-
-          {error === "This course could not be found." ? 'Course not found' : 'Access denied'}
-
-        </h2>
-
-        <p className="text-text-secondary mb-6 max-w-md">
-
-          {error ?? 'This course could not be loaded.'}
-
-        </p>
-
-        <Button variant="secondary" onClick={() => navigate('/instructor/dashboard')}>
-
-          <ArrowLeft className="w-4 h-4" />
-
-          Back to Dashboard
-
+        <h1 className="font-serif text-2xl font-semibold text-text-primary">Unable to open this course</h1>
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-text-secondary">{error ?? 'This course could not be loaded.'}</p>
+        <Button variant="secondary" onClick={() => navigate('/instructor/courses')} className="mt-6 cursor-pointer">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Back to My Courses
         </Button>
-
       </div>
-
     );
-
   }
 
+  const duration = [
+    course.estimatedDuration?.weeks ? `${course.estimatedDuration.weeks} weeks` : null,
+    course.estimatedDuration?.hours ? `${course.estimatedDuration.hours} hours` : null,
+  ].filter(Boolean).join(' · ');
 
+  const openTopic = (topic: Topic) => {
+    navigate(`/instructor/courses/${course._id}/topics/${topic._id}`);
+  };
 
   return (
-
-    <div className=" max-w-5xl space-y-8 pb-16">
-
-      {/* Header */}
-
-      <motion.div
-
-        initial={{ opacity: 0, y: 10 }}
-
+    <div className="mx-auto max-w-5xl space-y-7 pb-14">
+      <motion.header
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-
-        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-
-        className="space-y-4"
-
+        transition={{ duration: 0.24, ease: 'easeOut' }}
+        className="space-y-5"
       >
-
-        {/* Back link */}
-
         <button
-
           type="button"
-
-          onClick={() => navigate('/instructor/dashboard')}
-
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-text-tertiary hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded px-1 -ml-1 py-0.5"
-
+          onClick={() => navigate('/instructor/courses')}
+          className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-text-secondary transition-all duration-150 hover:bg-surface-elevated hover:text-text-primary active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
-
-          <ArrowLeft className="w-3.5 h-3.5" />
-
-          Dashboard
-
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          My Courses
         </button>
 
-
-
-        {/* Title, status, and draft continuation action */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-text-tertiary uppercase tracking-widest">
-              Course Workspace
-            </p>
-            <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-text-primary leading-tight">
-              {course.title}
-            </h1>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-tertiary">Course Workspace</p>
+            <h1 className="break-words font-serif text-3xl font-semibold leading-tight text-text-primary sm:text-4xl">{course.title}</h1>
             <StatusBadge status={course.status} />
           </div>
           {course.status === 'DRAFT' && (
-            <Button onClick={() => navigate(`/instructor/courses/${course._id}/setup`)}>
+            <Button onClick={() => navigate(`/instructor/courses/${course._id}/setup`)} className="w-full shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.98] sm:w-auto">
+              <FileText className="h-4 w-4" aria-hidden="true" />
               Continue Setup
             </Button>
           )}
         </div>
 
-        {/* Draft notice */}
-
         {course.status === 'DRAFT' && (
-
-          <div className="flex items-start gap-3 p-4 rounded-xl border border-signal/20 bg-signal-soft text-signal">
-
-            <FileText className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
-
-            <div>
-
-              <p className="text-sm font-medium">Your course is saved as a draft.</p>
-
-              <p className="text-xs mt-0.5 text-signal/85">
-
-                Continue building its learning structure. Publishing will be available once Topics,
-
-                Resources, and Assessments are ready.
-
-              </p>
-
+          <div className="flex items-start gap-3 rounded-xl border border-signal/20 bg-signal-soft p-4 text-signal">
+            <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <div className="space-y-1">
+              <p className="text-sm font-semibold">Your course is saved as a draft.</p>
+              <p className="text-sm leading-relaxed text-text-secondary">Continue setting up course-level information, then manage each topic and its lessons from the course structure below.</p>
             </div>
-
           </div>
-
         )}
-
-      </motion.div>
-
-
-
-      {/* Course metadata summary */}
+      </motion.header>
 
       <motion.section
-
-        initial={{ opacity: 0, y: 12 }}
-
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-
-        transition={{ duration: 0.4, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-
-        aria-label="Course details"
-
-        className="p-6 rounded-xl border border-border bg-linear-to-br from-surface to-surface-elevated space-y-5 shadow-sm transition-all duration-300 hover:border-signal/20 hover:shadow-(--shadow-premium-card)"
-
+        transition={{ duration: 0.24, delay: 0.04, ease: 'easeOut' }}
+        aria-labelledby="course-details-heading"
+        className="space-y-5 rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6"
       >
-
-        <h2 className="text-sm font-semibold text-text-primary">Course details</h2>
-
-
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
-
-          <MetaItem label="Domain" value={course.domain} />
-
-          <MetaItem label="Category" value={course.category} />
-
-          <MetaItem
-
-            label="Difficulty"
-
-            value={DIFFICULTY_LABELS[course.difficulty] ?? course.difficulty}
-
-          />
-
-          {course.estimatedDuration && (
-
-            <MetaItem
-
-              label="Duration"
-
-              value={[
-
-                course.estimatedDuration.weeks ? `${course.estimatedDuration.weeks}w` : null,
-
-                course.estimatedDuration.hours ? `${course.estimatedDuration.hours}h` : null,
-
-              ]
-
-                .filter(Boolean)
-
-                .join(' · ')}
-
-            />
-
-          )}
-
-        </div>
-
-
-
-        {/* Description */}
-
-        <div className="pt-4 border-t border-border-muted">
-
-          <p className="text-xs font-semibold uppercase tracking-widest text-text-disabled mb-2">
-
-            Description
-
-          </p>
-
-          <p className="text-sm text-text-secondary leading-relaxed line-clamp-4">
-
-            {course.description}
-
-          </p>
-
-        </div>
-
-
-
-        {/* Objectives */}
-
-        {course.objectives && course.objectives.length > 0 && (
-
-          <div className="pt-4 border-t border-border-muted">
-
-            <p className="text-xs font-semibold uppercase tracking-widest text-text-disabled mb-3">
-
-              Learning objectives
-
-            </p>
-
-            <ul className="space-y-2">
-
-              {course.objectives.map((obj, i) => (
-
-                <li key={i} className="flex items-start gap-2 text-sm text-text-secondary">
-
-                  <span className="mt-1 w-1.5 h-1.5 rounded-full bg-signal shrink-0" aria-hidden="true" />
-
-                  {obj}
-
-                </li>
-
-              ))}
-
-            </ul>
-
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface-elevated text-text-secondary">
+            <BookOpen className="h-4 w-4" aria-hidden="true" />
           </div>
+          <div>
+            <h2 id="course-details-heading" className="text-base font-semibold text-text-primary">Course details</h2>
+            <p className="text-xs text-text-secondary">The course-level information learners will see.</p>
+          </div>
+        </div>
 
+        <div className="grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
+          <MetaItem label="Domain" value={course.domain} />
+          <MetaItem label="Category" value={course.category} />
+          <MetaItem label="Difficulty" value={DIFFICULTY_LABELS[course.difficulty] ?? course.difficulty} />
+          {duration && <MetaItem label="Estimated duration" value={<span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />{duration}</span>} />}
+        </div>
+
+        <div className="border-t border-border-muted pt-4">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-tertiary">Description</p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">{course.description}</p>
+        </div>
+
+        {course.objectives.length > 0 && (
+          <div className="border-t border-border-muted pt-4">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-tertiary">Course learning objectives</p>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {course.objectives.map((objective, index) => (
+                <li key={`${index}-${objective}`} className="flex items-start gap-2.5 rounded-lg bg-surface-elevated p-3 text-sm leading-relaxed text-text-secondary">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sage-soft text-sage"><span className="text-[10px] font-bold">{index + 1}</span></span>
+                  {objective}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
-
-
-
-        {/* Progression policy */}
 
         {course.progressionPolicy && (
-
-          <div className="pt-4 border-t border-border-muted">
-
-            <p className="text-xs font-semibold uppercase tracking-widest text-text-disabled mb-2">
-
-              Topic progression
-
-            </p>
-
-            <p className="text-sm text-text-secondary">
-
-              {course.progressionPolicy.lockingEnabled
-
-                ? 'Sequential — learners must complete Topics in order.'
-
-                : 'Open — learners can access Topics independently.'}
-
-            </p>
-
+          <div className="border-t border-border-muted pt-4">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-tertiary">Topic progression</p>
+            <p className="text-sm text-text-secondary">{course.progressionPolicy.lockingEnabled ? 'Sequential — learners must complete topics in order.' : 'Open — learners can access topics independently.'}</p>
           </div>
-
         )}
-
       </motion.section>
-
-
-
-      {/* Course structure — future sections */}
 
       <motion.section
-
-        initial={{ opacity: 0, y: 12 }}
-
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-
-        transition={{ duration: 0.4, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-
-        aria-label="Course structure"
-
+        transition={{ duration: 0.24, delay: 0.08, ease: 'easeOut' }}
+        aria-labelledby="course-topics-heading"
         className="space-y-4"
-
       >
-
-        <div>
-
-          <h2 className="text-base font-semibold text-text-primary">Course structure</h2>
-
-          <p className="text-sm text-text-secondary mt-1">
-
-            Manage the ordered learning stages of your course here. Lessons and learning resources
-
-            will be added to each Topic in the next implementation phase.
-
-          </p>
-
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-signal/20 bg-signal-soft text-signal">
+            <Layers3 className="h-4 w-4" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 id="course-topics-heading" className="text-base font-semibold text-text-primary">Course structure</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-text-secondary">Organize the course into topics. Open a topic to manage its details, lessons, and future learning materials on a dedicated page.</p>
+          </div>
         </div>
 
-
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-          <div className="sm:col-span-2">
-            <TopicManagement
-              courseId={course._id}
-              courseStatus={course.status}
-              selectedTopicId={selectedTopic?._id ?? null}
-              onManageLessons={setSelectedTopic}
-              onTopicUpdated={(updatedTopic) => {
-                setSelectedTopic((current) => current?._id === updatedTopic._id ? updatedTopic : current);
-              }}
-            />
-          </div>
-
-          <div className="sm:col-span-2 scroll-mt-24" ref={lessonPanelRef}>
-            {selectedTopic ? (
-              <LessonManagement
-                key={selectedTopic._id}
-                topicId={selectedTopic._id}
-                topicTitle={selectedTopic.title}
-                courseStatus={course.status}
-              />
-            ) : (
-              <div className="rounded-2xl border border-dashed border-border bg-surface p-6 text-center">
-                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-elevated text-text-tertiary">
-                  <BookOpen className="h-5 w-5" aria-hidden="true" />
-                </div>
-                <h3 className="text-sm font-semibold text-text-primary">Select a topic to manage its lessons</h3>
-                <p className="mx-auto mt-1 max-w-lg text-sm text-text-secondary">Use the Manage Lessons action on a topic above. Lessons are created inside a topic and cannot be moved to another topic.</p>
-              </div>
-            )}
-          </div>
-
-          <ComingSoonBlock
-
-            icon={ClipboardList}
-
-            title="Practice &amp; Assessments"
-
-            description="Create practice exercises and assessments to evaluate learner understanding."
-
-          />
-
-          <ComingSoonBlock
-
-            icon={Clock}
-
-            title="Learning Sequence"
-
-            description="Define the progression order and unlock conditions for your Topics."
-
-          />
-
-          <ComingSoonBlock
-
-            icon={Users}
-
-            title="Enrolled Learners"
-
-            description="View and manage learners enrolled in this course once it is published."
-
-          />
-
-        </div>
-
+        <TopicManagement
+          courseId={course._id}
+          courseStatus={course.status}
+          onManageTopic={openTopic}
+        />
       </motion.section>
-
     </div>
-
   );
-
 };

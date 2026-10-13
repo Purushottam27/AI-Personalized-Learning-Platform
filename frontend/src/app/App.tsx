@@ -20,9 +20,10 @@ import { PlaceholderPage } from '../features/learner/pages/PlaceholderPage';
 // Instructor App
 import InstructorLayout from '../features/instructor/layouts/InstructorLayout';
 import { InstructorDashboardPage } from '../features/instructor/pages/InstructorDashboardPage';
-import {InstructorCoursesPage} from '../features/instructor/pages/InstructorCoursesPage';
+import { InstructorCoursesPage } from '../features/instructor/pages/InstructorCoursesPage';
 import { CreateCoursePage } from '../features/instructor/pages/CreateCoursePage';
 import { CourseWorkspacePage } from '../features/instructor/pages/CourseWorkspacePage';
+import { TopicWorkspacePage } from '../features/instructor/pages/TopicWorkspacePage';
 
 function App() {
   return (
@@ -30,26 +31,22 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <Routes>
-            {/* Public routes */}
             <Route element={<PublicLayout />}>
               <Route path="/" element={<LandingPage />} />
             </Route>
 
-            {/* Guest-only routes */}
             <Route element={<GuestRoute />}>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
             </Route>
 
-            {/* Authenticated onboarding */}
             <Route element={<ProtectedRoute />}>
               <Route path="/onboarding" element={<OnboardingRoute />} />
             </Route>
 
-            {/* Protected application routes; onboarding must be complete */}
             <Route element={<ProtectedRoute />}>
               <Route element={<OnboardingGuard />}>
-                {/* Legacy paths */}
+                {/* Legacy routes */}
                 <Route path="/learner-dashboard" element={<Navigate to="/learner/dashboard" replace />} />
                 <Route path="/instructor-dashboard" element={<Navigate to="/instructor/dashboard" replace />} />
 
@@ -68,8 +65,9 @@ function App() {
                   <Route path="dashboard" element={<InstructorDashboardPage />} />
                   <Route path="courses" element={<InstructorCoursesPage />} />
                   <Route path="courses/create" element={<CreateCoursePage />} />
-                  {/* Keep this route above the generic :courseId route. */}
                   <Route path="courses/:courseId/setup" element={<CreateCoursePage />} />
+                  {/* Keep the specific topic route before the course workspace route. */}
+                  <Route path="courses/:courseId/topics/:topicId" element={<TopicWorkspacePage />} />
                   <Route path="courses/:courseId" element={<CourseWorkspacePage />} />
                   <Route path="learners" element={<PlaceholderPage title="Learners" description="Manage learners enrolled in your courses." />} />
                   <Route path="analytics" element={<PlaceholderPage title="Analytics" description="Insights into learner performance and course metrics." />} />

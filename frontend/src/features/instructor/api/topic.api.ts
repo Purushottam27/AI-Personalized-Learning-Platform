@@ -13,6 +13,12 @@ export const getTopicsByCourse = async (courseId: string): Promise<Topic[]> => {
   return response.data.data;
 };
 
+/** GET /api/v1/topics/:topicId */
+export const getTopicById = async (topicId: string): Promise<Topic> => {
+  const response = await api.get<ApiResponse<Topic>>(`/topics/${topicId}`);
+  return response.data.data;
+};
+
 /** POST /api/v1/courses/:courseId/topics */
 export const createTopic = async (
   courseId: string,
