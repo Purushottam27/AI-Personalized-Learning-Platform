@@ -2,10 +2,10 @@
  * Question Import — Stage 2 + Stage 3 Integration Tests
  *
  * Tests are organised into two sections:
- *   A) Parser unit tests  (csv-excel-parser.util.js)
- *   B) Service integration tests  (question-import.service.js + database)
+ *   A) Parser unit tests (csv-excel-parser.util.js)
+ *   B) Service integration tests (question-import.service.js + database)
  *
- * The test database is isolated using the TEST_DB_NAME variable.
+ * The test database is isolated using TEST_DB_NAME.
  * All fixtures created here are cleaned up in the after() hook.
  */
 
@@ -32,6 +32,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 // ---------------------------------------------------------------------------
 // Headers — 12 canonical column names in a natural order
 // ---------------------------------------------------------------------------
+
 const HEADERS = [
     "questionText",
     "type",
@@ -60,10 +61,12 @@ const HEADERS_LINE = HEADERS.join(",");
 function makeRow(fields = {}) {
     return HEADERS.map((h) => {
         const val = fields[h] ?? "";
+
         // Wrap in quotes if the value contains a comma or newline.
         if (typeof val === "string" && (val.includes(",") || val.includes("\n"))) {
             return `"${val.replace(/"/g, '""')}"`;
         }
+
         return String(val);
     }).join(",");
 }
@@ -78,12 +81,14 @@ function csvBuffer(lines) {
 
 /**
  * Build a proper XLSX Buffer.
- * @param {Array<Array>} rows  - First element = header array, rest = data arrays.
+ * The first array is the header row; the rest are data rows.
  */
 async function xlsxBuffer(rows) {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Questions");
+
     rows.forEach((r) => ws.addRow(r));
+
     return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -120,6 +125,7 @@ test("Parser: Rejects unsupported file extension", async () => {
 
 test("Parser: Rejects .csv buffer with XLSX magic number", async () => {
     const xlsxMagic = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]);
+
     await assert.rejects(
         parseFile(xlsxMagic, "data.csv"),
         (err) => err.message.includes("does not match")
@@ -128,6 +134,7 @@ test("Parser: Rejects .csv buffer with XLSX magic number", async () => {
 
 test("Parser: Rejects .xlsx buffer that is not a ZIP container", async () => {
     const notXlsx = Buffer.from("plaintext", "utf-8");
+
     await assert.rejects(
         parseFile(notXlsx, "data.xlsx"),
         (err) => err.message.includes("does not match")
@@ -136,6 +143,7 @@ test("Parser: Rejects .xlsx buffer that is not a ZIP container", async () => {
 
 test("Parser: Rejects CSV with missing required headers", async () => {
     const buf = csvBuffer(["questionText,type", "Q1,MCQ_SINGLE"]);
+
     await assert.rejects(
         parseFile(buf, "data.csv"),
         (err) => err.message.includes("Missing required header")
@@ -145,6 +153,7 @@ test("Parser: Rejects CSV with missing required headers", async () => {
 test("Parser: Rejects CSV with duplicate headers", async () => {
     const dupeHeaders = HEADERS_LINE + ",questionText";
     const buf = csvBuffer([dupeHeaders, makeRow({ questionText: "Q1" })]);
+
     await assert.rejects(
         parseFile(buf, "data.csv"),
         (err) => err.message.includes("Duplicate header")
@@ -154,16 +163,19 @@ test("Parser: Rejects CSV with duplicate headers", async () => {
 test("Parser: Accepts case-insensitive and trimmed headers", async () => {
     const scrambled = HEADERS.map((h) => "  " + h.toUpperCase() + "  ").join(",");
     const buf = csvBuffer([scrambled, VALID_MCQ]);
+
     const result = await parseFile(buf, "data.csv");
+
     assert.equal(result.rows.length, 1);
 });
 
 test("Parser: Strips UTF-8 BOM from first header", async () => {
     const bomHeaders = "\uFEFF" + HEADERS_LINE;
     const buf = csvBuffer([bomHeaders, VALID_MCQ]);
+
     const result = await parseFile(buf, "data.csv");
+
     assert.equal(result.rows.length, 1);
-    // BOM should not appear in the parsed data key.
     assert.ok("questiontext" in result.rows[0].data);
 });
 
@@ -177,8 +189,10 @@ test("Parser: Handles quoted commas inside CSV fields", async () => {
         marks: "5",
         difficulty: "EASY",
     });
+
     const buf = csvBuffer([HEADERS_LINE, row]);
     const result = await parseFile(buf, "data.csv");
+
     assert.equal(result.rows.length, 1);
     assert.equal(result.rows[0].data.questiontext, "What is A, B, or C?");
 });
@@ -193,15 +207,25 @@ test("Parser: Handles quoted multiline CSV fields", async () => {
         marks: "5",
         difficulty: "EASY",
     });
+
     const buf = csvBuffer([HEADERS_LINE, row]);
     const result = await parseFile(buf, "data.csv");
+
     assert.equal(result.rows.length, 1);
     assert.ok(result.rows[0].data.questiontext.includes("Line 1"));
 });
 
 test("Parser: Skips blank rows and counts them", async () => {
-    const buf = csvBuffer([HEADERS_LINE, VALID_MCQ, "", "  ,,,,,,,,,,,  ", VALID_TF]);
+    const buf = csvBuffer([
+        HEADERS_LINE,
+        VALID_MCQ,
+        "",
+        "  ,,,,,,,,,,,  ",
+        VALID_TF,
+    ]);
+
     const result = await parseFile(buf, "data.csv");
+
     assert.equal(result.rows.length, 2);
     assert.equal(result.blankRowsSkipped, 2);
 });
@@ -209,25 +233,51 @@ test("Parser: Skips blank rows and counts them", async () => {
 test("Parser: Preserves original row numbers", async () => {
     const buf = csvBuffer([HEADERS_LINE, "", VALID_MCQ, "", VALID_TF]);
     const result = await parseFile(buf, "data.csv");
-    // Header = row 1 (1-indexed), blank = row 2, VALID_MCQ = row 3, blank = row 4, VALID_TF = row 5
+
+    // Header = row 1; data rows are rows 3 and 5.
     assert.equal(result.rows[0].rowNumber, 3);
     assert.equal(result.rows[1].rowNumber, 5);
 });
 
 test("Parser: Accepts exactly 500 data rows", async () => {
     const rows = [HEADERS_LINE];
+
     for (let i = 0; i < 500; i++) {
-        rows.push(makeRow({ questionText: `Q${i}`, type: "MCQ_SINGLE", optionA: "X", optionB: "Y", correctAnswer: "A", marks: "5", difficulty: "EASY" }));
+        rows.push(
+            makeRow({
+                questionText: `Q${i}`,
+                type: "MCQ_SINGLE",
+                optionA: "X",
+                optionB: "Y",
+                correctAnswer: "A",
+                marks: "5",
+                difficulty: "EASY",
+            })
+        );
     }
+
     const result = await parseFile(csvBuffer(rows), "data.csv");
+
     assert.equal(result.rows.length, 500);
 });
 
 test("Parser: Rejects 501 data rows", async () => {
     const rows = [HEADERS_LINE];
+
     for (let i = 0; i < 501; i++) {
-        rows.push(makeRow({ questionText: `Q${i}`, type: "MCQ_SINGLE", optionA: "X", optionB: "Y", correctAnswer: "A", marks: "5", difficulty: "EASY" }));
+        rows.push(
+            makeRow({
+                questionText: `Q${i}`,
+                type: "MCQ_SINGLE",
+                optionA: "X",
+                optionB: "Y",
+                correctAnswer: "A",
+                marks: "5",
+                difficulty: "EASY",
+            })
+        );
     }
+
     await assert.rejects(
         parseFile(csvBuffer(rows), "data.csv"),
         (err) => err.message.includes("500")
@@ -239,21 +289,25 @@ test("Parser: XLSX — accepts valid file and reads all columns", async () => {
         HEADERS,
         ["What is 2+2?", "MCQ_SINGLE", "3", "4", "", "", "", "", "B", "", 5, "EASY"],
     ]);
+
     const result = await parseFile(buf, "data.xlsx");
+
     assert.equal(result.rows.length, 1);
     assert.equal(result.rows[0].data.questiontext, "What is 2+2?");
     assert.equal(result.rows[0].data.optiona, "3");
-    assert.equal(result.rows[0].data.optionc, ""); // blank intermediate cell
+    assert.equal(result.rows[0].data.optionc, "");
 });
 
 test("Parser: XLSX — skips blank rows", async () => {
     const buf = await xlsxBuffer([
         HEADERS,
         ["Q1", "MCQ_SINGLE", "X", "Y", "", "", "", "", "A", "", 5, "EASY"],
-        [], // blank row
+        [],
         ["Q2", "TRUE_FALSE", "", "", "", "", "", "", "TRUE", "", 3, "HARD"],
     ]);
+
     const result = await parseFile(buf, "data.xlsx");
+
     assert.equal(result.rows.length, 2);
     assert.equal(result.blankRowsSkipped, 1);
 });
@@ -263,8 +317,9 @@ test("Parser: XLSX — numeric marks cell is read as string", async () => {
         HEADERS,
         ["Q1", "MCQ_SINGLE", "X", "Y", "", "", "", "", "A", "", 10, "EASY"],
     ]);
+
     const result = await parseFile(buf, "data.xlsx");
-    // The parser returns cell values as strings.
+
     assert.equal(result.rows[0].data.marks, "10");
 });
 
@@ -289,6 +344,7 @@ test("Question Import Service Integration Tests", async (t) => {
 
     t.after(async () => {
         if (!connected) return;
+
         try {
             await QuestionImport.deleteMany({ instructorId });
             await Question.deleteMany({ createdBy: instructorId });
@@ -313,7 +369,6 @@ test("Question Import Service Integration Tests", async (t) => {
     ]);
 
     // --- Fixtures ---
-
     course = await Course.create({
         _id: courseId,
         title: "Import Test Course",
@@ -331,7 +386,7 @@ test("Question Import Service Integration Tests", async (t) => {
         order: 1,
     });
 
-    // Second topic for the archived bank (topicId must be unique across QuestionBanks).
+    // Second topic for the archived bank.
     const archivedTopic = await Topic.create({
         courseId: course._id,
         title: "Archived Bank Topic",
@@ -369,22 +424,35 @@ test("Question Import Service Integration Tests", async (t) => {
 
     await t.test("Rejects malformed CSV (ZIP magic number)", async () => {
         const buf = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]);
+
         await assert.rejects(
-            processQuestionImportPreview(buf, "data.csv", questionBank._id, instructorId),
+            processQuestionImportPreview(
+                buf,
+                "data.csv",
+                questionBank._id,
+                instructorId
+            ),
             (err) => err.message.includes("does not match")
         );
     });
 
     await t.test("Rejects CSV with missing headers", async () => {
         const buf = csvBuffer(["questionText,type", "Q1,MCQ_SINGLE"]);
+
         await assert.rejects(
-            processQuestionImportPreview(buf, "data.csv", questionBank._id, instructorId),
+            processQuestionImportPreview(
+                buf,
+                "data.csv",
+                questionBank._id,
+                instructorId
+            ),
             (err) => err.message.includes("Missing required header")
         );
     });
 
     await t.test("Rejects unauthorized instructor (wrong owner)", async () => {
         const buf = csvBuffer([HEADERS_LINE]);
+
         await assert.rejects(
             processQuestionImportPreview(
                 buf,
@@ -392,13 +460,13 @@ test("Question Import Service Integration Tests", async (t) => {
                 questionBank._id,
                 otherInstructorId
             ),
-            // The service returns QUESTION_BANK_NOT_FOUND (ownership hidden).
             (err) => err.statusCode === 404 || err.statusCode === 403
         );
     });
 
     await t.test("Rejects import to archived QuestionBank", async () => {
         const buf = csvBuffer([HEADERS_LINE]);
+
         await assert.rejects(
             processQuestionImportPreview(
                 buf,
@@ -412,12 +480,14 @@ test("Question Import Service Integration Tests", async (t) => {
 
     await t.test("Valid CSV: MCQ_SINGLE and TRUE_FALSE rows pass", async () => {
         const buf = csvBuffer([HEADERS_LINE, VALID_MCQ, VALID_TF]);
+
         const result = await processQuestionImportPreview(
             buf,
             "data.csv",
             questionBank._id,
             instructorId
         );
+
         assert.equal(result.summary.totalRows, 2);
         assert.equal(result.summary.validRows, 2);
         assert.equal(result.summary.invalidRows, 0);
@@ -426,6 +496,7 @@ test("Question Import Service Integration Tests", async (t) => {
 
         // Verify preview document stored in DB.
         const doc = await QuestionImport.findById(result.importId);
+
         assert.ok(doc, "QuestionImport document should exist");
         assert.equal(doc.previewData.length, 2);
 
@@ -433,10 +504,113 @@ test("Question Import Service Integration Tests", async (t) => {
         const qCount = await Question.countDocuments({
             questionBankId: questionBank._id,
         });
+
         assert.equal(qCount, 0, "No Question documents should be created during preview");
 
         // Clean up for subsequent tests.
         await Question.deleteMany({ questionBankId: questionBank._id });
+    });
+
+    // -----------------------------------------------------------------------
+    // NEW TEST A: A blank question type must be rejected.
+    // -----------------------------------------------------------------------
+
+    await t.test("Rejects a row with a blank question type", async () => {
+        const blankTypeRow = makeRow({
+            questionText: "Question with missing type",
+            // type intentionally omitted
+            optionA: "Option A",
+            optionB: "Option B",
+            correctAnswer: "A",
+            marks: "5",
+            difficulty: "EASY",
+        });
+
+        const buf = csvBuffer([HEADERS_LINE, blankTypeRow]);
+
+        const result = await processQuestionImportPreview(
+            buf,
+            "data.csv",
+            questionBank._id,
+            instructorId
+        );
+
+        assert.equal(result.summary.totalRows, 1);
+        assert.equal(result.summary.validRows, 0);
+        assert.equal(result.summary.invalidRows, 1);
+        assert.equal(result.summary.duplicateRows, 0);
+        assert.equal(result.summary.importableRows, 0);
+
+        assert.equal(result.previewData.length, 1);
+        assert.equal(result.previewData[0].isValid, false);
+        assert.equal(result.previewData[0].type, "");
+
+        assert.ok(
+            result.previewData[0].rowErrors.length > 0,
+            "The invalid row should explain why validation failed"
+        );
+
+        const questionCount = await Question.countDocuments({
+            questionBankId: questionBank._id,
+        });
+
+        assert.equal(
+            questionCount,
+            0,
+            "Preview must not create Question documents"
+        );
+    });
+
+    // -----------------------------------------------------------------------
+    // NEW TEST B: MCQ_MULTIPLE and pipe-delimited answers must be accepted.
+    // -----------------------------------------------------------------------
+
+    await t.test("Valid CSV: MCQ_MULTIPLE row passes validation", async () => {
+        const multipleAnswerRow = makeRow({
+            questionText: "Which of these are JavaScript data types?",
+            type: "MCQ_MULTIPLE",
+            optionA: "String",
+            optionB: "Boolean",
+            optionC: "Browser",
+            optionD: "Number",
+            correctAnswer: "A|B|D",
+            marks: "5",
+            difficulty: "MEDIUM",
+        });
+
+        const buf = csvBuffer([HEADERS_LINE, multipleAnswerRow]);
+
+        const result = await processQuestionImportPreview(
+            buf,
+            "data.csv",
+            questionBank._id,
+            instructorId
+        );
+
+        assert.equal(result.summary.totalRows, 1);
+        assert.equal(result.summary.validRows, 1);
+        assert.equal(result.summary.invalidRows, 0);
+        assert.equal(result.summary.duplicateRows, 0);
+        assert.equal(result.summary.importableRows, 1);
+
+        assert.equal(result.previewData.length, 1);
+        assert.equal(result.previewData[0].isValid, true);
+        assert.equal(result.previewData[0].type, "MCQ_MULTIPLE");
+
+        assert.deepEqual(
+            result.previewData[0].correctAnswer,
+            ["A", "B", "D"]
+        );
+
+        const questionCount = await Question.countDocuments({
+            questionBankId: questionBank._id,
+        });
+
+        assert.equal(
+            questionCount,
+            0,
+            "Preview must not create Question documents"
+        );
     });
 
     await t.test("Partially valid CSV: summary accounting is correct", async () => {
@@ -457,7 +631,7 @@ test("Question Import Service Integration Tests", async (t) => {
         });
 
         const duplicateMCQ = makeRow({
-            questionText: "What is Node.js?", // same as VALID_MCQ
+            questionText: "What is Node.js?",
             type: "MCQ_SINGLE",
             optionA: "A runtime",
             optionB: "A language",
@@ -466,7 +640,14 @@ test("Question Import Service Integration Tests", async (t) => {
             difficulty: "EASY",
         });
 
-        const buf = csvBuffer([HEADERS_LINE, VALID_MCQ, VALID_TF, invalidMCQ, duplicateMCQ]);
+        const buf = csvBuffer([
+            HEADERS_LINE,
+            VALID_MCQ,
+            VALID_TF,
+            invalidMCQ,
+            duplicateMCQ,
+        ]);
+
         const result = await processQuestionImportPreview(
             buf,
             "data.csv",
@@ -481,23 +662,33 @@ test("Question Import Service Integration Tests", async (t) => {
         assert.equal(result.summary.importableRows, 2);
 
         const doc = await QuestionImport.findById(result.importId);
+
         assert.ok(doc);
         assert.equal(doc.previewData.length, 4);
 
-        // No Questions created.
-        const qCount = await Question.countDocuments({ questionBankId: questionBank._id });
+        const qCount = await Question.countDocuments({
+            questionBankId: questionBank._id,
+        });
+
         assert.equal(qCount, 0);
     });
 
     await t.test("Blank rows are skipped and counted separately", async () => {
-        const buf = csvBuffer([HEADERS_LINE, VALID_MCQ, "", VALID_TF]);
+        const buf = csvBuffer([
+            HEADERS_LINE,
+            VALID_MCQ,
+            "",
+            VALID_TF,
+        ]);
+
         const result = await processQuestionImportPreview(
             buf,
             "data.csv",
             questionBank._id,
             instructorId
         );
-        assert.equal(result.summary.totalRows, 2);        // blank not counted
+
+        assert.equal(result.summary.totalRows, 2);
         assert.equal(result.summary.blankRowsSkipped, 1);
     });
 
@@ -509,93 +700,108 @@ test("Question Import Service Integration Tests", async (t) => {
             marks: "3",
             difficulty: "EASY",
         });
+
         const dup2 = makeRow({
-            questionText: "Duplicate Q",  // same normalised text
+            questionText: "Duplicate Q",
             type: "TRUE_FALSE",
             correctAnswer: "FALSE",
             marks: "3",
             difficulty: "EASY",
         });
+
         const buf = csvBuffer([HEADERS_LINE, dup1, dup2]);
+
         const result = await processQuestionImportPreview(
             buf,
             "data.csv",
             questionBank._id,
             instructorId
         );
+
         assert.equal(result.summary.validRows, 1);
         assert.equal(result.summary.duplicateRows, 1);
     });
 
-    await t.test("Duplicate detection: matches existing DB question (including archived)", async () => {
-        // Insert an archived question to confirm archived questions block duplicates.
-        await Question.create({
-            questionBankId: questionBank._id,
-            courseId: course._id,
-            topicId: topic._id,
-            createdBy: instructorId,
-            questionText: "Existing archived Q",
-            normalizedQuestionText: "existing archived q",
-            type: "TRUE_FALSE",
-            correctAnswer: "TRUE",
-            marks: 5,
-            difficulty: "EASY",
-            status: "ARCHIVED",
-        });
+    await t.test(
+        "Duplicate detection: matches existing DB question (including archived)",
+        async () => {
+            // Insert an archived question to confirm archived questions block duplicates.
+            await Question.create({
+                questionBankId: questionBank._id,
+                courseId: course._id,
+                topicId: topic._id,
+                createdBy: instructorId,
+                questionText: "Existing archived Q",
+                normalizedQuestionText: "existing archived q",
+                type: "TRUE_FALSE",
+                correctAnswer: "TRUE",
+                marks: 5,
+                difficulty: "EASY",
+                status: "ARCHIVED",
+            });
 
-        const row = makeRow({
-            questionText: "Existing archived Q",
-            type: "TRUE_FALSE",
-            correctAnswer: "TRUE",
-            marks: "5",
-            difficulty: "EASY",
-        });
+            const row = makeRow({
+                questionText: "Existing archived Q",
+                type: "TRUE_FALSE",
+                correctAnswer: "TRUE",
+                marks: "5",
+                difficulty: "EASY",
+            });
 
-        const buf = csvBuffer([HEADERS_LINE, row]);
-        const result = await processQuestionImportPreview(
-            buf,
-            "data.csv",
-            questionBank._id,
-            instructorId
-        );
+            const buf = csvBuffer([HEADERS_LINE, row]);
 
-        assert.equal(result.summary.duplicateRows, 1);
-        assert.equal(result.summary.validRows, 0);
+            const result = await processQuestionImportPreview(
+                buf,
+                "data.csv",
+                questionBank._id,
+                instructorId
+            );
 
-        // Cleanup archived fixture.
-        await Question.deleteMany({ questionBankId: questionBank._id });
-    });
+            assert.equal(result.summary.duplicateRows, 1);
+            assert.equal(result.summary.validRows, 0);
 
-    await t.test("Invalid first row does not block later valid row with same text", async () => {
-        // Row 1 — invalid (no marks): should NOT reserve the normalised text.
-        const invalidRow = makeRow({
-            questionText: "Contested text",
-            type: "TRUE_FALSE",
-            correctAnswer: "TRUE",
-            // marks omitted → invalid
-            difficulty: "EASY",
-        });
-        // Row 2 — valid: should be accepted because row 1 was invalid.
-        const validRow = makeRow({
-            questionText: "Contested text",
-            type: "TRUE_FALSE",
-            correctAnswer: "TRUE",
-            marks: "5",
-            difficulty: "EASY",
-        });
+            // Cleanup archived fixture.
+            await Question.deleteMany({
+                questionBankId: questionBank._id,
+            });
+        }
+    );
 
-        const buf = csvBuffer([HEADERS_LINE, invalidRow, validRow]);
-        const result = await processQuestionImportPreview(
-            buf,
-            "data.csv",
-            questionBank._id,
-            instructorId
-        );
+    await t.test(
+        "Invalid first row does not block later valid row with same text",
+        async () => {
+            // Row 1 — invalid (no marks): should NOT reserve the normalised text.
+            const invalidRow = makeRow({
+                questionText: "Contested text",
+                type: "TRUE_FALSE",
+                correctAnswer: "TRUE",
+                // marks omitted → invalid
+                difficulty: "EASY",
+            });
 
-        assert.equal(result.summary.invalidRows, 1);
-        assert.equal(result.summary.validRows, 1);
-        assert.equal(result.summary.duplicateRows, 0);
-    });
+            // Row 2 — valid: should be accepted because row 1 was invalid.
+            const validRow = makeRow({
+                questionText: "Contested text",
+                type: "TRUE_FALSE",
+                correctAnswer: "TRUE",
+                marks: "5",
+                difficulty: "EASY",
+            });
+
+            const buf = csvBuffer([HEADERS_LINE, invalidRow, validRow]);
+
+            const result = await processQuestionImportPreview(
+                buf,
+                "data.csv",
+                questionBank._id,
+                instructorId
+            );
+
+            assert.equal(result.summary.invalidRows, 1);
+            assert.equal(result.summary.validRows, 1);
+            assert.equal(result.summary.duplicateRows, 0);
+        }
+    );
 
     await t.test("Non-contiguous MCQ options are rejected per row", async () => {
         const nonContiguous = makeRow({
@@ -608,14 +814,18 @@ test("Question Import Service Integration Tests", async (t) => {
             marks: "5",
             difficulty: "EASY",
         });
+
         const buf = csvBuffer([HEADERS_LINE, nonContiguous]);
+
         const result = await processQuestionImportPreview(
             buf,
             "data.csv",
             questionBank._id,
             instructorId
         );
+
         assert.equal(result.summary.invalidRows, 1);
+
         assert.ok(
             result.previewData[0].rowErrors.some((e) =>
                 e.toLowerCase().includes("contiguous")
@@ -629,6 +839,7 @@ test("Question Import Service Integration Tests", async (t) => {
             { marks: "10abc", label: "alphanumeric" },
             { marks: "", label: "empty" },
         ];
+
         for (const { marks, label } of cases) {
             const row = makeRow({
                 questionText: `Marks test ${label}`,
@@ -637,13 +848,16 @@ test("Question Import Service Integration Tests", async (t) => {
                 marks,
                 difficulty: "EASY",
             });
+
             const buf = csvBuffer([HEADERS_LINE, row]);
+
             const result = await processQuestionImportPreview(
                 buf,
                 "data.csv",
                 questionBank._id,
                 instructorId
             );
+
             assert.equal(
                 result.summary.invalidRows,
                 1,
@@ -655,34 +869,52 @@ test("Question Import Service Integration Tests", async (t) => {
     await t.test("Valid XLSX file is accepted and parsed correctly", async () => {
         const buf = await xlsxBuffer([
             HEADERS,
-            ["Excel MCQ", "MCQ_SINGLE", "Opt A", "Opt B", "", "", "", "", "A", "", 8, "HARD"],
+            [
+                "Excel MCQ",
+                "MCQ_SINGLE",
+                "Opt A",
+                "Opt B",
+                "",
+                "",
+                "",
+                "",
+                "A",
+                "",
+                8,
+                "HARD",
+            ],
         ]);
+
         const result = await processQuestionImportPreview(
             buf,
             "data.xlsx",
             questionBank._id,
             instructorId
         );
+
         assert.equal(result.summary.validRows, 1);
         assert.equal(result.summary.totalRows, 1);
     });
 
     await t.test("Preview document expires logically after 30 minutes", async () => {
         const buf = csvBuffer([HEADERS_LINE, VALID_MCQ]);
+
         const result = await processQuestionImportPreview(
             buf,
             "data.csv",
             questionBank._id,
             instructorId
         );
+
         const now = new Date();
         const expiresAt = new Date(result.expiresAt);
         const thirtyMinMs = 30 * 60 * 1000;
-        // expiresAt should be approximately 30 minutes in the future (within 5s tolerance).
+
         assert.ok(
             expiresAt.getTime() - now.getTime() > thirtyMinMs - 5000,
-            "expiresAt should be ~30 minutes in the future"
+            "expiresAt should be approximately 30 minutes in the future"
         );
+
         assert.ok(
             expiresAt.getTime() - now.getTime() <= thirtyMinMs + 5000,
             "expiresAt should not be more than 30 minutes (+5s) in the future"

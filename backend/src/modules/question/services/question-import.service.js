@@ -114,7 +114,7 @@ function mapRowToPayload(data) {
     // ---------- assemble payload ----------
     const payload = {
         questionText: (data.questiontext || '').trim(),
-        type: type || 'MCQ_SINGLE',
+        type,
         difficulty,
     };
 
