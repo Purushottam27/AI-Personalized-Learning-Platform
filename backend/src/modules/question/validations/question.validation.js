@@ -259,3 +259,10 @@ export const questionBankIdSchema = z
         questionBankId: objectIdStringSchema
     })
     .strict();
+
+// IMPORT ID
+export const importIdSchema = z
+    .object({
+        importId: objectIdStringSchema
+    })
+    .strict();

@@ -65,10 +65,29 @@ const questionImportSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            // Stage 4 will add "CONFIRMED" | "FAILED" etc.
-            enum: ["PREVIEW_READY"],
+            enum: ["PREVIEW_READY", "CONFIRMED"],
             required: true,
             default: "PREVIEW_READY",
+        },
+
+        confirmedAt: {
+            type: Date,
+            default: null,
+        },
+
+        createdCount: {
+            type: Number,
+            default: 0,
+        },
+
+        createdQuestionIds: {
+            type: [
+                {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "Question",
+                },
+            ],
+            default: [],
         },
 
         summary: {

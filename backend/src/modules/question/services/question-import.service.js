@@ -365,3 +365,5 @@ export async function processQuestionImportPreview(
         previewData: questionImport.previewData,
     };
 }
+
+export { confirmQuestionImportService } from './question-import-confirmation.service.js';

@@ -165,5 +165,9 @@ const questionSchema = new mongoose.Schema({
 },{ timestamps: true });
 
 questionSchema.index({ questionBankId: 1, status: 1 });
+questionSchema.index(
+    { questionBankId: 1, normalizedQuestionText: 1 },
+    { unique: true }
+);
 
 export const Question = mongoose.model("Question", questionSchema);

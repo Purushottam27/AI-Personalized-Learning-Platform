@@ -4,7 +4,8 @@ import {
     createQuestionSchema,
     updateQuestionSchema,
     questionIdSchema,
-    questionBankIdSchema
+    questionBankIdSchema,
+    importIdSchema
 } from "./question.validation.js";
 
 function parseOrThrow(schema, data, errorMessage) {
@@ -55,6 +56,16 @@ export function validateQuestionId(req, res, next) {
 export function validateQuestionBankId(req, res, next) {
     req.params = parseOrThrow(
         questionBankIdSchema,
+        req.params,
+        "Invalid path parameters"
+    );
+
+    next();
+}
+
+export function validateImportId(req, res, next) {
+    req.params = parseOrThrow(
+        importIdSchema,
         req.params,
         "Invalid path parameters"
     );

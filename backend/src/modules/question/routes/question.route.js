@@ -6,7 +6,8 @@ import {
     validateCreateQuestion,
     validateUpdateQuestion,
     validateQuestionId,
-    validateQuestionBankId
+    validateQuestionBankId,
+    validateImportId
 } from "../validations/question.validation.middleware.js";
 
 import {
@@ -18,7 +19,10 @@ import {
     restoreQuestion
 } from "../controllers/question.controller.js";
 
-import { importQuestionsPreview } from "../controllers/question-import.controller.js";
+import {
+    importQuestionsPreview,
+    confirmQuestionImport
+} from "../controllers/question-import.controller.js";
 import questionImportUpload from "../middleware/questionImportUpload.middleware.js";
 
 const questionRouter = Router();
@@ -51,6 +55,17 @@ questionRouter.post(
     validateQuestionBankId,
     questionImportUpload,
     importQuestionsPreview
+);
+
+/**
+ * POST /api/v1/question-imports/:importId/confirm
+ *
+ * Stage 4: Confirm import preview and permanently create questions.
+ */
+questionRouter.post(
+    "/question-imports/:importId/confirm",
+    validateImportId,
+    confirmQuestionImport
 );
 
 
