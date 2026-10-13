@@ -567,73 +567,126 @@ test("Question Import Confirmation — Stage 4 Integration Tests", async (t) => 
     });
 
     // -----------------------------------------------------------------------
-    // Test 9: A transaction failure leaves no partially created questions and does not mark the import confirmed
+    // Test 9: A failure after insertion rolls back questions and confirmation metadata
     // -----------------------------------------------------------------------
-    await t.test("9. A transaction failure leaves no partially created questions and does not mark the import confirmed", async () => {
-        // Pre-insert a conflicting question that will collide on the second row during transaction insertion
-        const conflictingText = "Transaction Rollback Collision Target";
-        await Question.create({
-            questionBankId: questionBank._id,
-            courseId: course._id,
-            topicId: topic._id,
-            createdBy: instructorId,
-            questionText: conflictingText,
-            normalizedQuestionText: normalizeQuestionText(conflictingText),
-            type: "TRUE_FALSE",
-            correctAnswer: "TRUE",
-            marks: 1,
-            difficulty: "EASY",
-            status: "ACTIVE",
-        });
+    await t.test(
+        "9. A transaction failure rolls back inserted questions and confirmation metadata",
+        async () => {
+            const firstText = "Rollback Test Question One";
+            const secondText = "Rollback Test Question Two";
 
-        const importDoc = await makeImportDoc({
-            previewData: [
-                {
-                    rowNumber: 1,
-                    isValid: true,
-                    isDuplicate: false,
-                    rowErrors: [],
-                    questionText: "First Row Before Collision Should Rollback",
-                    type: "TRUE_FALSE",
-                    correctAnswer: "TRUE",
-                    marks: 1,
-                    difficulty: "EASY",
+            const importDoc = await makeImportDoc({
+                previewData: [
+                    {
+                        rowNumber: 1,
+                        isValid: true,
+                        isDuplicate: false,
+                        rowErrors: [],
+                        questionText: firstText,
+                        type: "TRUE_FALSE",
+                        correctAnswer: "TRUE",
+                        marks: 1,
+                        difficulty: "EASY",
+                    },
+                    {
+                        rowNumber: 2,
+                        isValid: true,
+                        isDuplicate: false,
+                        rowErrors: [],
+                        questionText: secondText,
+                        type: "TRUE_FALSE",
+                        correctAnswer: "FALSE",
+                        marks: 1,
+                        difficulty: "EASY",
+                    },
+                ],
+                summary: {
+                    totalRows: 2,
+                    validRows: 2,
+                    invalidRows: 0,
+                    duplicateRows: 0,
+                    blankRowsSkipped: 0,
+                    importableRows: 2,
                 },
-                {
-                    rowNumber: 2,
-                    isValid: true,
-                    isDuplicate: false,
-                    rowErrors: [],
-                    questionText: conflictingText,
-                    type: "TRUE_FALSE",
-                    correctAnswer: "TRUE",
-                    marks: 1,
-                    difficulty: "EASY",
-                },
-            ],
-            summary: { totalRows: 2, validRows: 2, invalidRows: 0, duplicateRows: 0, blankRowsSkipped: 0, importableRows: 2 },
-        }).save();
+            }).save();
 
-        await assert.rejects(
-            confirmQuestionImportService(importDoc._id, instructorId),
-            (err) => {
-                assert.equal(err.statusCode, 409);
-                assert.equal(err.code, "DUPLICATE_KEY_CONFLICT");
-                return true;
+            const originalInsertMany = Question.insertMany;
+            let insertCompletedInsideTransaction = false;
+
+            try {
+                // Allow the real insert to run with the transaction session,
+                // then inject a failure before the service can commit.
+                Question.insertMany = async function (documents, options) {
+                    const inserted = await originalInsertMany.call(
+                        this,
+                        documents,
+                        options
+                    );
+
+                    insertCompletedInsideTransaction = true;
+
+                    throw new Error(
+                        "Injected failure after transactional question insertion"
+                    );
+                };
+
+                await assert.rejects(
+                    confirmQuestionImportService(importDoc._id, instructorId),
+                    (error) => {
+                        assert.equal(error.statusCode, 500);
+                        assert.equal(error.code, "DATABASE_ERROR");
+                        assert.match(
+                            error.message,
+                            /Injected failure after transactional question insertion/
+                        );
+                        return true;
+                    }
+                );
+            } finally {
+                // Never leave the mocked Mongoose method in place for other tests.
+                Question.insertMany = originalInsertMany;
             }
-        );
 
-        // Verify import is NOT marked confirmed
-        const checkImport = await QuestionImport.findById(importDoc._id);
-        assert.equal(checkImport.status, "PREVIEW_READY");
-        assert.equal(checkImport.confirmedAt, null);
+            // Prove the failure happened after insertMany completed.
+            assert.equal(
+                insertCompletedInsideTransaction,
+                true,
+                "The injected failure must occur after transactional insertion"
+            );
 
-        // Verify row 1 was NOT partially created
-        const partialQ = await Question.findOne({
-            normalizedQuestionText: normalizeQuestionText("First Row Before Collision Should Rollback"),
-        });
-        assert.equal(partialQ, null);
-    });
+            // Neither question should survive the aborted transaction.
+            const persistedQuestions = await Question.find({
+                questionBankId: questionBank._id,
+                normalizedQuestionText: {
+                    $in: [
+                        normalizeQuestionText(firstText),
+                        normalizeQuestionText(secondText),
+                    ],
+                },
+            }).lean();
+
+            assert.equal(
+                persistedQuestions.length,
+                0,
+                "The transaction must roll back all inserted questions"
+            );
+
+            // The import confirmation must also roll back.
+            const persistedImport = await QuestionImport.findById(
+                importDoc._id
+            ).lean();
+
+            assert.equal(persistedImport.status, "PREVIEW_READY");
+            assert.equal(persistedImport.confirmedAt ?? null, null);
+            assert.equal(persistedImport.createdCount ?? 0, 0);
+            assert.deepEqual(
+                persistedImport.createdQuestionIds ?? [],
+                [],
+                "No confirmation result should survive rollback"
+            );
+        }
+    );
+
 
     // -----------------------------------------------------------------------
     // Test 10: A duplicate introduced after preview generation is handled safely
