@@ -18,6 +18,16 @@ const FILE_FORMAT_BY_EXTENSION = {
     ".docx": "DOCX"
 };
 
+const EXTENSION_BY_FILE_FORMAT = {
+    PDF: "pdf",
+    PPT: "ppt",
+    PPTX: "pptx",
+    DOC: "doc",
+    DOCX: "docx"
+};
+
+const RESOURCE_DOWNLOAD_URL_TTL_SECONDS = 5 * 60;
+
 // Helper functions:
 
 async function getOwnedTopicAndCourse(instructorId, topicId) {
@@ -134,7 +144,8 @@ function getFileFormat(originalname) {
 async function cleanupCloudinaryAsset(publicId, resourceType) {
     try {
         await cloudinary.uploader.destroy(publicId, {
-            resource_type: resourceType ?? "raw"
+            resource_type: resourceType ?? "raw",
+            type: "authenticated"
         });
     } catch (cleanupError) {
         // Best-effort only: never let a cleanup failure hide the original error.
@@ -173,7 +184,12 @@ async function createUploadedResource(topicId, resourceData, file) {
 
     const fileFormat = getFileFormat(file.originalname);
 
-    const cloudinaryResponse = await uploadOnCloudinary(file.path);
+    // Resource documents are uploaded as authenticated raw assets. Do not change
+    // the shared helper's default because avatars use its existing public-upload behavior.
+    const cloudinaryResponse = await uploadOnCloudinary(file.path, {
+        resource_type: "raw",
+        type: "authenticated"
+    });
 
     if (!cloudinaryResponse) {
         throw new ApiError(500, "UPLOAD_FAILED", "File upload failed");
@@ -192,6 +208,8 @@ async function createUploadedResource(topicId, resourceData, file) {
             provider: null,
             url: null,
             storageReference: cloudinaryResponse.public_id,
+            storageAccess: "AUTHENTICATED",
+            storageResourceType: cloudinaryResponse.resource_type,
             fileFormat,
             fileSize: file.size,
             order,
@@ -266,6 +284,67 @@ export async function updateResourceService(instructorId, resourceId, updateData
     await resource.save();
 
     return resource;
+}
+
+/**
+ * Creates a five-minute, signed Cloudinary download URL after checking that
+ * the requesting instructor owns the resource. Legacy public uploads are
+ * deliberately blocked until their Cloudinary delivery type is migrated.
+ */
+export async function getResourceDownloadUrlService(instructorId, resourceId) {
+    const { resource } = await getOwnedResourceContext(instructorId, resourceId);
+
+    if (resource.source !== "UPLOAD" || resource.type !== "DOCUMENT") {
+        throw new ApiError(
+            400,
+            "RESOURCE_FILE_NOT_AVAILABLE",
+            "Only uploaded document resources have downloadable files"
+        );
+    }
+
+    if (resource.status !== "ACTIVE") {
+        throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+    }
+
+    // Select-false fields are loaded explicitly. Existing records have no access
+    // metadata and must be migrated rather than treated as private by assumption.
+    const securedResource = await Resource.findById(resourceId)
+        .select("+storageReference +storageAccess +storageResourceType fileFormat source type status");
+
+    if (
+        !securedResource?.storageReference ||
+        securedResource.storageAccess !== "AUTHENTICATED" ||
+        !securedResource.storageResourceType
+    ) {
+        throw new ApiError(
+            409,
+            "RESOURCE_FILE_MIGRATION_REQUIRED",
+            "This uploaded file must be migrated to private delivery before it can be opened"
+        );
+    }
+
+    const format = EXTENSION_BY_FILE_FORMAT[securedResource.fileFormat];
+    if (!format) {
+        throw new ApiError(
+            409,
+            "RESOURCE_FILE_FORMAT_UNSUPPORTED",
+            "A secure download URL cannot be generated for this file format"
+        );
+    }
+
+    const expiresAt = Math.floor(Date.now() / 1000) + RESOURCE_DOWNLOAD_URL_TTL_SECONDS;
+    const url = cloudinary.utils.private_download_url(
+        securedResource.storageReference,
+        format,
+        {
+            resource_type: securedResource.storageResourceType,
+            type: securedResource.storageAccess.toLowerCase(),
+            expires_at: expiresAt,
+            attachment: true
+        }
+    );
+
+    return { url, expiresAt };
 }
 
 export async function reorderResourcesService(instructorId, topicId, resourceIds) {

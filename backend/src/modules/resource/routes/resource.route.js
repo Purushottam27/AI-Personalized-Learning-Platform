@@ -21,7 +21,8 @@ import {
     updateResource,
     reorderResources,
     archiveResource,
-    restoreResource
+    restoreResource,
+    getResourceDownloadUrl
 } from "../controllers/resource.controller.js";
 
 const resourceRouter = Router();
@@ -47,6 +48,12 @@ resourceRouter.get(
     "/resources/:resourceId",
     validateResourceId,
     getResourceById
+);
+
+resourceRouter.get(
+    "/resources/:resourceId/file",
+    validateResourceId,
+    getResourceDownloadUrl
 );
 
 resourceRouter.patch(

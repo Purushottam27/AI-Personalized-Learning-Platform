@@ -1,23 +1,19 @@
 import fs from 'fs'
 import cloudinary from '../../config/cloudinary.js';
 
-const uploadOnCloudinary = async function(localFilePath){
+const uploadOnCloudinary = async function(localFilePath, uploadOptions = { resource_type: 'auto' }){
     try {
         if(!localFilePath) return null
 
         // upload the file on cloudinary
-        const response = await cloudinary.uploader.upload(localFilePath,{
-            resource_type:'auto'
-        })
-
-        console.log("File is uploaded on cloudinary ",response.url,response.secure_url); // form reponse we get the public url which we can give to user to access the images.
+        const response = await cloudinary.uploader.upload(localFilePath, uploadOptions)
 
         await fs.promises.unlink(localFilePath); // make it asynchronous
         
         return response
     } catch (error) {
-        console.log("Cloudinary Error:"); 
-        console.log(error);
+        // Do not log provider URLs, credentials, or uploaded-file details.
+        console.error("Cloudinary upload failed");
 
         if (localFilePath && fs.existsSync(localFilePath)) {
             await fs.promises.unlink(localFilePath);

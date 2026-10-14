@@ -58,7 +58,23 @@ const resourceSchema = new mongoose.Schema(
         storageReference: {
             type: String,
             trim: true,
-            default: null
+            default: null,
+            select: false
+        },
+
+        // Internal delivery metadata. Legacy records intentionally remain null until migrated.
+        storageAccess: {
+            type: String,
+            enum: ["AUTHENTICATED"],
+            default: null,
+            select: false
+        },
+
+        storageResourceType: {
+            type: String,
+            enum: ["raw", "image", "video"],
+            default: null,
+            select: false
         },
 
         fileFormat: {
