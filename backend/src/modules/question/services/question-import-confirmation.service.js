@@ -199,101 +199,136 @@ export async function confirmQuestionImportService(importId, instructorId) {
     const createdCount = questionsToInsert.length;
     const confirmedAt = new Date();
 
-    // 13. Persist questions and confirmed status/result atomically via transactions
-    const session = await mongoose.startSession();
+        // 13. Persist questions and confirmation result atomically.
+    // Retry only transient transaction conflicts.
+    const MAX_TRANSACTION_ATTEMPTS = 3;
 
-    try {
-        session.startTransaction();
-
-        // Atomically transition from PREVIEW_READY to CONFIRMED
-        const updatedImport = await QuestionImport.findOneAndUpdate(
-            { _id: importId, status: "PREVIEW_READY" },
-            {
-                $set: {
-                    status: "CONFIRMED",
-                    confirmedAt,
-                    createdCount,
-                    createdQuestionIds,
-                },
-            },
-            { session, returnDocument: 'after' }
-        );
-
-        if (!updatedImport) {
-            // Concurrent confirmation or state changed
-            await session.abortTransaction();
-
-            const rechecked = await QuestionImport.findById(importId);
-            if (rechecked && rechecked.status === "CONFIRMED") {
-                return {
-                    importId: rechecked._id,
-                    status: rechecked.status,
-                    confirmedAt: rechecked.confirmedAt,
-                    createdCount: rechecked.createdCount ?? rechecked.createdQuestionIds?.length ?? 0,
-                    createdQuestionIds: rechecked.createdQuestionIds ?? [],
-                };
-            }
-
-            throw new ApiError(
-                409,
-                "INVALID_IMPORT_STATE",
-                "Import preview is no longer in PREVIEW_READY state"
-            );
-        }
-
-        await Question.insertMany(questionsToInsert, { session });
-
-        await session.commitTransaction();
-
-        // 14. Return clear result
+    function getConfirmedResult(importDoc) {
         return {
-            importId: updatedImport._id,
-            status: updatedImport.status,
-            confirmedAt: updatedImport.confirmedAt,
-            createdCount: updatedImport.createdCount,
-            createdQuestionIds: updatedImport.createdQuestionIds,
+            importId: importDoc._id,
+            status: importDoc.status,
+            confirmedAt: importDoc.confirmedAt,
+            createdCount:
+                importDoc.createdCount ??
+                importDoc.createdQuestionIds?.length ??
+                0,
+            createdQuestionIds: importDoc.createdQuestionIds ?? [],
         };
-    } catch (error) {
-        if (session.inTransaction()) {
-            await session.abortTransaction();
-        }
-
-        // Handle concurrent WriteConflict
-        if (error.code === 112 || error.name === "WriteConflict") {
-            const rechecked = await QuestionImport.findById(importId);
-            if (rechecked && rechecked.status === "CONFIRMED") {
-                return {
-                    importId: rechecked._id,
-                    status: rechecked.status,
-                    confirmedAt: rechecked.confirmedAt,
-                    createdCount: rechecked.createdCount ?? rechecked.createdQuestionIds?.length ?? 0,
-                    createdQuestionIds: rechecked.createdQuestionIds ?? [],
-                };
-            }
-        }
-
-        // Duplicate-key error from MongoDB unique index
-        if (error.code === 11000) {
-            throw new ApiError(
-                409,
-                "DUPLICATE_KEY_CONFLICT",
-                "A question with this text already exists in the question bank"
-            );
-        }
-
-        if (error instanceof ApiError) {
-            throw error;
-        }
-
-        throw new ApiError(
-            500,
-            "DATABASE_ERROR",
-            `Failed to confirm question import: ${error.message}`
-        );
-    } finally {
-        if (session.inTransaction()) {
-            await session.abortTransaction();
-        }
-        await session.endSession();
     }
+
+    function isTransientTransactionError(error) {
+        return (
+            error?.code === 112 ||
+            error?.name === "WriteConflict" ||
+            error?.hasErrorLabel?.("TransientTransactionError") === true
+        );
+    }
+
+    for (
+        let attempt = 1;
+        attempt <= MAX_TRANSACTION_ATTEMPTS;
+        attempt++
+    ) {
+        const session = await mongoose.startSession();
+
+        try {
+            session.startTransaction();
+
+            // Atomically claim the import. Only one transaction can
+            // transition this import from PREVIEW_READY to CONFIRMED.
+            const updatedImport = await QuestionImport.findOneAndUpdate(
+                {
+                    _id: importId,
+                    status: "PREVIEW_READY",
+                },
+                {
+                    $set: {
+                        status: "CONFIRMED",
+                        confirmedAt,
+                        createdCount,
+                        createdQuestionIds,
+                    },
+                },
+                {
+                    session,
+                    returnDocument: "after",
+                }
+            );
+
+            if (!updatedImport) {
+                await session.abortTransaction();
+
+                // Another request may have completed the import.
+                const rechecked = await QuestionImport.findById(importId);
+
+                if (rechecked?.status === "CONFIRMED") {
+                    return getConfirmedResult(rechecked);
+                }
+
+                throw new ApiError(
+                    409,
+                    "INVALID_IMPORT_STATE",
+                    "Import preview is no longer in PREVIEW_READY state"
+                );
+            }
+
+            await Question.insertMany(questionsToInsert, { session });
+
+            await session.commitTransaction();
+
+            return getConfirmedResult(updatedImport);
+        } catch (error) {
+            if (session.inTransaction()) {
+                await session.abortTransaction();
+            }
+
+            // Resolve a concurrent confirmation before considering retry.
+            // The other transaction may have committed while this request
+            // was waiting or aborting.
+            const rechecked = await QuestionImport.findById(importId);
+
+            if (rechecked?.status === "CONFIRMED") {
+                return getConfirmedResult(rechecked);
+            }
+
+            if (
+                isTransientTransactionError(error) &&
+                attempt < MAX_TRANSACTION_ATTEMPTS
+            ) {
+                // Short bounded backoff gives the competing transaction
+                // time to finish before this request attempts again.
+                await new Promise((resolve) =>
+                    setTimeout(resolve, 50 * attempt)
+                );
+
+                continue;
+            }
+
+            if (error.code === 11000) {
+                throw new ApiError(
+                    409,
+                    "DUPLICATE_KEY_CONFLICT",
+                    "A question with this text already exists in the question bank"
+                );
+            }
+
+            if (error instanceof ApiError) {
+                throw error;
+            }
+
+            throw new ApiError(
+                500,
+                "DATABASE_ERROR",
+                `Failed to confirm question import: ${error.message}`
+            );
+        } finally {
+            await session.endSession();
+        }
+    }
+
+    throw new ApiError(
+        503,
+        "TRANSACTION_RETRY_EXHAUSTED",
+        "Could not confirm the import because of concurrent database activity. Please retry."
+    );
 }
