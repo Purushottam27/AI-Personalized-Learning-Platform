@@ -155,6 +155,9 @@ const questionSchema = new mongoose.Schema({
         required: true
     },
 
+    // Updated in publication transactions to serialize archive/edit operations.
+    lifecycleVersion: { type: Number, default: 0, select: false },
+
     status: {
         type: String,
         enum: ["ACTIVE", "ARCHIVED"],

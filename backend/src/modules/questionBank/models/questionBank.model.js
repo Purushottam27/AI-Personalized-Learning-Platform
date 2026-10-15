@@ -38,6 +38,9 @@ const questionBankSchema = new mongoose.Schema(
             default: ""
         },
 
+        // Incremented by publication transactions to serialize lifecycle changes.
+        lifecycleVersion: { type: Number, default: 0, select: false },
+
         status: {
             type: String,
             enum: ["ACTIVE", "ARCHIVED"],

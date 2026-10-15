@@ -58,13 +58,17 @@ const createEnrollmentService = async(learnerId, courseId) =>{
 
     assertDiagnosticEligibility(course.diagnosticPolicy);
 
-    const enrollment = await Enrollment.create({
-        learnerId,
-        courseId,
-        status: "ACTIVE"
-    });
-
-    return enrollment;
+    try {
+        return await Enrollment.create({ learnerId, courseId, status: "ACTIVE" });
+    } catch (error) {
+        if (error?.code === 11000 && (
+            error?.keyPattern?.status ||
+            error?.message?.includes("uniq_active_enrollment_per_learner_course")
+        )) {
+            throw new ApiError(409, "ALREADY_ENROLLED", "You are already enrolled in this course");
+        }
+        throw error;
+    }
 }
 
 const getMyEnrollmentsService = async(learnerId)=>{

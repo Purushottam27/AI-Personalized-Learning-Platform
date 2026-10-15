@@ -804,7 +804,10 @@ test("Practice service integration tests", async (t) => {
                 await assert.rejects(
                     publishPracticeService(instructorId, practice._id),
                     (error) =>
-                        assertApiError(error, "PRACTICE_STATE_CHANGED", 409)
+                        assertApiError(error, "PRACTICE_STATE_CHANGED", 409) ||
+                        // A transaction retry can observe the changed empty
+                        // selection and reject it before the state transition.
+                        assertApiError(error, "PRACTICE_REQUIRES_QUESTIONS", 400)
                 );
             } finally {
                 Practice.findOneAndUpdate = originalFindOneAndUpdate;

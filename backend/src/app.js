@@ -18,6 +18,7 @@ import { resourceRouter } from './modules/resource/routes/resource.route.js';
 import { questionBankRouter } from './modules/questionBank/routes/questionBank.route.js';
 import { questionRouter } from './modules/question/routes/question.route.js';
 import { practiceRouter } from "./modules/practice/routes/practice.route.js";
+import { assessmentRouter } from './modules/assessment/routes/assessment.route.js';
 
 const app = express();
 const logger = pino();
@@ -48,6 +49,7 @@ app.use('/api/v1',resourceRouter)
 app.use('/api/v1',questionBankRouter)
 app.use('/api/v1',questionRouter)
 app.use('/api/v1', practiceRouter);
+app.use('/api/v1', assessmentRouter);
 
 // Global Error-handling response Middleware
 app.use(errorMiddleware);

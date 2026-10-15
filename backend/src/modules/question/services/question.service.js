@@ -5,6 +5,9 @@ import { Course } from "../../course/models/course.model.js";
 import { Lesson } from "../../lesson/models/lesson.model.js";
 import { normalizeQuestionText } from "../../../shared/utils/textNormalization.js";
 
+import { Practice } from "../../practice/models/practice.model.js";
+import { Assessment } from "../../assessment/models/assessment.model.js";
+import { withTransaction } from "../../../shared/utils/withTransaction.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 /*
@@ -22,8 +25,9 @@ import { ApiError } from "../../../shared/errors/ApiError.js";
 |
 */
 
-export async function getOwnedQuestionBankContext(instructorId, questionBankId) {
-    const questionBank = await QuestionBank.findById(questionBankId);
+export async function getOwnedQuestionBankContext(instructorId, questionBankId, session = null) {
+    const bankQuery = QuestionBank.findById(questionBankId);
+    const questionBank = await (session ? bankQuery.session(session) : bankQuery);
 
     if (!questionBank) {
         throw new ApiError(
@@ -33,7 +37,8 @@ export async function getOwnedQuestionBankContext(instructorId, questionBankId) 
         );
     }
 
-    const topic = await Topic.findById(questionBank.topicId);
+    const topicQuery = Topic.findById(questionBank.topicId);
+    const topic = await (session ? topicQuery.session(session) : topicQuery);
 
     if (!topic) {
         throw new ApiError(
@@ -43,7 +48,8 @@ export async function getOwnedQuestionBankContext(instructorId, questionBankId) 
         );
     }
 
-    const course = await Course.findById(questionBank.courseId);
+    const courseQuery = Course.findById(questionBank.courseId);
+    const course = await (session ? courseQuery.session(session) : courseQuery);
 
     if (!course) {
         throw new ApiError(
@@ -79,8 +85,9 @@ export async function getOwnedQuestionBankContext(instructorId, questionBankId) 
 
 // Question Context: Used when accessing an existing Question.
 
-async function getOwnedQuestionContext(instructorId, questionId) {
-    const question = await Question.findById(questionId);
+async function getOwnedQuestionContext(instructorId, questionId, session = null) {
+    const questionQuery = Question.findById(questionId);
+    const question = await (session ? questionQuery.session(session) : questionQuery);
 
     if (!question) {
         throw new ApiError(
@@ -93,7 +100,8 @@ async function getOwnedQuestionContext(instructorId, questionId) {
     const { questionBank, topic, course } =
         await getOwnedQuestionBankContext(
             instructorId,
-            question.questionBankId
+            question.questionBankId,
+            session
         );
 
     // Verify that the Question's denormalized references are consistent with the Question Bank.
@@ -135,12 +143,13 @@ async function getOwnedQuestionContext(instructorId, questionId) {
 |
 */
 
-async function validateLessonForTopic(lessonId, topicId) {
+async function validateLessonForTopic(lessonId, topicId, session = null) {
     if (!lessonId) {
         return null;
     }
 
-    const lesson = await Lesson.findById(lessonId);
+    const lessonQuery = Lesson.findById(lessonId);
+    const lesson = await (session ? lessonQuery.session(session) : lessonQuery);
 
     if (!lesson) {
         throw new ApiError(
@@ -201,45 +210,30 @@ async function validateQuestionState(questionData) {
 
 // CREATE QUESTION
 
-export async function createQuestionService(  instructorId, questionBankId,questionData) {
-    const {questionBank,topic,course} = await getOwnedQuestionBankContext(
-        instructorId,
-        questionBankId
-    );
+export async function createQuestionService(instructorId, questionBankId, questionData) {
+    return withTransaction(async (session) => {
+        const { questionBank, topic, course } = await getOwnedQuestionBankContext(instructorId, questionBankId, session);
+        ensureQuestionBankActive(questionBank);
+        if (questionData.lessonId) await validateLessonForTopic(questionData.lessonId, topic._id, session);
 
-    ensureQuestionBankActive(questionBank);
-
-    if (questionData.lessonId) {
-        await validateLessonForTopic(
-            questionData.lessonId,
-            topic._id
+        const questionPayload = {
+            questionBankId: questionBank._id, courseId: course._id, topicId: topic._id,
+            lessonId: questionData.lessonId ?? null, createdBy: instructorId,
+            questionText: questionData.questionText, type: questionData.type,
+            options: questionData.options ?? [], correctAnswer: questionData.correctAnswer,
+            explanation: questionData.explanation ?? "", marks: questionData.marks,
+            difficulty: questionData.difficulty,
+        };
+        const question = await validateQuestionState(questionPayload);
+        const bankFence = await QuestionBank.updateOne(
+            { _id: questionBank._id, status: "ACTIVE" },
+            { $inc: { lifecycleVersion: 1 } },
+            { session }
         );
-    }
-
-    const questionPayload = {
-        questionBankId: questionBank._id,
-        courseId: course._id,
-        topicId: topic._id,
-        lessonId: questionData.lessonId ?? null,
-
-        createdBy: instructorId,
-
-        questionText: questionData.questionText,
-        type: questionData.type,
-        options: questionData.options ?? [],
-        correctAnswer: questionData.correctAnswer,
-        explanation: questionData.explanation ?? "",
-        marks: questionData.marks,
-        difficulty: questionData.difficulty
-    };
-
-    // Validate the complete question before saving.
-     
-    const question = await validateQuestionState(questionPayload);
-
-    await question.save();
-
-    return question;
+        if (bankFence.modifiedCount !== 1) throw new ApiError(409, "QUESTION_BANK_ARCHIVED", "Question bank changed during question creation; reload and retry");
+        await question.save({ session });
+        return question;
+    });
 }
 
 // GET QUESTIONS BY QUESTION BANK
@@ -272,159 +266,102 @@ export async function getQuestionByIdService(instructorId,questionId) {
 
 // UPDATE QUESTION
 
-export async function updateQuestionService( instructorId, questionId, updateData) {
-    const {question,questionBank,topic} = await getOwnedQuestionContext(
-        instructorId,
-        questionId
-    );
+export async function updateQuestionService(instructorId, questionId, updateData) {
+    return withTransaction(async (session) => {
+        const { question, questionBank, topic } = await getOwnedQuestionContext(instructorId, questionId, session);
+        ensureQuestionBankActive(questionBank);
 
-    ensureQuestionBankActive(questionBank);
+        // Published Assessment questions are immutable: historical and future attempts
+        // must continue to refer to the same question definition.
+        const assessmentUsage = await Assessment.exists({
+            status: "PUBLISHED",
+            questionIds: question._id,
+        }).session(session);
+        if (assessmentUsage) {
+            throw new ApiError(409, "QUESTION_USED_IN_PUBLISHED_ASSESSMENT", "A question used by a published assessment cannot be edited");
+        }
 
-    /*
-     * Assessment immutability:
-     *
-     * A question that has already been included in an Assessment
-     * must not be edited.
-     *
-     * The Assessment module is not implemented yet, so the actual
-     * usage check will be added when Assessment is implemented.
-     */
-
-    /*
-     * Create the complete next state by merging the current
-     * question with the PATCH data.
-     */
-    const nextState = {
-        questionBankId: question.questionBankId,
-        courseId: question.courseId,
-        topicId: question.topicId,
-        lessonId:
-            updateData.lessonId !== undefined
-                ? updateData.lessonId
-                : question.lessonId,
-
-        createdBy: question.createdBy,
-
-        questionText:
-            updateData.questionText !== undefined
-                ? updateData.questionText
-                : question.questionText,
-
-        type:
-            updateData.type !== undefined
-                ? updateData.type
-                : question.type,
-
-        options:
-            updateData.options !== undefined
-                ? updateData.options
-                : question.options,
-
-        correctAnswer:
-            updateData.correctAnswer !== undefined
-                ? updateData.correctAnswer
-                : question.correctAnswer,
-
-        explanation:
-            updateData.explanation !== undefined
-                ? updateData.explanation
-                : question.explanation,
-
-        marks:
-            updateData.marks !== undefined
-                ? updateData.marks
-                : question.marks,
-
-        difficulty:
-            updateData.difficulty !== undefined
-                ? updateData.difficulty
-                : question.difficulty,
-
-        status: question.status
-    };
-
-    // If lessonId is changed, verify that the new lesson belongs to the same topic.
-     
-    if (nextState.lessonId) {
-        await validateLessonForTopic(
-            nextState.lessonId,
-            topic._id
+        const nextState = {
+            questionBankId: question.questionBankId,
+            courseId: question.courseId,
+            topicId: question.topicId,
+            lessonId: updateData.lessonId !== undefined ? updateData.lessonId : question.lessonId,
+            createdBy: question.createdBy,
+            questionText: updateData.questionText !== undefined ? updateData.questionText : question.questionText,
+            type: updateData.type !== undefined ? updateData.type : question.type,
+            options: updateData.options !== undefined ? updateData.options : question.options,
+            correctAnswer: updateData.correctAnswer !== undefined ? updateData.correctAnswer : question.correctAnswer,
+            explanation: updateData.explanation !== undefined ? updateData.explanation : question.explanation,
+            marks: updateData.marks !== undefined ? updateData.marks : question.marks,
+            difficulty: updateData.difficulty !== undefined ? updateData.difficulty : question.difficulty,
+            status: question.status,
+        };
+        if (nextState.lessonId) await validateLessonForTopic(nextState.lessonId, topic._id, session);
+        const validatedQuestion = await validateQuestionState(nextState);
+        question.questionText = validatedQuestion.questionText;
+        question.normalizedQuestionText = validatedQuestion.normalizedQuestionText;
+        question.type = validatedQuestion.type;
+        question.options = validatedQuestion.options;
+        question.correctAnswer = validatedQuestion.correctAnswer;
+        question.explanation = validatedQuestion.explanation;
+        question.marks = validatedQuestion.marks;
+        question.difficulty = validatedQuestion.difficulty;
+        question.lessonId = validatedQuestion.lessonId;
+        const bankFence = await QuestionBank.updateOne(
+            { _id: questionBank._id, status: "ACTIVE" },
+            { $inc: { lifecycleVersion: 1 } },
+            { session }
         );
-    }
-
-    // Validate the COMPLETE merged question.
-     
-    const validatedQuestion = await validateQuestionState(nextState);
-
-    question.questionText = validatedQuestion.questionText;
-    question.normalizedQuestionText = validatedQuestion.normalizedQuestionText;
-    question.type = validatedQuestion.type;
-    question.options = validatedQuestion.options;
-    question.correctAnswer = validatedQuestion.correctAnswer;
-    question.explanation = validatedQuestion.explanation;
-    question.marks = validatedQuestion.marks;
-    question.difficulty = validatedQuestion.difficulty;
-    question.lessonId = validatedQuestion.lessonId;
-
-    await question.save();
-
-    return question;
+        if (bankFence.modifiedCount !== 1) throw new ApiError(409, "QUESTION_BANK_ARCHIVED", "Question bank changed during question update; reload and retry");
+        question.lifecycleVersion = (question.lifecycleVersion ?? 0) + 1;
+        await question.save({ session });
+        return question;
+    });
 }
 
 // ARCHIVE QUESTION
 
-export async function archiveQuestionService(
-    instructorId,
-    questionId
-) {
-    const { question, questionBank } = await getOwnedQuestionContext(
-        instructorId,
-        questionId
-    );
-
-    // Assessment usage restriction will be checked here once the Assessment module exists.
-     
-    if (question.status === "ARCHIVED") {
-        throw new ApiError(
-            409,
-            "QUESTION_ALREADY_ARCHIVED",
-            "Question is already archived"
+export async function archiveQuestionService(instructorId, questionId) {
+    return withTransaction(async (session) => {
+        const { question, questionBank } = await getOwnedQuestionContext(instructorId, questionId, session);
+        if (question.status === "ARCHIVED") {
+            throw new ApiError(409, "QUESTION_ALREADY_ARCHIVED", "Question is already archived");
+        }
+        // Keep transaction operations sequential; the MongoDB driver does not
+        // support parallel operations on one transaction session.
+        const assessmentUsage = await Assessment.exists({ status: "PUBLISHED", questionIds: question._id }).session(session);
+        const practiceUsage = await Practice.exists({ status: "PUBLISHED", questionIds: question._id }).session(session);
+        if (assessmentUsage) throw new ApiError(409, "QUESTION_USED_IN_PUBLISHED_ASSESSMENT", "A question used by a published assessment cannot be archived");
+        if (practiceUsage) throw new ApiError(409, "QUESTION_USED_IN_PUBLISHED_PRACTICE", "A question used by published practice cannot be archived");
+        const bankFence = await QuestionBank.updateOne(
+            { _id: questionBank._id, status: "ACTIVE" },
+            { $inc: { lifecycleVersion: 1 } },
+            { session }
         );
-    }
-
-    question.status = "ARCHIVED";
-
-    await question.save();
-
-    return question;
+        if (bankFence.modifiedCount !== 1) throw new ApiError(409, "QUESTION_BANK_ARCHIVED", "Question bank changed during question archival; reload and retry");
+        question.status = "ARCHIVED";
+        question.lifecycleVersion = (question.lifecycleVersion ?? 0) + 1;
+        await question.save({ session });
+        return question;
+    });
 }
 
 // RESTORE QUESTION
 
-export async function restoreQuestionService(
-    instructorId,
-    questionId
-) {
-    const {question,questionBank} = await getOwnedQuestionContext(
-        instructorId,
-        questionId
-    );
-
-    // A question can only be restored if its Question Bank  is active.
-     
-    ensureQuestionBankActive(questionBank);
-
-    if (question.status === "ACTIVE") {
-        throw new ApiError(
-            409,
-            "QUESTION_ALREADY_ACTIVE",
-            "Question is already active"
+export async function restoreQuestionService(instructorId, questionId) {
+    return withTransaction(async (session) => {
+        const { question, questionBank } = await getOwnedQuestionContext(instructorId, questionId, session);
+        ensureQuestionBankActive(questionBank);
+        if (question.status === "ACTIVE") throw new ApiError(409, "QUESTION_ALREADY_ACTIVE", "Question is already active");
+        const bankFence = await QuestionBank.updateOne(
+            { _id: questionBank._id, status: "ACTIVE" },
+            { $inc: { lifecycleVersion: 1 } },
+            { session }
         );
-    }
-
-    question.status = "ACTIVE";
-
-    await question.save();
-
-    return question;
+        if (bankFence.modifiedCount !== 1) throw new ApiError(409, "QUESTION_BANK_ARCHIVED", "Question bank changed during question restoration; reload and retry");
+        question.status = "ACTIVE";
+        question.lifecycleVersion = (question.lifecycleVersion ?? 0) + 1;
+        await question.save({ session });
+        return question;
+    });
 }

@@ -8,6 +8,7 @@ import { Topic } from "../../topic/models/topic.model.js";
 
 import { Course } from "../../course/models/course.model.js";
 
+import { withTransaction } from "../../../shared/utils/withTransaction.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 /*
@@ -20,9 +21,10 @@ import { ApiError } from "../../../shared/errors/ApiError.js";
 
 */
 
-async function getOwnedQuestionBankContext(instructorId, questionBankId) {
+async function getOwnedQuestionBankContext(instructorId, questionBankId, session = null) {
 
-    const questionBank = await QuestionBank.findById(questionBankId);
+    const bankQuery = QuestionBank.findById(questionBankId);
+    const questionBank = await (session ? bankQuery.session(session) : bankQuery);
 
     if (!questionBank) {
 
@@ -38,9 +40,10 @@ async function getOwnedQuestionBankContext(instructorId, questionBankId) {
 
     }
 
-    const topic = await Topic.findById(questionBank.topicId);
-
-    const course = await Course.findById(questionBank.courseId);
+    const topicQuery = Topic.findById(questionBank.topicId);
+    const courseQuery = Course.findById(questionBank.courseId);
+    const topic = await (session ? topicQuery.session(session) : topicQuery);
+    const course = await (session ? courseQuery.session(session) : courseQuery);
 
     if (!topic || !course) {
 
@@ -98,9 +101,10 @@ async function getOwnedQuestionBankContext(instructorId, questionBankId) {
 
 */
 
-async function getOwnedPracticeContext(instructorId, practiceId) {
+async function getOwnedPracticeContext(instructorId, practiceId, session = null) {
 
-    const practice = await Practice.findById(practiceId);
+    const practiceQuery = Practice.findById(practiceId);
+    const practice = await (session ? practiceQuery.session(session) : practiceQuery);
 
     if (!practice || practice.createdBy.toString() !== instructorId.toString()) {
         
@@ -116,7 +120,8 @@ async function getOwnedPracticeContext(instructorId, practiceId) {
 
             instructorId,
 
-            practice.questionBankId
+            practice.questionBankId,
+            session
 
         );
 
@@ -182,7 +187,7 @@ function ensureQuestionBankActive(questionBank) {
 
 */
 
-async function validatePracticeQuestions(questionIds, context) {
+async function validatePracticeQuestions(questionIds, context, session = null) {
 
     if (questionIds.length === 0) {
 
@@ -190,7 +195,7 @@ async function validatePracticeQuestions(questionIds, context) {
 
     }
 
-    const questions = await Question.find({
+    const questions = Question.find({
 
         _id: { $in: questionIds },
 
@@ -203,8 +208,10 @@ async function validatePracticeQuestions(questionIds, context) {
         status: "ACTIVE"
 
     }).select("_id");
+    if (session) questions.session(session);
+    const resolvedQuestions = await questions;
 
-    if (questions.length !== questionIds.length) {
+    if (resolvedQuestions.length !== questionIds.length) {
 
         throw new ApiError(
 
@@ -458,96 +465,51 @@ export async function getPracticesByTopicService(instructorId, topicId) {
 
 */
 
-export async function updatePracticeService(
+export async function updatePracticeService(instructorId, practiceId, updateData) {
+    return withTransaction(async (session) => {
+        const { practice, questionBank, topic, course } = await getOwnedPracticeContext(instructorId, practiceId, session);
+        if (practice.status === "ARCHIVED") throw new ApiError(409, "PRACTICE_ARCHIVED", "Archived practice cannot be updated");
+        ensureQuestionBankActive(questionBank);
 
-    instructorId,
-
-    practiceId,
-
-    updateData
-
-) {
-
-    const { practice, questionBank, topic, course } =
-
-        await getOwnedPracticeContext(instructorId, practiceId);
-
-    if (practice.status === "ARCHIVED") {
-
-        throw new ApiError(
-
-            409,
-
-            "PRACTICE_ARCHIVED",
-
-            "Archived practice cannot be updated"
-
-        );
-
-    }
-
-    ensureQuestionBankActive(questionBank);
-
-    if (updateData.questionIds !== undefined) {
-
-        if (
-
-            practice.status === "PUBLISHED" &&
-
-            updateData.questionIds.length === 0
-
-        ) {
-
-            throw new ApiError(
-
-                400,
-
-                "PRACTICE_REQUIRES_QUESTIONS",
-
-                "A published practice must keep at least one question"
-
-            );
-
+        const oldQuestionIds = practice.questionIds.map((id) => id.toString());
+        let nextQuestionIds = practice.questionIds;
+        if (updateData.questionIds !== undefined) {
+            if (practice.status === "PUBLISHED" && updateData.questionIds.length === 0) {
+                throw new ApiError(400, "PRACTICE_REQUIRES_QUESTIONS", "A published practice must keep at least one question");
+            }
+            await validatePracticeQuestions(updateData.questionIds, { questionBank, topic, course }, session);
+            nextQuestionIds = updateData.questionIds;
         }
 
-        await validatePracticeQuestions(updateData.questionIds, {
-
-            questionBank,
-
-            topic,
-
-            course
-
-        });
-
-        practice.questionIds = updateData.questionIds;
-
-    }
-
-    if (updateData.title !== undefined) {
-
-        practice.title = updateData.title;
-
-    }
-
-    if (updateData.description !== undefined) {
-
-        practice.description = updateData.description;
-
-    }
-
-    if (updateData.contributeToLearningEvidence !== undefined) {
-
-        practice.contributeToLearningEvidence =
-
-            updateData.contributeToLearningEvidence;
-
-    }
-
-    await practice.save();
-
-    return practice;
-
+        // Lock existing and newly selected questions when changing the pool. This
+        // shares writes with question archive and Practice/Assessment publication.
+        if (updateData.questionIds !== undefined) {
+            const unionIds = [...new Set([...oldQuestionIds, ...nextQuestionIds.map((id) => id.toString())])];
+            const existingQuery = Question.find({ _id: { $in: unionIds } }).select("_id");
+            const existing = await existingQuery.session(session);
+            if (existing.length) {
+                await Question.updateMany(
+                    { _id: { $in: existing.map((question) => question._id) } },
+                    { $inc: { lifecycleVersion: 1 } },
+                    { session }
+                );
+            }
+            practice.questionIds = nextQuestionIds;
+        }
+        if (updateData.title !== undefined) practice.title = updateData.title;
+        if (updateData.description !== undefined) practice.description = updateData.description;
+        if (updateData.contributeToLearningEvidence !== undefined) {
+            practice.contributeToLearningEvidence = updateData.contributeToLearningEvidence;
+        }
+        const bankFence = await QuestionBank.updateOne(
+            { _id: questionBank._id, status: "ACTIVE" },
+            { $inc: { lifecycleVersion: 1 } },
+            { session }
+        );
+        if (bankFence.modifiedCount !== 1) throw new ApiError(409, "QUESTION_BANK_ARCHIVED", "Question bank changed during Practice update; reload and retry");
+        await practice.save({ session });
+        return practice;
+    });
 }
 
 /*
@@ -571,109 +533,38 @@ export async function updatePracticeService(
 */
 
 export async function publishPracticeService(instructorId, practiceId) {
+    return withTransaction(async (session) => {
+        const { practice, questionBank, topic, course } = await getOwnedPracticeContext(instructorId, practiceId, session);
+        if (practice.status === "PUBLISHED") throw new ApiError(409, "PRACTICE_ALREADY_PUBLISHED", "Practice is already published");
+        if (practice.status === "ARCHIVED") throw new ApiError(409, "PRACTICE_ARCHIVED", "Archived practice cannot be published");
+        ensureQuestionBankActive(questionBank);
+        if (practice.questionIds.length === 0) throw new ApiError(400, "PRACTICE_REQUIRES_QUESTIONS", "Select at least one question before publishing practice");
+        await validatePracticeQuestions(practice.questionIds, { questionBank, topic, course }, session);
 
-    const { practice, questionBank, topic, course } =
-
-        await getOwnedPracticeContext(instructorId, practiceId);
-
-    if (practice.status === "PUBLISHED") {
-
-        throw new ApiError(
-
-            409,
-
-            "PRACTICE_ALREADY_PUBLISHED",
-
-            "Practice is already published"
-
+        // Shared writes serialize this publication with question/bank archive operations.
+        const questionTouch = await Question.updateMany(
+            { _id: { $in: practice.questionIds }, status: "ACTIVE" },
+            { $inc: { lifecycleVersion: 1 } },
+            { session }
         );
-
-    }
-
-    if (practice.status === "ARCHIVED") {
-
-        throw new ApiError(
-
-            409,
-
-            "PRACTICE_ARCHIVED",
-
-            "Archived practice cannot be published"
-
-        );
-
-    }
-
-    ensureQuestionBankActive(questionBank);
-
-    if (practice.questionIds.length === 0) {
-
-        throw new ApiError(
-
-            400,
-
-            "PRACTICE_REQUIRES_QUESTIONS",
-
-            "Select at least one question before publishing practice"
-
-        );
-
-    }
-
-    await validatePracticeQuestions(practice.questionIds, {
-
-        questionBank,
-
-        topic,
-
-        course
-
-    });
-
-    const updatedPractice = await Practice.findOneAndUpdate(
-
-        {
-
-            _id: practice._id,
-
-            status: "DRAFT",
-
-            questionIds: { $eq: practice.questionIds }
-
-        },
-
-        {
-
-            $set: { status: "PUBLISHED" }
-
-        },
-
-        {
-
-            returnDocument: "after",
-
-            runValidators: true
-
+        if (questionTouch.modifiedCount !== practice.questionIds.length) {
+            throw new ApiError(409, "PRACTICE_STATE_CHANGED", "A selected question changed during publication; reload and retry");
         }
-
-    );
-
-    if (!updatedPractice) {
-
-        throw new ApiError(
-
-            409,
-
-            "PRACTICE_STATE_CHANGED",
-
-            "Practice status changed, please retry"
-
+        const bankTouch = await QuestionBank.updateOne(
+            { _id: questionBank._id, status: "ACTIVE" },
+            { $inc: { lifecycleVersion: 1 } },
+            { session }
         );
+        if (bankTouch.modifiedCount !== 1) throw new ApiError(409, "QUESTION_BANK_ARCHIVED", "The question bank changed during publication; reload and retry");
 
-    }
-
-    return updatedPractice;
-
+        const updatedPractice = await Practice.findOneAndUpdate(
+            { _id: practice._id, status: "DRAFT", questionIds: { $eq: practice.questionIds } },
+            { $set: { status: "PUBLISHED" } },
+            { returnDocument: "after", runValidators: true, session }
+        );
+        if (!updatedPractice) throw new ApiError(409, "PRACTICE_STATE_CHANGED", "Practice status changed, please retry");
+        return updatedPractice;
+    });
 }
 
 /*

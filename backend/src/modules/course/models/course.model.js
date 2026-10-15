@@ -89,6 +89,8 @@ const courseSchema = new mongoose.Schema({
             default:false
         }
     },
+    // Lifecycle write fence shared with diagnostic Assessment publication.
+    lifecycleVersion: { type: Number, default: 0, select: false },
     status:{
         type:String,
         required:true,

@@ -1,4 +1,6 @@
 import { Course } from "../models/course.model.js";
+import { Assessment } from "../../assessment/models/assessment.model.js";
+import { withTransaction } from "../../../shared/utils/withTransaction.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 async function validatePrerequisiteCourses(courseIds) {
@@ -193,8 +195,9 @@ function assertNoSelfReference(courseId, prerequisiteCourseIds) {
     }
 }
 
-const updateCourseService = async (userId, courseId, updateData) => {
-    const course = await Course.findById(courseId);
+const updateCourseServiceInternal = async (userId, courseId, updateData, session = null) => {
+    const courseQuery = Course.findById(courseId);
+    const course = await (session ? courseQuery.session(session) : courseQuery);
 
     if (!course) {
         throw new ApiError(
@@ -274,6 +277,15 @@ const updateCourseService = async (userId, courseId, updateData) => {
         };
 
         validateDiagnosticPolicy(update.diagnosticPolicy);
+
+        // Once a diagnostic assessment is published, its course policy is locked.
+        // The transaction shares a write fence with Assessment publication so a
+        // concurrent policy edit and publication cannot both succeed inconsistently.
+        const publishedDiagnosticQuery = Assessment.exists({ courseId: course._id, type: "DIAGNOSTIC", status: "PUBLISHED" });
+        const publishedDiagnostic = await (session ? publishedDiagnosticQuery.session(session) : publishedDiagnosticQuery);
+        if (publishedDiagnostic) {
+            throw new ApiError(409, "DIAGNOSTIC_POLICY_LOCKED", "Diagnostic policy cannot change after a diagnostic assessment is published");
+        }
     }
 
     if (update.progressionPolicy) {
@@ -285,9 +297,16 @@ const updateCourseService = async (userId, courseId, updateData) => {
 
     course.set(update);
 
-    await course.save();
+    await course.save(session ? { session } : undefined);
 
     return course;
+};
+
+const updateCourseService = async (userId, courseId, updateData) => {
+    if (Object.prototype.hasOwnProperty.call(updateData ?? {}, "diagnosticPolicy")) {
+        return withTransaction((session) => updateCourseServiceInternal(userId, courseId, updateData, session));
+    }
+    return updateCourseServiceInternal(userId, courseId, updateData);
 };
 
 const publishCourseService = async(userId, courseId)=>{
