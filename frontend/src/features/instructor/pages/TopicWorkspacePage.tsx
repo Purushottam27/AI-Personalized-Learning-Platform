@@ -20,6 +20,7 @@ import { getTopicById, updateTopic } from '../api/topic.api';
 import { useCourse } from '../hooks/useCourse';
 import { isApiError } from '../../../lib/axios';
 import LessonManagement from '../components/LessonManagement/LessonManagement';
+import ResourceManagement from '../components/ResourceManagement/ResourceManagement';
 import type { Topic, TopicPayload } from '../types/topic.types';
 
  type TopicSection = 'LESSONS' | 'RESOURCES' | 'PRACTICE' | 'ASSESSMENT';
@@ -254,7 +255,7 @@ export const TopicWorkspacePage: React.FC = () => {
 >
   {SECTION_ITEMS.map(({ id, label, Icon }) => {
     const selected = activeSection === id;
-    const comingSoon = id !== 'LESSONS';
+    const comingSoon = id === 'PRACTICE' || id === 'ASSESSMENT';
 
     return (
       <button
@@ -307,6 +308,10 @@ export const TopicWorkspacePage: React.FC = () => {
             {activeSection === 'LESSONS' ? (
               <motion.div key="lessons" initial={{ opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
                 <LessonManagement topicId={topic._id} topicTitle={topic.title} courseStatus={course.status} />
+              </motion.div>
+            ) : activeSection === 'RESOURCES' ? (
+              <motion.div key="resources" initial={{ opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
+                <ResourceManagement topicId={topic._id} topicTitle={topic.title} courseStatus={course.status} />
               </motion.div>
             ) : (
               <ComingSoonPanel key={activeSection} section={activeSection} onGoToLessons={() => setActiveSection('LESSONS')} />
