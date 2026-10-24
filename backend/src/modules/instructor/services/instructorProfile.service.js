@@ -47,7 +47,7 @@ const updateInstructorProfileService = async (userId, updateData) => {
 
     await profile.save();
     
-    return profile.toObject();
+    return profile.toObject({ flattenMaps: true });
 };
 
 const updateInstructorOnboardingService = async (userId, updateData) => {

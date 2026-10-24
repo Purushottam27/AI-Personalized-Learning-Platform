@@ -171,3 +171,8 @@ html {
 body {
   @apply bg-background text-text-primary font-sans antialiased;
 }
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-signal);
+}

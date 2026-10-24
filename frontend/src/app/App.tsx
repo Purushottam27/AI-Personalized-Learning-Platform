@@ -25,6 +25,10 @@ import { CreateCoursePage } from '../features/instructor/pages/CreateCoursePage'
 import { CourseWorkspacePage } from '../features/instructor/pages/CourseWorkspacePage';
 import { TopicWorkspacePage } from '../features/instructor/pages/TopicWorkspacePage';
 
+// Profile & Settings
+import { LearnerProfilePage } from '../features/profile/pages/LearnerProfilePage';
+import { InstructorProfilePage } from '../features/profile/pages/InstructorProfilePage';
+
 function App() {
   return (
     <BrowserRouter>
@@ -57,7 +61,7 @@ function App() {
                   <Route path="explore" element={<PlaceholderPage title="Explore" description="Discover new courses tailored to your interests and level." />} />
                   <Route path="recommended" element={<PlaceholderPage title="Recommended" description="AI-powered learning recommendations based on your profile." />} />
                   <Route path="analytics" element={<PlaceholderPage title="Analytics" description="Deep insights into your learning progress and mastery." />} />
-                  <Route path="profile" element={<PlaceholderPage title="Profile & Settings" description="Manage your account, preferences, and learning profile." />} />
+                  <Route path="profile" element={<LearnerProfilePage />} />
                 </Route>
 
                 {/* Instructor application */}
@@ -71,7 +75,7 @@ function App() {
                   <Route path="courses/:courseId" element={<CourseWorkspacePage />} />
                   <Route path="learners" element={<PlaceholderPage title="Learners" description="Manage learners enrolled in your courses." />} />
                   <Route path="analytics" element={<PlaceholderPage title="Analytics" description="Insights into learner performance and course metrics." />} />
-                  <Route path="profile" element={<PlaceholderPage title="Profile & Settings" description="Manage your instructor profile and account settings." />} />
+                  <Route path="profile" element={<InstructorProfilePage />} />
                 </Route>
 
                 {/* Admin routes */}

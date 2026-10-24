@@ -58,6 +58,7 @@ export interface AuthContextValue extends AuthState {
   logout: () => Promise<void>;
   reactivate: (payload: ReactivatePayload) => Promise<void>;
   clearAccountError: () => void;
+  updateUser: (fields: Partial<AuthUser>) => void;
 }
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -156,6 +157,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setAccountError(null);
   }, []);
 
+  const updateUser = useCallback((fields: Partial<AuthUser>) => {
+    setUser((prev) => (prev ? { ...prev, ...fields } : prev));
+  }, []);
+
   // ── Context value ──────────────────────────────────────────────────────────
 
   const value = useMemo<AuthContextValue>(
@@ -169,8 +174,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       logout,
       reactivate,
       clearAccountError,
+      updateUser,
     }),
-    [user, isLoading, accountError, login, signup, logout, reactivate, clearAccountError]
+    [user, isLoading, accountError, login, signup, logout, reactivate, clearAccountError, updateUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

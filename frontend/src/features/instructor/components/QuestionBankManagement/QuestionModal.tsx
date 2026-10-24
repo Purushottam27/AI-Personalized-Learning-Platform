@@ -439,7 +439,7 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
                               checked={singleCorrectAnswer === opt.key}
                               onChange={() => setSingleCorrectAnswer(opt.key)}
                               aria-label={`Mark option ${opt.key} as correct`}
-                              className="h-4 w-4 text-signal focus:ring-focus"
+                              className="h-4 w-4 accent-signal cursor-pointer focus:ring-focus"
                             />
                           ) : (
                             <input
@@ -447,7 +447,7 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
                               checked={multipleCorrectAnswers.includes(opt.key)}
                               onChange={() => toggleMultipleAnswer(opt.key)}
                               aria-label={`Mark option ${opt.key} as correct`}
-                              className="h-4 w-4 rounded-xs text-signal focus:ring-focus"
+                              className="h-4 w-4 rounded-xs accent-signal cursor-pointer focus:ring-focus"
                             />
                           )}
                         </div>

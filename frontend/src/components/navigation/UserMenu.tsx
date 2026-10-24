@@ -77,18 +77,34 @@ const UserMenu: React.FC = () => {
               {roleLabel}
             </p>
           </div>
-          <div className="py-1">
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                navigate('/learner/profile');
-              }}
-              className="flex w-full items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:bg-surface hover:text-text-primary focus-visible:bg-surface focus-visible:outline-none"
-            >
-              <UserRoundCog className="h-4 w-4" />
-              Profile & Settings
-            </button>
-          </div>
+          {user?.role === 'LEARNER' && (
+            <div className="py-1">
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate('/learner/profile');
+                }}
+                className="flex w-full items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:bg-surface hover:text-text-primary focus-visible:bg-surface focus-visible:outline-none"
+              >
+                <UserRoundCog className="h-4 w-4" />
+                Profile & Settings
+              </button>
+            </div>
+          )}
+          {user?.role === 'INSTRUCTOR' && (
+            <div className="py-1">
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate('/instructor/profile');
+                }}
+                className="flex w-full items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:bg-surface hover:text-text-primary focus-visible:bg-surface focus-visible:outline-none"
+              >
+                <UserRoundCog className="h-4 w-4" />
+                Profile & Settings
+              </button>
+            </div>
+          )}
           <div className="py-1 border-t border-border-muted">
             <button
               onClick={handleLogout}
