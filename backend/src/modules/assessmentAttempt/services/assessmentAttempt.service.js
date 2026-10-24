@@ -282,9 +282,12 @@ export async function saveAssessmentAnswerService(learnerId, attemptId, question
         await attempt.save();
     } catch (error) {
         if (isVersionError(error)) {
-            const fresh = await AssessmentAttempt.findOne({ _id: attemptId, learnerId });
-            if (fresh && fresh.status !== "IN_PROGRESS") {
-                fail(409, "ATTEMPT_NOT_IN_PROGRESS", "Answers cannot be changed after submission");
+            let fresh = await AssessmentAttempt.findOne({ _id: attemptId, learnerId });
+            if (fresh) {
+                fresh = await finalizeIfDeadlinePassed(fresh);
+                if (fresh.status !== "IN_PROGRESS") {
+                    fail(409, "ATTEMPT_NOT_IN_PROGRESS", "Answers cannot be changed after submission");
+                }
             }
             fail(409, "ATTEMPT_CHANGED", "Attempt changed concurrently; reload and save the answer again");
         }

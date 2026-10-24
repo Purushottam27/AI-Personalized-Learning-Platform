@@ -566,4 +566,132 @@ test("Assessment Attempt HTTP API", async (t) => {
         assert.equal(activeAttempts.length, 1);
         assert.equal(activeAttempts[0].attemptNumber, 1);
     });
+
+    await t.test("Test 8 — Answers cannot be accepted after attempt deadline has expired", async () => {
+        const learner = await createTestLearner("DeadlineAnswerReject");
+        const startRes = await learner.req(`/api/v1/assessments/${assessmentId}/attempts`, { method: "POST" });
+        assert.equal(startRes.status, 201);
+        const { data: startData } = await startRes.json();
+        const testAttemptId = startData._id;
+        const q0 = startData.questions[0];
+        const q1 = startData.questions[1];
+
+        // Save answer to question 0 while in progress
+        const validAnswerRes = await learner.req(
+            `/api/v1/assessment-attempts/${testAttemptId}/questions/${q0.questionId}/answer`,
+            { method: "PUT", body: JSON.stringify({ answer: "A" }) }
+        );
+        assert.equal(validAnswerRes.status, 200);
+
+        // Force attempt deadline into the past directly in DB
+        await AssessmentAttempt.updateOne(
+            { _id: testAttemptId },
+            { $set: { deadlineAt: new Date(Date.now() - 30000), deadlineReason: "TIME_LIMIT" } }
+        );
+
+        // Attempt to save an answer after deadline has passed
+        const lateAnswerRes = await learner.req(
+            `/api/v1/assessment-attempts/${testAttemptId}/questions/${q1.questionId}/answer`,
+            { method: "PUT", body: JSON.stringify({ answer: "B" }) }
+        );
+        assert.equal(lateAnswerRes.status, 409);
+        const lateAnswerBody = await lateAnswerRes.json();
+        assert.equal(lateAnswerBody.error.code, "ATTEMPT_NOT_IN_PROGRESS");
+
+        // Verify database state: attempt is finalized as SUBMITTED (TIME_LIMIT) and question 1 answer is NOT saved
+        const inDb = await AssessmentAttempt.findById(testAttemptId);
+        assert.equal(inDb.status, "SUBMITTED");
+        assert.equal(inDb.submissionReason, "TIME_LIMIT");
+        assert.ok(inDb.submittedAt instanceof Date);
+        assert.equal(inDb.answers.length, 1);
+        assert.equal(inDb.answers[0].questionId.toString(), q0.questionId);
+        assert.equal(inDb.answers[0].answer, "A");
+        assert.equal(inDb.marksAwarded, 2);
+        assert.equal(inDb.totalMarks, 10);
+        assert.equal(inDb.scorePercent, 20);
+        assert.equal(inDb.passed, false);
+    });
+
+    await t.test("Test 9 — Assessment and Enrollment write-fence increments persist on attempt creation", async () => {
+        const learner = await createTestLearner("WriteFencePersistence");
+        const assessmentBefore = await Assessment.findById(assessmentId).select("+attemptVersion");
+        const initialAssessmentVer = assessmentBefore.attemptVersion ?? 0;
+
+        const enrollmentBefore = await Enrollment.findOne({ learnerId: learner.id, courseId }).select("+attemptVersion");
+        const initialEnrollmentVer = enrollmentBefore.attemptVersion ?? 0;
+
+        // Start first attempt
+        const start1 = await learner.req(`/api/v1/assessments/${assessmentId}/attempts`, { method: "POST" });
+        assert.equal(start1.status, 201);
+        const attempt1 = (await start1.json()).data;
+
+        // Assert write fence increments persisted in MongoDB
+        const assessmentAfter1 = await Assessment.findById(assessmentId).select("+attemptVersion");
+        assert.equal(assessmentAfter1.attemptVersion, initialAssessmentVer + 1);
+
+        const enrollmentAfter1 = await Enrollment.findOne({ learnerId: learner.id, courseId }).select("+attemptVersion");
+        assert.equal(enrollmentAfter1.attemptVersion, initialEnrollmentVer + 1);
+
+        // Submit first attempt so second attempt can start
+        await learner.req(`/api/v1/assessment-attempts/${attempt1._id}/submit`, { method: "POST", body: JSON.stringify({}) });
+
+        // Start second attempt
+        const start2 = await learner.req(`/api/v1/assessments/${assessmentId}/attempts`, { method: "POST" });
+        assert.equal(start2.status, 201);
+
+        // Assert second write fence increments persisted
+        const assessmentAfter2 = await Assessment.findById(assessmentId).select("+attemptVersion");
+        assert.equal(assessmentAfter2.attemptVersion, initialAssessmentVer + 2);
+
+        const enrollmentAfter2 = await Enrollment.findOne({ learnerId: learner.id, courseId }).select("+attemptVersion");
+        assert.equal(enrollmentAfter2.attemptVersion, initialEnrollmentVer + 2);
+    });
+
+    await t.test("Test 10 — Write fences serialize correctly against assessment and enrollment lifecycle changes", async () => {
+        // Part 1: Assessment fence failure -> rejects with 409 ASSESSMENT_STATE_CHANGED
+        const learnerA = await createTestLearner("AssessmentFenceSerialize");
+        const originalAssessmentUpdateOne = Assessment.updateOne;
+        try {
+            Assessment.updateOne = async function (filter, update, options) {
+                if (filter?.status === "PUBLISHED" && options?.session) {
+                    return { modifiedCount: 0, acknowledged: true };
+                }
+                return originalAssessmentUpdateOne.call(this, filter, update, options);
+            };
+
+            const startRes = await learnerA.req(`/api/v1/assessments/${assessmentId}/attempts`, { method: "POST" });
+            assert.equal(startRes.status, 409);
+            const body = await startRes.json();
+            assert.equal(body.error.code, "ASSESSMENT_STATE_CHANGED");
+        } finally {
+            Assessment.updateOne = originalAssessmentUpdateOne;
+        }
+
+        // Part 2: Enrollment fence failure -> rejects with 409 ENROLLMENT_STATE_CHANGED
+        const learnerB = await createTestLearner("EnrollmentFenceSerialize");
+        const originalEnrollmentUpdateOne = Enrollment.updateOne;
+        try {
+            Enrollment.updateOne = async function (filter, update, options) {
+                if (filter?.status === "ACTIVE" && options?.session) {
+                    return { modifiedCount: 0, acknowledged: true };
+                }
+                return originalEnrollmentUpdateOne.call(this, filter, update, options);
+            };
+
+            const startRes = await learnerB.req(`/api/v1/assessments/${assessmentId}/attempts`, { method: "POST" });
+            assert.equal(startRes.status, 409);
+            const body = await startRes.json();
+            assert.equal(body.error.code, "ENROLLMENT_STATE_CHANGED");
+        } finally {
+            Enrollment.updateOne = originalEnrollmentUpdateOne;
+        }
+
+        // Part 3: Inactive enrollment state verification -> rejects with 403 ACTIVE_ENROLLMENT_REQUIRED
+        const learnerC = await createTestLearner("WithdrawnEnrollment");
+        await Enrollment.updateOne({ learnerId: learnerC.id, courseId }, { $set: { status: "WITHDRAWN" } });
+        const startResC = await learnerC.req(`/api/v1/assessments/${assessmentId}/attempts`, { method: "POST" });
+        assert.equal(startResC.status, 403);
+        const bodyC = await startResC.json();
+        assert.equal(bodyC.error.code, "ACTIVE_ENROLLMENT_REQUIRED");
+    });
 });

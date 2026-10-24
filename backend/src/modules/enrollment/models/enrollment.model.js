@@ -31,9 +31,9 @@ const enrollmentSchema = new mongoose.Schema({
     completedAt:{
         type:Date,
         default: null
-    }
-
-
+    },
+    // Internal write fence used to serialize attempt creation against enrollment lifecycle changes.
+    attemptVersion: { type: Number, default: 0, select: false },
 },{timestamps:true})
 
 // Database-level invariant: at most one active enrollment per learner/course.

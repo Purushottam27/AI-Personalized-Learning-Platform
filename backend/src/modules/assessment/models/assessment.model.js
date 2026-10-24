@@ -36,6 +36,8 @@ const assessmentSchema = new mongoose.Schema({
     opensAt: { type: Date, default: null },
     closesAt: { type: Date, default: null },
     status: { type: String, enum: ASSESSMENT_STATUSES, required: true, default: "DRAFT" },
+    // Internal write fence used to serialize attempt creation against assessment lifecycle changes.
+    attemptVersion: { type: Number, default: 0, select: false },
 }, {
     timestamps: true,
     optimisticConcurrency: true,
