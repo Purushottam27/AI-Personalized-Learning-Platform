@@ -7,6 +7,7 @@ import {
   BookOpen,
   Check,
   ClipboardCheck,
+  Database,
   FileText,
   Layers3,
   Loader2,
@@ -21,13 +22,15 @@ import { useCourse } from '../hooks/useCourse';
 import { isApiError } from '../../../lib/axios';
 import LessonManagement from '../components/LessonManagement/LessonManagement';
 import ResourceManagement from '../components/ResourceManagement/ResourceManagement';
+import QuestionBankManagement from '../components/QuestionBankManagement/QuestionBankManagement';
 import type { Topic, TopicPayload } from '../types/topic.types';
 
- type TopicSection = 'LESSONS' | 'RESOURCES' | 'PRACTICE' | 'ASSESSMENT';
+ type TopicSection = 'LESSONS' | 'RESOURCES' | 'QUESTION_BANK' | 'PRACTICE' | 'ASSESSMENT';
 
 const SECTION_ITEMS: Array<{ id: TopicSection; label: string; Icon: React.ElementType; description: string }> = [
   { id: 'LESSONS', label: 'Lessons', Icon: BookOpen, description: 'Build the teaching content learners will study.' },
   { id: 'RESOURCES', label: 'Resources', Icon: Paperclip, description: 'Supporting material linked to this topic.' },
+  { id: 'QUESTION_BANK', label: 'Question Bank', Icon: Database, description: 'Build and manage the pool of questions for practice and assessments.' },
   { id: 'PRACTICE', label: 'Practice', Icon: Layers3, description: 'Short activities to reinforce understanding.' },
   { id: 'ASSESSMENT', label: 'Assessment', Icon: ClipboardCheck, description: 'Evaluate understanding and learning outcomes.' },
 ];
@@ -80,6 +83,9 @@ const ComingSoonPanel: React.FC<{ section: TopicSection; onGoToLessons: () => vo
     },
     LESSONS: {
       eyebrow: '', title: '', description: '', Icon: BookOpen,
+    },
+    QUESTION_BANK: {
+      eyebrow: '', title: '', description: '', Icon: Database,
     },
   }[section];
   const Icon = details.Icon;
@@ -312,6 +318,10 @@ export const TopicWorkspacePage: React.FC = () => {
             ) : activeSection === 'RESOURCES' ? (
               <motion.div key="resources" initial={{ opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
                 <ResourceManagement topicId={topic._id} topicTitle={topic.title} courseStatus={course.status} />
+              </motion.div>
+            ) : activeSection === 'QUESTION_BANK' ? (
+              <motion.div key="question-bank" initial={{ opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
+                <QuestionBankManagement topicId={topic._id} topicTitle={topic.title} courseStatus={course.status} />
               </motion.div>
             ) : (
               <ComingSoonPanel key={activeSection} section={activeSection} onGoToLessons={() => setActiveSection('LESSONS')} />
