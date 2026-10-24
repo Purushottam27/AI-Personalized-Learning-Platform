@@ -21,11 +21,10 @@ import {
 
 const questionBankRouter = Router();
 
-questionBankRouter.use(authMiddleware);
-questionBankRouter.use(roleMiddleware("INSTRUCTOR"));
-
 questionBankRouter.post(
     "/topics/:topicId/question-bank",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateTopicId,
     validateCreateQuestionBank,
     createQuestionBank
@@ -33,18 +32,24 @@ questionBankRouter.post(
 
 questionBankRouter.get(
     "/topics/:topicId/question-bank",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateTopicId,
     getQuestionBankByTopic
 );
 
 questionBankRouter.get(
     "/question-banks/:questionBankId",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateQuestionBankId,
     getQuestionBankById
 );
 
 questionBankRouter.patch(
     "/question-banks/:questionBankId",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateQuestionBankId,
     validateUpdateQuestionBank,
     updateQuestionBank
@@ -52,12 +57,16 @@ questionBankRouter.patch(
 
 questionBankRouter.post(
     "/question-banks/:questionBankId/archive",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateQuestionBankId,
     archiveQuestionBank
 );
 
 questionBankRouter.post(
     "/question-banks/:questionBankId/restore",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateQuestionBankId,
     restoreQuestionBank
 );

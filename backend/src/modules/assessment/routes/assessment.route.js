@@ -20,16 +20,14 @@ import {
 } from "../controllers/assessment.controller.js";
 
 const assessmentRouter = Router();
-assessmentRouter.use(authMiddleware);
-assessmentRouter.use(roleMiddleware("INSTRUCTOR"));
 
-assessmentRouter.post("/assessments", validateCreateAssessment, createAssessment);
-assessmentRouter.get("/courses/:courseId/assessments", validateAssessmentCourseId, getAssessmentsByCourse);
-assessmentRouter.get("/topics/:topicId/assessments", validateAssessmentTopicId, getAssessmentsByTopic);
-assessmentRouter.get("/assessments/:assessmentId", validateAssessmentId, getAssessmentById);
-assessmentRouter.patch("/assessments/:assessmentId", validateAssessmentId, validateUpdateAssessment, updateAssessment);
-assessmentRouter.post("/assessments/:assessmentId/publish", validateAssessmentId, publishAssessment);
-assessmentRouter.post("/assessments/:assessmentId/archive", validateAssessmentId, archiveAssessment);
-assessmentRouter.post("/assessments/:assessmentId/restore", validateAssessmentId, restoreAssessment);
+assessmentRouter.post("/assessments", authMiddleware, roleMiddleware("INSTRUCTOR"), validateCreateAssessment, createAssessment);
+assessmentRouter.get("/courses/:courseId/assessments", authMiddleware, roleMiddleware("INSTRUCTOR"), validateAssessmentCourseId, getAssessmentsByCourse);
+assessmentRouter.get("/topics/:topicId/assessments", authMiddleware, roleMiddleware("INSTRUCTOR"), validateAssessmentTopicId, getAssessmentsByTopic);
+assessmentRouter.get("/assessments/:assessmentId", authMiddleware, roleMiddleware("INSTRUCTOR"), validateAssessmentId, getAssessmentById);
+assessmentRouter.patch("/assessments/:assessmentId", authMiddleware, roleMiddleware("INSTRUCTOR"), validateAssessmentId, validateUpdateAssessment, updateAssessment);
+assessmentRouter.post("/assessments/:assessmentId/publish", authMiddleware, roleMiddleware("INSTRUCTOR"), validateAssessmentId, publishAssessment);
+assessmentRouter.post("/assessments/:assessmentId/archive", authMiddleware, roleMiddleware("INSTRUCTOR"), validateAssessmentId, archiveAssessment);
+assessmentRouter.post("/assessments/:assessmentId/restore", authMiddleware, roleMiddleware("INSTRUCTOR"), validateAssessmentId, restoreAssessment);
 
 export { assessmentRouter };

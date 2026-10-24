@@ -27,12 +27,10 @@ import questionImportUpload from "../middleware/questionImportUpload.middleware.
 
 const questionRouter = Router();
 
-questionRouter.use(authMiddleware);
-questionRouter.use(roleMiddleware("INSTRUCTOR"));
-
-
 questionRouter.post(
     "/question-banks/:questionBankId/questions",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateQuestionBankId,
     validateCreateQuestion,
     createQuestion
@@ -40,6 +38,8 @@ questionRouter.post(
 
 questionRouter.get(
     "/question-banks/:questionBankId/questions",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateQuestionBankId,
     getQuestionsByQuestionBank
 );
@@ -52,6 +52,8 @@ questionRouter.get(
  */
 questionRouter.post(
     "/question-banks/:questionBankId/import",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateQuestionBankId,
     questionImportUpload,
     importQuestionsPreview
@@ -64,6 +66,8 @@ questionRouter.post(
  */
 questionRouter.post(
     "/question-imports/:importId/confirm",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateImportId,
     confirmQuestionImport
 );
@@ -71,12 +75,16 @@ questionRouter.post(
 
 questionRouter.get(
     "/questions/:questionId",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateQuestionId,
     getQuestionById
 );
 
 questionRouter.patch(
     "/questions/:questionId",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateQuestionId,
     validateUpdateQuestion,
     updateQuestion
@@ -84,12 +92,16 @@ questionRouter.patch(
 
 questionRouter.post(
     "/questions/:questionId/archive",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateQuestionId,
     archiveQuestion
 );
 
 questionRouter.post(
     "/questions/:questionId/restore",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateQuestionId,
     restoreQuestion
 );

@@ -12,10 +12,9 @@ import { authMiddleware } from "../../../middleware/auth.middleware.js";
 
 const enrollmentRouter = Router();
 
-enrollmentRouter.use(authMiddleware)
-
 enrollmentRouter.post(
     "/courses/:courseId/enroll",
+    authMiddleware,
     roleMiddleware('LEARNER'),
     validateCourseId,
     createEnrollment
@@ -23,12 +22,14 @@ enrollmentRouter.post(
 
 enrollmentRouter.get(
     "/users/me/enrollments",
+    authMiddleware,
     roleMiddleware('LEARNER'),
     getMyEnrollments
 );
 
 enrollmentRouter.get(
     "/enrollments/:enrollmentId",
+    authMiddleware,
     roleMiddleware('LEARNER'),
     validateEnrollmentId,
     getEnrollmentById
@@ -36,6 +37,7 @@ enrollmentRouter.get(
 
 enrollmentRouter.post(
     "/enrollments/:enrollmentId/withdraw",
+    authMiddleware,
     roleMiddleware('LEARNER'),
     validateEnrollmentId,
     withdrawEnrollment

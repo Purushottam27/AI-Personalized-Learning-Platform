@@ -7,19 +7,15 @@ import { validateTopicId } from '../../topic/validations/topic.validation.middle
 
 const lessonRouter = Router()
 
-lessonRouter.use(authMiddleware)
-lessonRouter.use(roleMiddleware("INSTRUCTOR"));
-
 lessonRouter.route('/topics/:topicId/lessons')
-    .post(validateTopicId,validateLesson,createLesson)
-    .get(validateTopicId,getLessonsByTopic)
+    .post(authMiddleware, roleMiddleware("INSTRUCTOR"), validateTopicId, validateLesson, createLesson)
+    .get(authMiddleware, roleMiddleware("INSTRUCTOR"), validateTopicId, getLessonsByTopic)
 
 lessonRouter.route('/lessons/:lessonId')
-    .get(validateLessonId,getLessonById)
-    .patch(validateLessonUpdates,updateLesson)
-    .delete(validateLessonId,deleteLesson)
+    .get(authMiddleware, roleMiddleware("INSTRUCTOR"), validateLessonId, getLessonById)
+    .patch(authMiddleware, roleMiddleware("INSTRUCTOR"), validateLessonUpdates, updateLesson)
+    .delete(authMiddleware, roleMiddleware("INSTRUCTOR"), validateLessonId, deleteLesson)
 
-lessonRouter.patch('/topics/:topicId/lessons/reorder',validateLessonReorder,reorderLessons)
-
+lessonRouter.patch('/topics/:topicId/lessons/reorder', authMiddleware, roleMiddleware("INSTRUCTOR"), validateLessonReorder, reorderLessons)
 
 export {lessonRouter}

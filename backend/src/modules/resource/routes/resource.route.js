@@ -27,11 +27,10 @@ import {
 
 const resourceRouter = Router();
 
-resourceRouter.use(authMiddleware);
-resourceRouter.use(roleMiddleware("INSTRUCTOR"));
-
 resourceRouter.post(
     "/topics/:topicId/resources",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateTopicId,
     resourceUpload,
     validateResource,
@@ -40,24 +39,32 @@ resourceRouter.post(
 
 resourceRouter.get(
     "/topics/:topicId/resources",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateTopicId,
     getResourcesByTopic
 );
 
 resourceRouter.get(
     "/resources/:resourceId",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateResourceId,
     getResourceById
 );
 
 resourceRouter.get(
     "/resources/:resourceId/file",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateResourceId,
     getResourceDownloadUrl
 );
 
 resourceRouter.patch(
     "/resources/:resourceId",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateResourceId,
     validateResourceUpdates,
     updateResource
@@ -65,6 +72,8 @@ resourceRouter.patch(
 
 resourceRouter.patch(
     "/topics/:topicId/resources/reorder",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateTopicId,
     validateResourceReorder,
     reorderResources
@@ -72,12 +81,16 @@ resourceRouter.patch(
 
 resourceRouter.post(
     "/resources/:resourceId/archive",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateResourceId,
     archiveResource
 );
 
 resourceRouter.post(
     "/resources/:resourceId/restore",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validateResourceId,
     restoreResource
 );

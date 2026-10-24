@@ -8,10 +8,9 @@ import { validateTopic, validateTopicId, validateTopicReorder, validateTopicUpda
 
 const topicRouter = Router()
 
-topicRouter.use(authMiddleware);
-
 topicRouter.post(
     "/courses/:courseId/topics",
+    authMiddleware,
     roleMiddleware("INSTRUCTOR"),
     validateCourseId,
     validateTopic,
@@ -20,6 +19,7 @@ topicRouter.post(
 
 topicRouter.get(
     "/courses/:courseId/topics",
+    authMiddleware,
     roleMiddleware("INSTRUCTOR"),
     validateCourseId,
     getTopicsByCourse
@@ -27,6 +27,7 @@ topicRouter.get(
 
 topicRouter.patch(
     "/courses/:courseId/topics/reorder",
+    authMiddleware,
     roleMiddleware("INSTRUCTOR"),
     validateTopicReorder,
     reorderTopics
@@ -34,6 +35,7 @@ topicRouter.patch(
 
 topicRouter.get(
     "/topics/:topicId",
+    authMiddleware,
     roleMiddleware("INSTRUCTOR"),
     validateTopicId,
     getTopicById
@@ -41,6 +43,7 @@ topicRouter.get(
 
 topicRouter.patch(
     "/topics/:topicId",
+    authMiddleware,
     roleMiddleware("INSTRUCTOR"),
     validateTopicUpdates,
     updateTopic

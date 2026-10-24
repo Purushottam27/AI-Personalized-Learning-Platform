@@ -23,11 +23,10 @@ import {
 
 const practiceRouter = Router();
 
-practiceRouter.use(authMiddleware);
-practiceRouter.use(roleMiddleware("INSTRUCTOR"));
-
 practiceRouter.post(
     "/topics/:topicId/practices",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validatePracticeTopicId,
     validateCreatePractice,
     createPractice
@@ -35,18 +34,24 @@ practiceRouter.post(
 
 practiceRouter.get(
     "/topics/:topicId/practices",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validatePracticeTopicId,
     getPracticesByTopic
 );
 
 practiceRouter.get(
     "/practices/:practiceId",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validatePracticeId,
     getPracticeById
 );
 
 practiceRouter.patch(
     "/practices/:practiceId",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validatePracticeId,
     validateUpdatePractice,
     updatePractice
@@ -54,18 +59,24 @@ practiceRouter.patch(
 
 practiceRouter.post(
     "/practices/:practiceId/publish",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validatePracticeId,
     publishPractice
 );
 
 practiceRouter.post(
     "/practices/:practiceId/archive",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validatePracticeId,
     archivePractice
 );
 
 practiceRouter.post(
     "/practices/:practiceId/restore",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
     validatePracticeId,
     restorePractice
 );
