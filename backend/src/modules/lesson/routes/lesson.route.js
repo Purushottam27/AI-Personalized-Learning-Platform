@@ -9,10 +9,10 @@ const lessonRouter = Router()
 
 lessonRouter.route('/topics/:topicId/lessons')
     .post(authMiddleware, roleMiddleware("INSTRUCTOR"), validateTopicId, validateLesson, createLesson)
-    .get(authMiddleware, roleMiddleware("INSTRUCTOR"), validateTopicId, getLessonsByTopic)
+    .get(authMiddleware, validateTopicId, getLessonsByTopic)
 
 lessonRouter.route('/lessons/:lessonId')
-    .get(authMiddleware, roleMiddleware("INSTRUCTOR"), validateLessonId, getLessonById)
+    .get(authMiddleware, validateLessonId, getLessonById)
     .patch(authMiddleware, roleMiddleware("INSTRUCTOR"), validateLessonUpdates, updateLesson)
     .delete(authMiddleware, roleMiddleware("INSTRUCTOR"), validateLessonId, deleteLesson)
 

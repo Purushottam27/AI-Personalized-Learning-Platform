@@ -4,6 +4,7 @@ import { Course } from "../../course/models/course.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
 import { QuestionBank } from "../../questionBank/models/questionBank.model.js";
 import { Question } from "../../question/models/question.model.js";
+import { Enrollment } from "../../enrollment/models/enrollment.model.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 const TYPES = new Set(["TOPIC", "DIAGNOSTIC", "FINAL"]);
@@ -242,21 +243,128 @@ export async function createAssessmentService(instructorId, data) {
     return Assessment.create(candidate);
 }
 
-export async function getAssessmentByIdService(instructorId, assessmentId) {
-    return (await ownedAssessment(instructorId, assessmentId)).assessment;
+function serializeLearnerAssessment(assessment) {
+    return {
+        _id: assessment._id,
+        courseId: assessment.courseId,
+        topicId: assessment.topicId ?? null,
+        type: assessment.type,
+        title: assessment.title,
+        description: assessment.description ?? "",
+        questionsPerAttempt: assessment.questionsPerAttempt,
+        passingScore: assessment.passingScore,
+        maxAttempts: assessment.maxAttempts,
+        timeLimitMinutes: assessment.timeLimitMinutes ?? null,
+        opensAt: assessment.opensAt ?? null,
+        closesAt: assessment.closesAt ?? null,
+        status: assessment.status,
+        createdAt: assessment.createdAt,
+        updatedAt: assessment.updatedAt,
+    };
 }
 
-export async function getAssessmentsByCourseService(instructorId, courseId) {
-    const course = await ownedCourse(instructorId, courseId);
-    return Assessment.find({ courseId: course._id }).sort({ createdAt: -1, _id: -1 });
+export async function getAssessmentByIdService(userId, assessmentId, userRole = "INSTRUCTOR") {
+    requireId(assessmentId, "assessmentId");
+    const assessment = await Assessment.findById(assessmentId);
+    if (!assessment) error(404, "ASSESSMENT_NOT_FOUND", "Assessment not found");
+    const course = await Course.findById(assessment.courseId);
+    if (!course || course.status === "ARCHIVED") {
+        error(404, "ASSESSMENT_NOT_FOUND", "Assessment not found");
+    }
+
+    if (userRole === "INSTRUCTOR") {
+        if (!sameId(course.createdBy, userId) || !sameId(assessment.createdBy, userId)) {
+            error(404, "ASSESSMENT_NOT_FOUND", "Assessment not found");
+        }
+        return assessment;
+    }
+
+    if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED" || assessment.status !== "PUBLISHED") {
+            error(404, "ASSESSMENT_NOT_FOUND", "Assessment not found");
+        }
+        if (assessment.type !== "DIAGNOSTIC") {
+            const enrollment = await Enrollment.findOne({ learnerId: userId, courseId: course._id, status: "ACTIVE" });
+            if (!enrollment) {
+                error(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required for this assessment");
+            }
+        }
+        return serializeLearnerAssessment(assessment);
+    }
+
+    if (userRole === "ADMIN") {
+        return assessment;
+    }
+
+    error(403, "FORBIDDEN", "Access denied");
 }
 
-export async function getAssessmentsByTopicService(instructorId, topicId) {
+export async function getAssessmentsByCourseService(userId, courseId, userRole = "INSTRUCTOR") {
+    requireId(courseId, "courseId");
+    const course = await Course.findById(courseId);
+    if (!course || course.status === "ARCHIVED") {
+        error(404, "COURSE_NOT_FOUND", "Course not found");
+    }
+
+    if (userRole === "INSTRUCTOR") {
+        if (!sameId(course.createdBy, userId)) {
+            error(404, "COURSE_NOT_FOUND", "Course not found");
+        }
+        return Assessment.find({ courseId: course._id }).sort({ createdAt: -1, _id: -1 });
+    }
+
+    if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED") {
+            error(404, "COURSE_NOT_FOUND", "Course not found");
+        }
+        const enrollment = await Enrollment.findOne({ learnerId: userId, courseId: course._id, status: "ACTIVE" });
+        if (!enrollment) {
+            error(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to view course assessments");
+        }
+        const assessments = await Assessment.find({ courseId: course._id, status: "PUBLISHED" }).sort({ createdAt: -1, _id: -1 });
+        return assessments.map(serializeLearnerAssessment);
+    }
+
+    if (userRole === "ADMIN") {
+        return Assessment.find({ courseId: course._id }).sort({ createdAt: -1, _id: -1 });
+    }
+
+    error(403, "FORBIDDEN", "Access denied");
+}
+
+export async function getAssessmentsByTopicService(userId, topicId, userRole = "INSTRUCTOR") {
     requireId(topicId, "topicId");
     const topic = await Topic.findById(topicId);
     if (!topic) error(404, "TOPIC_NOT_FOUND", "Topic not found");
-    const course = await ownedCourse(instructorId, topic.courseId);
-    return Assessment.find({ courseId: course._id, topicId: topic._id }).sort({ createdAt: -1, _id: -1 });
+    const course = await Course.findById(topic.courseId);
+    if (!course || course.status === "ARCHIVED") {
+        error(404, "COURSE_NOT_FOUND", "Course not found");
+    }
+
+    if (userRole === "INSTRUCTOR") {
+        if (!sameId(course.createdBy, userId)) {
+            error(404, "COURSE_NOT_FOUND", "Course not found");
+        }
+        return Assessment.find({ courseId: course._id, topicId: topic._id }).sort({ createdAt: -1, _id: -1 });
+    }
+
+    if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED") {
+            error(404, "TOPIC_NOT_FOUND", "Topic not found");
+        }
+        const enrollment = await Enrollment.findOne({ learnerId: userId, courseId: course._id, status: "ACTIVE" });
+        if (!enrollment) {
+            error(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to view topic assessments");
+        }
+        const assessments = await Assessment.find({ courseId: course._id, topicId: topic._id, status: "PUBLISHED" }).sort({ createdAt: -1, _id: -1 });
+        return assessments.map(serializeLearnerAssessment);
+    }
+
+    if (userRole === "ADMIN") {
+        return Assessment.find({ courseId: course._id, topicId: topic._id }).sort({ createdAt: -1, _id: -1 });
+    }
+
+    error(403, "FORBIDDEN", "Access denied");
 }
 
 export async function updateAssessmentService(instructorId, assessmentId, data) {
@@ -407,3 +515,48 @@ export async function restoreAssessmentService(instructorId, assessmentId) {
     if (!restored) error(409, "ASSESSMENT_STATE_CHANGED", "Assessment changed; reload and retry");
     return restored;
 }
+
+function serializeDiagnosticAssessment(assessment) {
+    return {
+        _id: assessment._id,
+        courseId: assessment.courseId,
+        type: assessment.type,
+        title: assessment.title,
+        description: assessment.description ?? "",
+        questionsPerAttempt: assessment.questionsPerAttempt,
+        passingScore: assessment.passingScore,
+        maxAttempts: assessment.maxAttempts,
+        timeLimitMinutes: assessment.timeLimitMinutes ?? null,
+        opensAt: assessment.opensAt ?? null,
+        closesAt: assessment.closesAt ?? null,
+        status: assessment.status,
+        createdAt: assessment.createdAt,
+        updatedAt: assessment.updatedAt,
+    };
+}
+
+export async function getCourseDiagnosticAssessmentService(courseId) {
+    requireId(courseId, "courseId");
+    const course = await Course.findById(courseId);
+    if (!course || course.status === "ARCHIVED") {
+        error(404, "COURSE_NOT_FOUND", "Course not found");
+    }
+    if (course.status !== "PUBLISHED") {
+        error(409, "COURSE_NOT_AVAILABLE", "Course is not published");
+    }
+    if (!course.diagnosticPolicy?.enabled) {
+        error(409, "DIAGNOSTIC_ASSESSMENT_DISABLED", "Diagnostic assessment is disabled for this course");
+    }
+    const assessment = await Assessment.findOne({
+        courseId: course._id,
+        type: "DIAGNOSTIC",
+        status: "PUBLISHED",
+    }).sort({ createdAt: -1, _id: -1 });
+
+    if (!assessment) {
+        error(404, "ASSESSMENT_NOT_FOUND", "No published diagnostic assessment found for this course");
+    }
+
+    return serializeDiagnosticAssessment(assessment);
+}
+

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Lesson } from "../models/lesson.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
 import { Course } from "../../course/models/course.model.js";
+import { Enrollment } from "../../enrollment/models/enrollment.model.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 async function getOwnedTopicAndCourse(instructorId, topicId) {
@@ -71,15 +72,49 @@ const createLessonService = async(instructorId, topicId, lessonData)=>{
     return lesson;
 }
 
-const getLessonsByTopicService = async(instructorId, topicId)=>{
-    await getOwnedTopicAndCourse(instructorId, topicId);
+const getLessonsByTopicService = async(userId, topicId, userRole = "INSTRUCTOR")=>{
+    const topic = await Topic.findById(topicId);
+
+    if (!topic) {
+        throw new ApiError(404, "TOPIC_NOT_FOUND", "Topic not found");
+    }
+
+    const course = await Course.findById(topic.courseId);
+
+    if (!course) {
+        throw new ApiError(404, "COURSE_NOT_FOUND", "Course not found");
+    }
+
+    if (userRole === "INSTRUCTOR") {
+        if (!userId || course.createdBy.toString() !== userId.toString()) {
+            throw new ApiError(404, "TOPIC_NOT_FOUND", "Topic not found");
+        }
+    } else if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED") {
+            throw new ApiError(404, "TOPIC_NOT_FOUND", "Topic not found");
+        }
+        const enrollment = await Enrollment.findOne({
+            learnerId: userId,
+            courseId: course._id,
+            status: "ACTIVE"
+        });
+        if (!enrollment) {
+            throw new ApiError(
+                403,
+                "ACTIVE_ENROLLMENT_REQUIRED",
+                "Active course enrollment is required to access lessons"
+            );
+        }
+    } else if (userRole !== "ADMIN") {
+        throw new ApiError(403, "FORBIDDEN", "Access denied");
+    }
 
     const lessons = await Lesson.find({ topicId }).sort({ order: 1 });
 
     return lessons;
 }
 
-const getLessonByIdService = async(instructorId, lessonId)=>{
+const getLessonByIdService = async(userId, lessonId, userRole = "INSTRUCTOR")=>{
     const lesson = await Lesson.findById(lessonId);
 
     if (!lesson) {
@@ -94,8 +129,32 @@ const getLessonByIdService = async(instructorId, lessonId)=>{
 
     const course = await Course.findById(topic.courseId);
 
-    if (!course || course.createdBy.toString() !== instructorId.toString()) {
+    if (!course) {
         throw new ApiError(404, "LESSON_NOT_FOUND", "Lesson not found");
+    }
+
+    if (userRole === "INSTRUCTOR") {
+        if (!userId || course.createdBy.toString() !== userId.toString()) {
+            throw new ApiError(404, "LESSON_NOT_FOUND", "Lesson not found");
+        }
+    } else if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED") {
+            throw new ApiError(404, "LESSON_NOT_FOUND", "Lesson not found");
+        }
+        const enrollment = await Enrollment.findOne({
+            learnerId: userId,
+            courseId: course._id,
+            status: "ACTIVE"
+        });
+        if (!enrollment) {
+            throw new ApiError(
+                403,
+                "ACTIVE_ENROLLMENT_REQUIRED",
+                "Active course enrollment is required to access lessons"
+            );
+        }
+    } else if (userRole !== "ADMIN") {
+        throw new ApiError(403, "FORBIDDEN", "Access denied");
     }
 
     return lesson;

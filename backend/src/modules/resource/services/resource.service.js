@@ -5,6 +5,7 @@ import { Resource } from "../models/resource.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
 import { Course } from "../../course/models/course.model.js";
 import { Lesson } from "../../lesson/models/lesson.model.js";
+import { Enrollment } from "../../enrollment/models/enrollment.model.js";
 
 import { ApiError } from "../../../shared/errors/ApiError.js";
 import { uploadOnCloudinary } from "../../../shared/utils/cloudinary.js";
@@ -241,18 +242,97 @@ export async function createResourceService(instructorId, topicId, resourceData,
     return createUploadedResource(topicId, resourceData, file);
 }
 
-export async function getResourcesByTopicService(instructorId, topicId) {
-    await getOwnedTopicAndCourse(instructorId, topicId);
+export async function getResourcesByTopicService(userId, topicId, userRole = "INSTRUCTOR") {
+    const topic = await Topic.findById(topicId);
+    if (!topic) {
+        throw new ApiError(404, "TOPIC_NOT_FOUND", "Topic not found");
+    }
 
-    const resources = await Resource.find({ topicId }).sort({ order: 1 });
+    const course = await Course.findById(topic.courseId);
+    if (!course) {
+        throw new ApiError(404, "COURSE_NOT_FOUND", "Course not found");
+    }
 
-    return resources;
+    if (userRole === "INSTRUCTOR") {
+        if (!userId || course.createdBy.toString() !== userId.toString()) {
+            throw new ApiError(404, "TOPIC_NOT_FOUND", "Topic not found");
+        }
+        return Resource.find({ topicId }).sort({ order: 1 });
+    }
+
+    if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED") {
+            throw new ApiError(404, "TOPIC_NOT_FOUND", "Topic not found");
+        }
+        const enrollment = await Enrollment.findOne({
+            learnerId: userId,
+            courseId: course._id,
+            status: "ACTIVE"
+        });
+        if (!enrollment) {
+            throw new ApiError(
+                403,
+                "ACTIVE_ENROLLMENT_REQUIRED",
+                "Active course enrollment is required to access resources"
+            );
+        }
+        return Resource.find({ topicId, status: "ACTIVE" }).sort({ order: 1 });
+    }
+
+    if (userRole === "ADMIN") {
+        return Resource.find({ topicId }).sort({ order: 1 });
+    }
+
+    throw new ApiError(403, "FORBIDDEN", "Access denied");
 }
 
-export async function getResourceByIdService(instructorId, resourceId) {
-    const { resource } = await getOwnedResourceContext(instructorId, resourceId);
+export async function getResourceByIdService(userId, resourceId, userRole = "INSTRUCTOR") {
+    const resource = await Resource.findById(resourceId);
+    if (!resource) {
+        throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+    }
 
-    return resource;
+    const topic = await Topic.findById(resource.topicId);
+    if (!topic) {
+        throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+    }
+
+    const course = await Course.findById(topic.courseId);
+    if (!course) {
+        throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+    }
+
+    if (userRole === "INSTRUCTOR") {
+        if (!userId || course.createdBy.toString() !== userId.toString()) {
+            throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+        }
+        return resource;
+    }
+
+    if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED" || resource.status !== "ACTIVE") {
+            throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+        }
+        const enrollment = await Enrollment.findOne({
+            learnerId: userId,
+            courseId: course._id,
+            status: "ACTIVE"
+        });
+        if (!enrollment) {
+            throw new ApiError(
+                403,
+                "ACTIVE_ENROLLMENT_REQUIRED",
+                "Active course enrollment is required to access resources"
+            );
+        }
+        return resource;
+    }
+
+    if (userRole === "ADMIN") {
+        return resource;
+    }
+
+    throw new ApiError(403, "FORBIDDEN", "Access denied");
 }
 
 export async function updateResourceService(instructorId, resourceId, updateData) {
@@ -288,11 +368,48 @@ export async function updateResourceService(instructorId, resourceId, updateData
 
 /**
  * Creates a five-minute, signed Cloudinary download URL after checking that
- * the requesting instructor owns the resource. Legacy public uploads are
+ * the requesting instructor or enrolled learner has access to the resource. Legacy public uploads are
  * deliberately blocked until their Cloudinary delivery type is migrated.
  */
-export async function getResourceDownloadUrlService(instructorId, resourceId) {
-    const { resource } = await getOwnedResourceContext(instructorId, resourceId);
+export async function getResourceDownloadUrlService(userId, resourceId, userRole = "INSTRUCTOR") {
+    const resource = await Resource.findById(resourceId);
+    if (!resource) {
+        throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+    }
+
+    const topic = await Topic.findById(resource.topicId);
+    if (!topic) {
+        throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+    }
+
+    const course = await Course.findById(topic.courseId);
+    if (!course) {
+        throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+    }
+
+    if (userRole === "INSTRUCTOR") {
+        if (!userId || course.createdBy.toString() !== userId.toString()) {
+            throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+        }
+    } else if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED" || resource.status !== "ACTIVE") {
+            throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+        }
+        const enrollment = await Enrollment.findOne({
+            learnerId: userId,
+            courseId: course._id,
+            status: "ACTIVE"
+        });
+        if (!enrollment) {
+            throw new ApiError(
+                403,
+                "ACTIVE_ENROLLMENT_REQUIRED",
+                "Active course enrollment is required to download resources"
+            );
+        }
+    } else if (userRole !== "ADMIN") {
+        throw new ApiError(403, "FORBIDDEN", "Access denied");
+    }
 
     if (resource.source !== "UPLOAD" || resource.type !== "DOCUMENT") {
         throw new ApiError(

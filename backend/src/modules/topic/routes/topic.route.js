@@ -20,7 +20,6 @@ topicRouter.post(
 topicRouter.get(
     "/courses/:courseId/topics",
     authMiddleware,
-    roleMiddleware("INSTRUCTOR"),
     validateCourseId,
     getTopicsByCourse
 );
@@ -36,7 +35,6 @@ topicRouter.patch(
 topicRouter.get(
     "/topics/:topicId",
     authMiddleware,
-    roleMiddleware("INSTRUCTOR"),
     validateTopicId,
     getTopicById
 );

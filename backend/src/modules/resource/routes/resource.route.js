@@ -40,7 +40,6 @@ resourceRouter.post(
 resourceRouter.get(
     "/topics/:topicId/resources",
     authMiddleware,
-    roleMiddleware("INSTRUCTOR"),
     validateTopicId,
     getResourcesByTopic
 );
@@ -48,7 +47,6 @@ resourceRouter.get(
 resourceRouter.get(
     "/resources/:resourceId",
     authMiddleware,
-    roleMiddleware("INSTRUCTOR"),
     validateResourceId,
     getResourceById
 );
@@ -56,7 +54,6 @@ resourceRouter.get(
 resourceRouter.get(
     "/resources/:resourceId/file",
     authMiddleware,
-    roleMiddleware("INSTRUCTOR"),
     validateResourceId,
     getResourceDownloadUrl
 );

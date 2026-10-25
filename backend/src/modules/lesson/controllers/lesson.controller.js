@@ -22,7 +22,7 @@ const createLesson = async (req, res) => {
 const getLessonsByTopic = async (req, res) => {
     const { topicId } = req.params;
 
-    const lessons = await getLessonsByTopicService(req.user._id,topicId);
+    const lessons = await getLessonsByTopicService(req.user._id, topicId, req.user.role);
 
     return res.status(200).json(
         new ApiResponse(
@@ -38,7 +38,8 @@ const getLessonById = async (req, res) => {
 
     const lesson = await getLessonByIdService(
         req.user._id,
-        lessonId      
+        lessonId,
+        req.user.role
     );
 
     return res.status(200).json(

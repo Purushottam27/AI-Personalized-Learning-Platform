@@ -44,9 +44,8 @@ const createTopicService = async (courseId, userId, topicData) => {
 };
 
 
-const getTopicsByCourseService = async (courseId, userId) => {
-    const course = await Course.findById(courseId)
-        .select("createdBy");
+const getTopicsByCourseService = async (courseId, userId, userRole = "INSTRUCTOR") => {
+    const course = await Course.findById(courseId);
 
     if (!course) {
         throw new ApiError(
@@ -56,21 +55,41 @@ const getTopicsByCourseService = async (courseId, userId) => {
         );
     }
 
-    if (course.createdBy.toString() !== userId.toString()) {
-        throw new ApiError(
-            403,
-            "FORBIDDEN",
-            "You are not authorized to access these topics"
-        );
+    if (userRole === "INSTRUCTOR") {
+        if (!userId || course.createdBy.toString() !== userId.toString()) {
+            throw new ApiError(
+                403,
+                "FORBIDDEN",
+                "You are not authorized to access these topics"
+            );
+        }
+        return Topic.find({ courseId }).sort({ order: 1 });
     }
 
-    return Topic.find({
-        courseId
-    }).sort({ order: 1 });
+    if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED") {
+            throw new ApiError(
+                404,
+                "COURSE_NOT_FOUND",
+                "Course not found"
+            );
+        }
+        return Topic.find({ courseId }).sort({ order: 1 });
+    }
+
+    if (userRole === "ADMIN") {
+        return Topic.find({ courseId }).sort({ order: 1 });
+    }
+
+    throw new ApiError(
+        403,
+        "FORBIDDEN",
+        "You are not authorized to access these topics"
+    );
 };
 
 
-const getTopicByIdService = async (topicId, userId) => {
+const getTopicByIdService = async (topicId, userId, userRole = "INSTRUCTOR") => {
     const topic = await Topic.findById(topicId);
 
     if (!topic) {
@@ -91,15 +110,37 @@ const getTopicByIdService = async (topicId, userId) => {
         );
     }
 
-    if (course.createdBy.toString() !== userId.toString()) {
-        throw new ApiError(
-            403,
-            "FORBIDDEN",
-            "You are not authorized to access this topic"
-        );
+    if (userRole === "INSTRUCTOR") {
+        if (!userId || course.createdBy.toString() !== userId.toString()) {
+            throw new ApiError(
+                403,
+                "FORBIDDEN",
+                "You are not authorized to access this topic"
+            );
+        }
+        return topic;
     }
 
-    return topic;
+    if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED") {
+            throw new ApiError(
+                404,
+                "TOPIC_NOT_FOUND",
+                "Topic not found"
+            );
+        }
+        return topic;
+    }
+
+    if (userRole === "ADMIN") {
+        return topic;
+    }
+
+    throw new ApiError(
+        403,
+        "FORBIDDEN",
+        "You are not authorized to access this topic"
+    );
 };
 
 

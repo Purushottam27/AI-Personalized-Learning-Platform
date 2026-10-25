@@ -24,19 +24,17 @@ export async function createResource(req, res) {
 }
 
 export async function getResourcesByTopic(req, res) {
-    const instructorId = req.user._id;
     const { topicId } = req.params;
 
-    const resources = await getResourcesByTopicService(instructorId, topicId);
+    const resources = await getResourcesByTopicService(req.user._id, topicId, req.user.role);
 
     res.status(200).json(new ApiResponse(toResourceResponseList(resources), "Resources fetched successfully"));
 }
 
 export async function getResourceById(req, res) {
-    const instructorId = req.user._id;
     const { resourceId } = req.params;
 
-    const resource = await getResourceByIdService(instructorId, resourceId);
+    const resource = await getResourceByIdService(req.user._id, resourceId, req.user.role);
 
     res.status(200).json(new ApiResponse(toResourceResponse(resource), "Resource fetched successfully"));
 }
@@ -79,10 +77,9 @@ export async function restoreResource(req, res) {
     res.status(200).json(new ApiResponse(toResourceResponse(resource), "Resource restored successfully"));
 }
 export async function getResourceDownloadUrl(req, res) {
-    const instructorId = req.user._id;
     const { resourceId } = req.params;
 
-    const result = await getResourceDownloadUrlService(instructorId, resourceId);
+    const result = await getResourceDownloadUrlService(req.user._id, resourceId, req.user.role);
 
     res.set("Cache-Control", "private, no-store");
     res.status(200).json(new ApiResponse(result, "Secure download URL generated successfully"));

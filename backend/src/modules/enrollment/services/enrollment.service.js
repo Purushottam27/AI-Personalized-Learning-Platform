@@ -1,5 +1,6 @@
 import { Enrollment } from "../models/enrollment.model.js";
 import { Course } from "../../course/models/course.model.js";
+import { AssessmentAttempt } from "../../assessmentAttempt/models/assessmentAttempt.model.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 async function assertPrerequisitesSatisfied(learnerId, prerequisiteCourseIds) {
@@ -20,20 +21,31 @@ async function assertPrerequisitesSatisfied(learnerId, prerequisiteCourseIds) {
     }
 }
 
-function assertDiagnosticEligibility(diagnosticPolicy) {
-    if (diagnosticPolicy?.enabled === true) {
-        // TODO: Once the Diagnostic/Question Bank module is implemented,
-        // replace this rejection with an actual diagnostic-eligibility check.
+async function assertDiagnosticEligibility(learnerId, courseId, diagnosticPolicy, session = null) {
+    if (!diagnosticPolicy?.enabled) return;
+
+    const query = AssessmentAttempt.findOne({
+        learnerId,
+        courseId,
+        assessmentType: "DIAGNOSTIC",
+        status: "SUBMITTED",
+        passed: true,
+    }).sort({ submittedAt: -1, _id: -1 });
+
+    const passingAttempt = await (session ? query.session(session) : query);
+
+    if (!passingAttempt) {
         throw new ApiError(
             409,
             "DIAGNOSTIC_REQUIRED",
-            "This course requires a diagnostic assessment before enrollment, which is not yet available"
+            "Passing a diagnostic assessment is required before enrolling in this course"
         );
     }
 }
 
-const createEnrollmentService = async(learnerId, courseId) =>{
-    const course = await Course.findById(courseId);
+const createEnrollmentService = async(learnerId, courseId, session = null) =>{
+    const courseQuery = Course.findById(courseId);
+    const course = await (session ? courseQuery.session(session) : courseQuery);
 
     if (!course) {
         throw new ApiError(404, "COURSE_NOT_FOUND", "Course not found");
@@ -43,11 +55,12 @@ const createEnrollmentService = async(learnerId, courseId) =>{
         throw new ApiError(409, "COURSE_NOT_ENROLLABLE", "Course is not open for enrollment");
     }
 
-    const existingActiveEnrollment = await Enrollment.findOne({
+    const enrollmentQuery = Enrollment.findOne({
         learnerId,
         courseId,
         status: "ACTIVE"
     });
+    const existingActiveEnrollment = await (session ? enrollmentQuery.session(session) : enrollmentQuery);
 
     if (existingActiveEnrollment) {
         throw new ApiError(409, "ALREADY_ENROLLED", "You are already enrolled in this course");
@@ -56,9 +69,13 @@ const createEnrollmentService = async(learnerId, courseId) =>{
     const prerequisiteCourseIds = course.prerequisites?.courses ?? [];
     await assertPrerequisitesSatisfied(learnerId, prerequisiteCourseIds);
 
-    assertDiagnosticEligibility(course.diagnosticPolicy);
+    await assertDiagnosticEligibility(learnerId, courseId, course.diagnosticPolicy, session);
 
     try {
+        if (session) {
+            const [created] = await Enrollment.create([{ learnerId, courseId, status: "ACTIVE" }], { session });
+            return created;
+        }
         return await Enrollment.create({ learnerId, courseId, status: "ACTIVE" });
     } catch (error) {
         if (error?.code === 11000 && (

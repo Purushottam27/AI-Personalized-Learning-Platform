@@ -30,7 +30,7 @@ const createTopic = async (req, res) => {
 const getTopicsByCourse = async (req, res) => {
     const { courseId } = req.params;
 
-    const topics = await getTopicsByCourseService(courseId,req.user._id);
+    const topics = await getTopicsByCourseService(courseId, req.user._id, req.user.role);
 
     return res.status(200).json(
         new ApiResponse(
@@ -46,7 +46,8 @@ const getTopicById = async (req, res) => {
 
     const topic = await getTopicByIdService(
         topicId,
-        req.user._id
+        req.user._id,
+        req.user.role
     );
 
     return res.status(200).json(
