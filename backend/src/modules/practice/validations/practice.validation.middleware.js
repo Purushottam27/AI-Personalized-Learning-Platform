@@ -6,6 +6,7 @@ import {
     updatePracticeSchema,
     practiceIdSchema,
     topicIdSchema,
+    courseIdSchema,
 } from "./practice.validation.js";
 
 function parseOrThrow(schema, data, errorMessage) {
@@ -62,3 +63,14 @@ export function validatePracticeTopicId(req, res, next) {
 
     next();
 }
+
+export function validatePracticeCourseId(req, res, next) {
+    req.params = parseOrThrow(
+        courseIdSchema,
+        req.params,
+        "Invalid path parameters"
+    );
+
+    next();
+}
+

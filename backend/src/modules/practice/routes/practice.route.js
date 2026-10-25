@@ -8,34 +8,50 @@ import {
     validateCreatePractice,
     validateUpdatePractice,
     validatePracticeId,
-    validatePracticeTopicId
+    validatePracticeTopicId,
+    validatePracticeCourseId,
 } from "../validations/practice.validation.middleware.js";
 
 import {
+    validatePracticeAttemptPracticeId,
+    validatePracticeAttemptId,
+    validatePracticeAttemptQuestionParams,
+    validateSavePracticeAnswer,
+    validateSubmitPracticeAttempt,
+} from "../validations/practiceAttempt.validation.middleware.js";
+
+import {
     createPractice,
+    getPracticesByCourse,
     getPracticesByTopic,
     getPracticeById,
     updatePractice,
     publishPractice,
     archivePractice,
-    restorePractice
+    restorePractice,
 } from "../controllers/practice.controller.js";
+
+import {
+    startPracticeAttempt,
+    savePracticeAnswer,
+    submitPracticeAttempt,
+    getPracticeAttempt,
+    getPracticeAttemptHistory,
+} from "../controllers/practiceAttempt.controller.js";
 
 const practiceRouter = Router();
 
-practiceRouter.post(
-    "/topics/:topicId/practices",
+// Discovery routes (accessible by enrolled learners and instructors)
+practiceRouter.get(
+    "/courses/:courseId/practices",
     authMiddleware,
-    roleMiddleware("INSTRUCTOR"),
-    validatePracticeTopicId,
-    validateCreatePractice,
-    createPractice
+    validatePracticeCourseId,
+    getPracticesByCourse
 );
 
 practiceRouter.get(
     "/topics/:topicId/practices",
     authMiddleware,
-    roleMiddleware("INSTRUCTOR"),
     validatePracticeTopicId,
     getPracticesByTopic
 );
@@ -43,9 +59,18 @@ practiceRouter.get(
 practiceRouter.get(
     "/practices/:practiceId",
     authMiddleware,
-    roleMiddleware("INSTRUCTOR"),
     validatePracticeId,
     getPracticeById
+);
+
+// Instructor-only authoring routes
+practiceRouter.post(
+    "/topics/:topicId/practices",
+    authMiddleware,
+    roleMiddleware("INSTRUCTOR"),
+    validatePracticeTopicId,
+    validateCreatePractice,
+    createPractice
 );
 
 practiceRouter.patch(
@@ -81,4 +106,48 @@ practiceRouter.post(
     restorePractice
 );
 
+// Learner practice attempt routes
+practiceRouter.post(
+    "/practices/:practiceId/attempts",
+    authMiddleware,
+    roleMiddleware("LEARNER"),
+    validatePracticeAttemptPracticeId,
+    startPracticeAttempt
+);
+
+practiceRouter.get(
+    "/practices/:practiceId/attempts",
+    authMiddleware,
+    roleMiddleware("LEARNER"),
+    validatePracticeAttemptPracticeId,
+    getPracticeAttemptHistory
+);
+
+practiceRouter.get(
+    "/practice-attempts/:attemptId",
+    authMiddleware,
+    roleMiddleware("LEARNER"),
+    validatePracticeAttemptId,
+    getPracticeAttempt
+);
+
+practiceRouter.put(
+    "/practice-attempts/:attemptId/questions/:questionId/answer",
+    authMiddleware,
+    roleMiddleware("LEARNER"),
+    validatePracticeAttemptQuestionParams,
+    validateSavePracticeAnswer,
+    savePracticeAnswer
+);
+
+practiceRouter.post(
+    "/practice-attempts/:attemptId/submit",
+    authMiddleware,
+    roleMiddleware("LEARNER"),
+    validatePracticeAttemptId,
+    validateSubmitPracticeAttempt,
+    submitPracticeAttempt
+);
+
 export { practiceRouter };
+

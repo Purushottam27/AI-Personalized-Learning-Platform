@@ -3,6 +3,7 @@ import {
     createPracticeService,
     getPracticeByIdService,
     getPracticesByTopicService,
+    getPracticesByCourseService,
     updatePracticeService,
     publishPracticeService,
     archivePracticeService,
@@ -12,7 +13,7 @@ import {
 import { ApiResponse } from "../../../shared/responses/ApiResponse.js";
 
 export async function createPractice(req, res) {
-    const instructorId = req.user._id;
+    const instructorId = req.user._id || req.user.id;
     const { topicId } = req.params;
 
     const practice = await createPracticeService(
@@ -27,12 +28,28 @@ export async function createPractice(req, res) {
 }
 
 export async function getPracticesByTopic(req, res) {
-    const instructorId = req.user._id;
+    const userId = req.user._id || req.user.id;
     const { topicId } = req.params;
 
     const practices = await getPracticesByTopicService(
-        instructorId,
-        topicId
+        userId,
+        topicId,
+        req.user.role
+    );
+
+    res.status(200).json(
+        new ApiResponse(practices, "Practices fetched successfully")
+    );
+}
+
+export async function getPracticesByCourse(req, res) {
+    const userId = req.user._id || req.user.id;
+    const { courseId } = req.params;
+
+    const practices = await getPracticesByCourseService(
+        userId,
+        courseId,
+        req.user.role
     );
 
     res.status(200).json(
@@ -41,18 +58,20 @@ export async function getPracticesByTopic(req, res) {
 }
 
 export async function getPracticeById(req, res) {
-    const instructorId = req.user._id;
+    const userId = req.user._id || req.user.id;
     const { practiceId } = req.params;
 
     const practice = await getPracticeByIdService(
-        instructorId,
-        practiceId
+        userId,
+        practiceId,
+        req.user.role
     );
 
     res.status(200).json(
         new ApiResponse(practice, "Practice fetched successfully")
     );
 }
+
 
 export async function updatePractice(req, res) {
     const instructorId = req.user._id;

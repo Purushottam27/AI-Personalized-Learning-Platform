@@ -7,9 +7,11 @@ import { Question } from "../../question/models/question.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
 
 import { Course } from "../../course/models/course.model.js";
+import { Enrollment } from "../../enrollment/models/enrollment.model.js";
 
 import { withTransaction } from "../../../shared/utils/withTransaction.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
+
 
 /*
 
@@ -373,18 +375,63 @@ const questionBank = await QuestionBank.findOne({
 
 */
 
-export async function getPracticeByIdService(instructorId, practiceId) {
+export function serializeLearnerPractice(practice) {
+    return {
+        _id: practice._id,
+        courseId: practice.courseId,
+        topicId: practice.topicId,
+        title: practice.title,
+        description: practice.description ?? "",
+        questionCount: practice.questionIds ? practice.questionIds.length : 0,
+        contributeToLearningEvidence: practice.contributeToLearningEvidence ?? false,
+        status: practice.status,
+        createdAt: practice.createdAt,
+        updatedAt: practice.updatedAt,
+    };
+}
 
-    const { practice } = await getOwnedPracticeContext(
+/*
 
-        instructorId,
+|--------------------------------------------------------------------------
 
-        practiceId
+| Get Practice By ID
 
-    );
+|--------------------------------------------------------------------------
 
-    return practice;
+*/
 
+export async function getPracticeByIdService(userId, practiceId, userRole = "INSTRUCTOR") {
+    if (userRole === "INSTRUCTOR") {
+        const { practice } = await getOwnedPracticeContext(
+            userId,
+            practiceId
+        );
+        return practice;
+    }
+
+    if (userRole === "LEARNER") {
+        const practice = await Practice.findById(practiceId);
+        if (!practice || practice.status !== "PUBLISHED") {
+            throw new ApiError(404, "PRACTICE_NOT_FOUND", "Practice not found");
+        }
+        const course = await Course.findById(practice.courseId);
+        if (!course || course.status !== "PUBLISHED") {
+            throw new ApiError(404, "PRACTICE_NOT_FOUND", "Practice not found");
+        }
+        const enrollment = await Enrollment.findOne({ learnerId: userId, courseId: course._id, status: "ACTIVE" });
+        if (!enrollment) {
+            throw new ApiError(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to view this practice");
+        }
+        return serializeLearnerPractice(practice);
+    }
+
+    if (userRole === "ADMIN") {
+        const practice = await Practice.findById(practiceId);
+        if (!practice) throw new ApiError(404, "PRACTICE_NOT_FOUND", "Practice not found");
+        return practice;
+    }
+
+    throw new ApiError(403, "FORBIDDEN", "Access denied");
 }
 
 /*
@@ -397,55 +444,85 @@ export async function getPracticeByIdService(instructorId, practiceId) {
 
 */
 
-export async function getPracticesByTopicService(instructorId, topicId) {
-
+export async function getPracticesByTopicService(userId, topicId, userRole = "INSTRUCTOR") {
     const topic = await Topic.findById(topicId);
-
     if (!topic) {
-
-        throw new ApiError(
-
-            404,
-
-            "TOPIC_NOT_FOUND",
-
-            "Topic not found"
-
-        );
-
+        throw new ApiError(404, "TOPIC_NOT_FOUND", "Topic not found");
     }
 
     const course = await Course.findById(topic.courseId);
-
-    if (
-
-        !course ||
-
-        course.createdBy.toString() !== instructorId.toString()
-
-    ) {
-
-        throw new ApiError(
-
-            404,
-
-            "TOPIC_NOT_FOUND",
-
-            "Topic not found"
-
-        );
-
+    if (!course || course.status === "ARCHIVED") {
+        throw new ApiError(404, "COURSE_NOT_FOUND", "Course not found");
     }
 
-    const practices = await Practice.find({
+    if (userRole === "INSTRUCTOR") {
+        if (course.createdBy.toString() !== userId.toString()) {
+            throw new ApiError(404, "TOPIC_NOT_FOUND", "Topic not found");
+        }
+        return Practice.find({ topicId: topic._id }).sort({ createdAt: -1 });
+    }
 
-        topicId: topic._id
+    if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED") {
+            throw new ApiError(404, "TOPIC_NOT_FOUND", "Topic not found");
+        }
+        const enrollment = await Enrollment.findOne({ learnerId: userId, courseId: course._id, status: "ACTIVE" });
+        if (!enrollment) {
+            throw new ApiError(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to view topic practices");
+        }
+        const practices = await Practice.find({ topicId: topic._id, status: "PUBLISHED" }).sort({ createdAt: -1 });
+        return practices.map(serializeLearnerPractice);
+    }
 
-    }).sort({ createdAt: -1 });
+    if (userRole === "ADMIN") {
+        return Practice.find({ topicId: topic._id }).sort({ createdAt: -1 });
+    }
 
-    return practices;
-
+    throw new ApiError(403, "FORBIDDEN", "Access denied");
 }
+
+/*
+
+|--------------------------------------------------------------------------
+
+| Get Practices By Course
+
+|--------------------------------------------------------------------------
+
+*/
+
+export async function getPracticesByCourseService(userId, courseId, userRole = "INSTRUCTOR") {
+    const course = await Course.findById(courseId);
+    if (!course || course.status === "ARCHIVED") {
+        throw new ApiError(404, "COURSE_NOT_FOUND", "Course not found");
+    }
+
+    if (userRole === "INSTRUCTOR") {
+        if (course.createdBy.toString() !== userId.toString()) {
+            throw new ApiError(404, "COURSE_NOT_FOUND", "Course not found");
+        }
+        return Practice.find({ courseId: course._id }).sort({ createdAt: -1 });
+    }
+
+    if (userRole === "LEARNER") {
+        if (course.status !== "PUBLISHED") {
+            throw new ApiError(404, "COURSE_NOT_FOUND", "Course not found");
+        }
+        const enrollment = await Enrollment.findOne({ learnerId: userId, courseId: course._id, status: "ACTIVE" });
+        if (!enrollment) {
+            throw new ApiError(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to view course practices");
+        }
+        const practices = await Practice.find({ courseId: course._id, status: "PUBLISHED" }).sort({ createdAt: -1 });
+        return practices.map(serializeLearnerPractice);
+    }
+
+    if (userRole === "ADMIN") {
+        return Practice.find({ courseId: course._id }).sort({ createdAt: -1 });
+    }
+
+    throw new ApiError(403, "FORBIDDEN", "Access denied");
+}
+
 
 /*
 

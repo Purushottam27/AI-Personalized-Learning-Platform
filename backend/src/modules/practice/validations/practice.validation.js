@@ -61,3 +61,10 @@ export const topicIdSchema = z
         topicId: objectIdStringSchema,
     })
     .passthrough();
+
+export const courseIdSchema = z
+    .object({
+        courseId: objectIdStringSchema,
+    })
+    .passthrough();
+
