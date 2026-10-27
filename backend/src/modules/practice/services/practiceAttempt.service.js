@@ -114,6 +114,7 @@ export function serializePublicAttempt(attempt, { revealResults = attempt.status
         correctCount: revealResults ? attempt.correctCount : null,
         contributeToLearningEvidence: attempt.contributeToLearningEvidence,
         questions: attempt.questions.map((question) => {
+            const hasAnswer = answers.has(question.questionId.toString()) && answers.get(question.questionId.toString()) != null;
             const item = {
                 questionId: question.questionId,
                 questionText: question.questionText,
@@ -123,7 +124,7 @@ export function serializePublicAttempt(attempt, { revealResults = attempt.status
                 difficulty: question.difficulty,
                 answer: answers.get(question.questionId.toString()) ?? null,
             };
-            if (revealResults) {
+            if (revealResults || hasAnswer) {
                 item.correctAnswer = question.correctAnswer;
                 item.explanation = question.explanation;
                 item.isCorrect = answersEqual(question.type, item.answer, question.correctAnswer);
@@ -134,6 +135,7 @@ export function serializePublicAttempt(attempt, { revealResults = attempt.status
         updatedAt: attempt.updatedAt,
     };
 }
+
 
 export async function startPracticeAttemptService(learnerId, practiceId) {
     requireObjectId(learnerId, "learnerId");
@@ -176,7 +178,13 @@ export async function startPracticeAttemptService(learnerId, practiceId) {
                 fail(409, "PRACTICE_QUESTION_POOL_EMPTY", "This practice has no questions assigned");
             }
 
-            const questionQuery = Question.find({ _id: { $in: ids }, status: "ACTIVE", courseId: course._id });
+            const questionQuery = Question.find({
+                _id: { $in: ids },
+                status: "ACTIVE",
+                courseId: course._id,
+                topicId: topic._id,
+                questionBankId: practice.questionBankId,
+            });
             const sourceQuestions = await questionQuery.session(session);
             if (sourceQuestions.length === 0) {
                 fail(409, "PRACTICE_QUESTION_POOL_EMPTY", "No active questions are currently available for this practice");
@@ -237,6 +245,16 @@ export async function savePracticeAnswerService(learnerId, attemptId, questionId
         fail(409, "ATTEMPT_NOT_IN_PROGRESS", "Answers cannot be changed after submission");
     }
 
+    const course = await Course.findById(attempt.courseId);
+    if (!course || course.status !== "PUBLISHED") {
+        fail(409, "COURSE_NOT_AVAILABLE", "The course is not available to learners");
+    }
+
+    const enrollment = await Enrollment.findOne({ learnerId, courseId: attempt.courseId, status: "ACTIVE" });
+    if (!enrollment) {
+        fail(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to practice");
+    }
+
     const question = attempt.questions.find((item) => sameId(item.questionId, questionId));
     if (!question) {
         fail(404, "ATTEMPT_QUESTION_NOT_FOUND", "Question does not belong to this attempt");
@@ -285,6 +303,16 @@ export async function submitPracticeAttemptService(learnerId, attemptId, answers
     // Idempotent submission: if already submitted, return finalized results
     if (attempt.status === "SUBMITTED") {
         return serializePublicAttempt(attempt, { revealResults: true });
+    }
+
+    const course = await Course.findById(attempt.courseId);
+    if (!course || course.status !== "PUBLISHED") {
+        fail(409, "COURSE_NOT_AVAILABLE", "The course is not available to learners");
+    }
+
+    const enrollment = await Enrollment.findOne({ learnerId, courseId: attempt.courseId, status: "ACTIVE" });
+    if (!enrollment) {
+        fail(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to submit practice");
     }
 
     // Apply batch answers if provided in submission payload
@@ -343,14 +371,32 @@ export async function getPracticeAttemptService(learnerId, attemptId) {
     if (!attempt) {
         fail(404, "ATTEMPT_NOT_FOUND", "Practice attempt not found");
     }
+    const course = await Course.findById(attempt.courseId);
+    if (!course || course.status === "ARCHIVED") {
+        fail(404, "COURSE_NOT_FOUND", "Course not found");
+    }
+    const enrollment = await Enrollment.findOne({ learnerId, courseId: attempt.courseId, status: "ACTIVE" });
+    if (!enrollment) {
+        fail(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to view this practice attempt");
+    }
     return serializePublicAttempt(attempt);
 }
 
 export async function getPracticeAttemptHistoryService(learnerId, practiceId) {
     requireObjectId(practiceId, "practiceId");
-    const practice = await Practice.findById(practiceId).select("_id courseId topicId title description contributeToLearningEvidence");
-    if (!practice) {
+    const practice = await Practice.findById(practiceId).select("_id courseId topicId title description contributeToLearningEvidence status");
+    if (!practice || practice.status !== "PUBLISHED") {
         fail(404, "PRACTICE_NOT_FOUND", "Practice not found");
+    }
+
+    const course = await Course.findById(practice.courseId);
+    if (!course || course.status !== "PUBLISHED") {
+        fail(404, "PRACTICE_NOT_FOUND", "Practice not found");
+    }
+
+    const enrollment = await Enrollment.findOne({ learnerId, courseId: course._id, status: "ACTIVE" });
+    if (!enrollment) {
+        fail(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to view practice history");
     }
 
     const attempts = await PracticeAttempt.find({ practiceId, learnerId }).sort({ attemptNumber: -1 });
@@ -382,3 +428,4 @@ export async function getPracticeAttemptHistoryService(learnerId, practiceId) {
         attempts: results,
     };
 }
+

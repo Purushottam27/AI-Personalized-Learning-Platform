@@ -614,4 +614,104 @@ test("Practice Execution & Attempt HTTP API", async (t) => {
         });
         assert.equal(instructorAttemptRes.status, 403);
     });
+
+    // -------------------------------------------------------------------------
+    // 18. Per-question feedback: answered questions expose feedback while unanswered remain hidden
+    // -------------------------------------------------------------------------
+    await t.test("18. Per-question feedback: answered questions expose feedback while unanswered remain hidden", async () => {
+        const startRes = await request(`/api/v1/practices/${publishedPracticeId}/attempts`, { method: "POST" });
+        const startBody = await startRes.json();
+        const testAttemptId = startBody.data._id;
+
+        // Save answer for qSingle only
+        const answerRes = await request(`/api/v1/practice-attempts/${testAttemptId}/questions/${qSingleId}/answer`, {
+            method: "PUT",
+            body: JSON.stringify({ answer: "B" }),
+        });
+        const answerBody = await answerRes.json();
+        assert.equal(answerRes.status, 200);
+
+        const qSingleResult = answerBody.data.questions.find((q) => q.questionId === qSingleId);
+        assert.equal(qSingleResult.answer, "B");
+        assert.equal(qSingleResult.isCorrect, true);
+        assert.equal(qSingleResult.correctAnswer, "B");
+        assert.equal(qSingleResult.explanation, "2 plus 2 equals 4.");
+
+        // Unanswered questions must NOT reveal correctAnswer or explanation
+        const qMultiResult = answerBody.data.questions.find((q) => q.questionId === qMultiId);
+        assert.equal(qMultiResult.answer, null);
+        assert.equal("correctAnswer" in qMultiResult, false);
+        assert.equal("explanation" in qMultiResult, false);
+        assert.equal("isCorrect" in qMultiResult, false);
+
+        // Changing answer to wrong answer updates feedback
+        const changeRes = await request(`/api/v1/practice-attempts/${testAttemptId}/questions/${qSingleId}/answer`, {
+            method: "PUT",
+            body: JSON.stringify({ answer: "A" }),
+        });
+        const changeBody = await changeRes.json();
+        assert.equal(changeRes.status, 200);
+        const changedSingle = changeBody.data.questions.find((q) => q.questionId === qSingleId);
+        assert.equal(changedSingle.answer, "A");
+        assert.equal(changedSingle.isCorrect, false);
+        assert.equal(changedSingle.correctAnswer, "B");
+
+        // Cleanup attempt by submitting
+        await request(`/api/v1/practice-attempts/${testAttemptId}/submit`, { method: "POST" });
+    });
+
+    // -------------------------------------------------------------------------
+    // 19. Enrollment revocation or course availability changes block attempt updates
+    // -------------------------------------------------------------------------
+    await t.test("19. Enrollment revocation blocks attempt answer saving and submission", async () => {
+        const startRes = await request(`/api/v1/practices/${publishedPracticeId}/attempts`, { method: "POST" });
+        const startBody = await startRes.json();
+        const testAttemptId = startBody.data._id;
+
+        // Revoke active enrollment
+        await Enrollment.updateOne({ learnerId, courseId }, { $set: { status: "WITHDRAWN" } });
+
+        try {
+            // Attempting to save an answer should fail with 403
+            const answerRes = await request(`/api/v1/practice-attempts/${testAttemptId}/questions/${qSingleId}/answer`, {
+                method: "PUT",
+                body: JSON.stringify({ answer: "B" }),
+            });
+            assert.equal(answerRes.status, 403);
+            const answerBody = await answerRes.json();
+            assert.equal(answerBody.error?.code, "ACTIVE_ENROLLMENT_REQUIRED");
+
+            // Attempting to submit should also fail with 403
+            const submitRes = await request(`/api/v1/practice-attempts/${testAttemptId}/submit`, { method: "POST" });
+            assert.equal(submitRes.status, 403);
+        } finally {
+            // Restore enrollment
+            await Enrollment.updateOne({ learnerId, courseId }, { $set: { status: "ACTIVE" } });
+        }
+
+        // Now submission should succeed
+        const submitSuccessRes = await request(`/api/v1/practice-attempts/${testAttemptId}/submit`, { method: "POST" });
+        assert.equal(submitSuccessRes.status, 200);
+    });
+
+    // -------------------------------------------------------------------------
+    // 20. Attempt history rejects unpublished practices with 404
+    // -------------------------------------------------------------------------
+    await t.test("20. Attempt history rejects unpublished practices with 404", async () => {
+        const draftHistoryRes = await request(`/api/v1/practices/${draftPracticeId}/attempts`);
+        assert.equal(draftHistoryRes.status, 404);
+
+        const archivedHistoryRes = await request(`/api/v1/practices/${archivedPracticeId}/attempts`);
+        assert.equal(archivedHistoryRes.status, 404);
+    });
+
+    // -------------------------------------------------------------------------
+    // 21. Practice attempt execution does not mutate formal AssessmentAttempt or diagnostic pass
+    // -------------------------------------------------------------------------
+    await t.test("21. Practice attempt execution does not create or mutate AssessmentAttempt", async () => {
+        const { AssessmentAttempt } = await import("../src/modules/assessmentAttempt/models/assessmentAttempt.model.js");
+        const formalAttempts = await AssessmentAttempt.find({ learnerId, courseId });
+        assert.equal(formalAttempts.length, 0, "Practice execution must never create AssessmentAttempt records");
+    });
 });
+
