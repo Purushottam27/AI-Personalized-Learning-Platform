@@ -4,6 +4,7 @@ import { Assessment } from "../../assessment/models/assessment.model.js";
 import { Course } from "../../course/models/course.model.js";
 import { PracticeAttempt } from "../../practice/models/practiceAttempt.model.js";
 import { AssessmentAttempt } from "../../assessmentAttempt/models/assessmentAttempt.model.js";
+import { recalculateTopicMasteryService } from "../../topicMastery/services/topicMastery.service.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 function fail(status, code, message, details = null) {
@@ -101,16 +102,29 @@ export async function recordPracticeEvidenceService(attempt, session = null) {
         contributeToLearningEvidence: true,
     };
 
+    let result;
     try {
         const [created] = await LearningEvidence.create([payload], session ? { session } : {});
-        return created;
+        result = created;
     } catch (error) {
         if (isDuplicateKey(error)) {
             const query = LearningEvidence.findOne({ attemptId: attempt._id });
-            return await (session ? query.session(session) : query);
+            result = await (session ? query.session(session) : query);
+        } else {
+            throw error;
         }
-        throw error;
     }
+
+    if (result?.topicId) {
+        try {
+            await recalculateTopicMasteryService(result.learnerId, result.courseId, result.topicId, session);
+        } catch (err) {
+            // Topic mastery calculation failure must not invalidate historical evidence recording
+            console.error("Auto topic mastery recalculation failed:", err);
+        }
+    }
+
+    return result;
 }
 
 /**
@@ -175,16 +189,29 @@ export async function recordAssessmentEvidenceService(attempt, session = null) {
         contributeToLearningEvidence: true,
     };
 
+    let result;
     try {
         const [created] = await LearningEvidence.create([payload], session ? { session } : {});
-        return created;
+        result = created;
     } catch (error) {
         if (isDuplicateKey(error)) {
             const query = LearningEvidence.findOne({ attemptId: attempt._id });
-            return await (session ? query.session(session) : query);
+            result = await (session ? query.session(session) : query);
+        } else {
+            throw error;
         }
-        throw error;
     }
+
+    if (result?.topicId) {
+        try {
+            await recalculateTopicMasteryService(result.learnerId, result.courseId, result.topicId, session);
+        } catch (err) {
+            // Topic mastery calculation failure must not invalidate historical evidence recording
+            console.error("Auto topic mastery recalculation failed:", err);
+        }
+    }
+
+    return result;
 }
 
 /**
