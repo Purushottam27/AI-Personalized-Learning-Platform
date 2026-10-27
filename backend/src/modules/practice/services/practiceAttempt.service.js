@@ -5,6 +5,7 @@ import { Course } from "../../course/models/course.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
 import { Question } from "../../question/models/question.model.js";
+import { recordPracticeEvidenceService } from "../../learningEvidence/services/learningEvidence.service.js";
 import { withTransaction } from "../../../shared/utils/withTransaction.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
@@ -355,11 +356,26 @@ export async function submitPracticeAttemptService(learnerId, attemptId, answers
         if (isVersionError(error)) {
             const fresh = await PracticeAttempt.findOne({ _id: attemptId, learnerId });
             if (fresh && fresh.status === "SUBMITTED") {
+                if (fresh.contributeToLearningEvidence) {
+                    try {
+                        await recordPracticeEvidenceService(fresh);
+                    } catch (evidenceError) {
+                        console.error("Failed to record learning evidence for practice attempt:", evidenceError);
+                    }
+                }
                 return serializePublicAttempt(fresh, { revealResults: true });
             }
             fail(409, "ATTEMPT_CHANGED", "Attempt changed concurrently; reload and submit again");
         }
         throw error;
+    }
+
+    if (attempt.contributeToLearningEvidence) {
+        try {
+            await recordPracticeEvidenceService(attempt);
+        } catch (evidenceError) {
+            console.error("Failed to record learning evidence for practice attempt:", evidenceError);
+        }
     }
 
     return serializePublicAttempt(attempt, { revealResults: true });

@@ -4,6 +4,7 @@ import { AssessmentAttempt } from "../models/assessmentAttempt.model.js";
 import { Course } from "../../course/models/course.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
 import { Question } from "../../question/models/question.model.js";
+import { recordAssessmentEvidenceService } from "../../learningEvidence/services/learningEvidence.service.js";
 import { withTransaction } from "../../../shared/utils/withTransaction.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
@@ -88,12 +89,22 @@ async function finalizeDocument(attempt, reason, now = new Date(), retryCount = 
     attempt.passed = result.passed;
     try {
         await attempt.save();
+        try {
+            await recordAssessmentEvidenceService(attempt);
+        } catch (evidenceError) {
+            console.error("Failed to record learning evidence for assessment attempt:", evidenceError);
+        }
         return attempt;
     } catch (error) {
         if (isVersionError(error)) {
             const fresh = await AssessmentAttempt.findOne({ _id: attempt._id, learnerId: attempt.learnerId });
             if (!fresh) throw error;
             if (fresh.status === "SUBMITTED") {
+                try {
+                    await recordAssessmentEvidenceService(fresh);
+                } catch (evidenceError) {
+                    console.error("Failed to record learning evidence for assessment attempt:", evidenceError);
+                }
                 return fresh;
             }
             if (retryCount < 1) {
