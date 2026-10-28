@@ -23,6 +23,7 @@ import { isApiError } from '../../../lib/axios';
 import LessonManagement from '../components/LessonManagement/LessonManagement';
 import ResourceManagement from '../components/ResourceManagement/ResourceManagement';
 import QuestionBankManagement from '../components/QuestionBankManagement/QuestionBankManagement';
+import { PracticeManagement } from '../components/PracticeManagement/PracticeManagement';
 import type { Topic, TopicPayload } from '../types/topic.types';
 
  type TopicSection = 'LESSONS' | 'RESOURCES' | 'QUESTION_BANK' | 'PRACTICE' | 'ASSESSMENT';
@@ -261,7 +262,7 @@ export const TopicWorkspacePage: React.FC = () => {
 >
   {SECTION_ITEMS.map(({ id, label, Icon }) => {
     const selected = activeSection === id;
-    const comingSoon = id === 'PRACTICE' || id === 'ASSESSMENT';
+    const comingSoon = id === 'ASSESSMENT';
 
     return (
       <button
@@ -322,6 +323,10 @@ export const TopicWorkspacePage: React.FC = () => {
             ) : activeSection === 'QUESTION_BANK' ? (
               <motion.div key="question-bank" initial={{ opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
                 <QuestionBankManagement topicId={topic._id} topicTitle={topic.title} courseStatus={course.status} />
+              </motion.div>
+            ) : activeSection === 'PRACTICE' ? (
+              <motion.div key="practice" initial={{ opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
+                <PracticeManagement topicId={topic._id} topicTitle={topic.title} courseStatus={course.status} />
               </motion.div>
             ) : (
               <ComingSoonPanel key={activeSection} section={activeSection} onGoToLessons={() => setActiveSection('LESSONS')} />

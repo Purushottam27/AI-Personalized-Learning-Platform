@@ -101,6 +101,14 @@
   --sidebar-ambient-opacity: 0;
   --shadow-premium-card: 0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.04);
   --shadow-premium-btn: none;
+
+  /* Color Scheme */
+  color-scheme: light;
+
+  /* Scrollbars (Light) */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(25, 24, 22, 0.20);
+  --scrollbar-thumb-hover: rgba(25, 24, 22, 0.35);
 }
 
 /* ─────────────────────────────────────────
@@ -152,6 +160,14 @@
   --sidebar-ambient-opacity: 0.8;
   --shadow-premium-card: 0 10px 25px -5px rgba(208, 100, 71, 0.05), 0 8px 10px -6px rgba(208, 100, 71, 0.02);
   --shadow-premium-btn: 0 4px 8px -2px rgba(208, 100, 71, 0.15);
+
+  /* Color Scheme */
+  color-scheme: dark;
+
+  /* Scrollbars (Dark) */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(244, 240, 232, 0.24);
+  --scrollbar-thumb-hover: rgba(244, 240, 232, 0.40);
 }
 
 /* ─────────────────────────────────────────
@@ -175,4 +191,41 @@ body {
 input[type="checkbox"],
 input[type="radio"] {
   accent-color: var(--color-signal);
+}
+
+/* ─────────────────────────────────────────
+   SCROLLBARS
+   Theme-aware styling across standard and WebKit engines
+   ───────────────────────────────────────── */
+
+* {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

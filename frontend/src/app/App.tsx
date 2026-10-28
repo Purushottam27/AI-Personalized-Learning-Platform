@@ -15,7 +15,10 @@ import '../App.css';
 // Learner App
 import LearnerLayout from '../layouts/LearnerLayout';
 import { LearnerDashboardPage } from '../features/learner/pages/LearnerDashboardPage';
+import { LearnerAnalyticsPage } from '../features/learner/pages/LearnerAnalyticsPage';
 import { PlaceholderPage } from '../features/learner/pages/PlaceholderPage';
+import { PracticeOverviewPage } from '../features/learner/pages/PracticeOverviewPage';
+import { PracticeSessionPage } from '../features/learner/pages/PracticeSessionPage';
 
 // Instructor App
 import InstructorLayout from '../features/instructor/layouts/InstructorLayout';
@@ -60,8 +63,10 @@ function App() {
                   <Route path="courses" element={<PlaceholderPage title="My Courses" description="View and manage your active and completed courses." />} />
                   <Route path="explore" element={<PlaceholderPage title="Explore" description="Discover new courses tailored to your interests and level." />} />
                   <Route path="recommended" element={<PlaceholderPage title="Recommended" description="AI-powered learning recommendations based on your profile." />} />
-                  <Route path="analytics" element={<PlaceholderPage title="Analytics" description="Deep insights into your learning progress and mastery." />} />
+                  <Route path="analytics" element={<LearnerAnalyticsPage />} />
                   <Route path="profile" element={<LearnerProfilePage />} />
+                  <Route path="practices/:practiceId" element={<PracticeOverviewPage />} />
+                  <Route path="practice-attempts/:attemptId" element={<PracticeSessionPage />} />
                 </Route>
 
                 {/* Instructor application */}

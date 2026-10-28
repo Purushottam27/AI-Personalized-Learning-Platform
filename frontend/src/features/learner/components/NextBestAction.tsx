@@ -1,12 +1,20 @@
-import React from 'react';
-import { ArrowRight, Brain, Target, BookOpen, FileText } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowRight, Brain, Target, BookOpen, FileText, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { NextBestAction as NextBestActionType } from '../types/learner.types';
+import {
+  getLearnerPracticeById,
+  getLearnerPracticesByTopic,
+} from '../api/practiceAttempt.api';
 
 interface NextBestActionProps {
   action: NextBestActionType | null;
 }
 
 export const NextBestAction: React.FC<NextBestActionProps> = ({ action }) => {
+  const navigate = useNavigate();
+  const [isResolving, setIsResolving] = useState(false);
+
   if (!action) {
     return null; // Don't show if no recommendation
   }
@@ -29,6 +37,44 @@ export const NextBestAction: React.FC<NextBestActionProps> = ({ action }) => {
     }
   };
 
+  const handleActionClick = async () => {
+    if (action.type !== 'START_PRACTICE') {
+      return;
+    }
+
+    if (!action.targetId) return;
+
+    setIsResolving(true);
+    try {
+      // 1. Check if action.targetId is already a practice ID
+      try {
+        const directPractice = await getLearnerPracticeById(action.targetId);
+        if (directPractice && directPractice._id) {
+          navigate(`/learner/practices/${directPractice._id}`);
+          return;
+        }
+      } catch {
+        // targetId might be a topic ID
+      }
+
+      // 2. If targetId represents a topic, resolve a published practice for that topic
+      try {
+        const topicPractices = await getLearnerPracticesByTopic(action.targetId);
+        if (topicPractices && topicPractices.length > 0) {
+          navigate(`/learner/practices/${topicPractices[0]._id}`);
+          return;
+        }
+      } catch {
+        // Topic lookup failed or not enrolled
+      }
+
+      // 3. Fallback: navigate with targetId so overview page displays specific status
+      navigate(`/learner/practices/${action.targetId}`);
+    } finally {
+      setIsResolving(false);
+    }
+  };
+
   return (
     <div 
       className="rounded-2xl border border-signal/20 bg-signal-soft/30 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-l-4 border-l-signal transition-shadow duration-300"
@@ -47,8 +93,21 @@ export const NextBestAction: React.FC<NextBestActionProps> = ({ action }) => {
         </div>
       </div>
       
-      <button className="w-full sm:w-auto inline-flex items-center justify-center gap-2 font-semibold transition-colors duration-150 px-5 py-2.5 text-sm rounded-lg bg-surface border border-border hover:bg-surface-elevated hover:border-signal/30 text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shrink-0">
-        {getActionLabel()} <ArrowRight className="w-4 h-4 text-signal" />
+      <button 
+        type="button"
+        onClick={handleActionClick}
+        disabled={isResolving}
+        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 font-semibold transition-colors duration-150 px-5 py-2.5 text-sm rounded-lg bg-surface border border-border hover:bg-surface-elevated hover:border-signal/30 text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {isResolving ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin text-signal" /> Loading...
+          </>
+        ) : (
+          <>
+            {getActionLabel()} <ArrowRight className="w-4 h-4 text-signal" />
+          </>
+        )}
       </button>
     </div>
   );
