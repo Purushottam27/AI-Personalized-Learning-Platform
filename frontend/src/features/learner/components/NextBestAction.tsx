@@ -38,11 +38,30 @@ export const NextBestAction: React.FC<NextBestActionProps> = ({ action }) => {
   };
 
   const handleActionClick = async () => {
-    if (action.type !== 'START_PRACTICE') {
+    if (!action.targetId && action.type !== 'CONTINUE_LESSON') return;
+
+    if (action.type === 'TAKE_ASSESSMENT') {
+      navigate(`/learner/assessments/${action.targetId}`);
       return;
     }
 
-    if (!action.targetId) return;
+    if (action.type === 'CONTINUE_LESSON') {
+      if (action.targetId) {
+        navigate(`/learner/courses/${action.targetId}/learn`);
+      } else {
+        navigate('/learner/courses');
+      }
+      return;
+    }
+
+    if (action.type === 'REVIEW_TOPIC') {
+      navigate(`/learner/practices/${action.targetId}`);
+      return;
+    }
+
+    if (action.type !== 'START_PRACTICE') {
+      return;
+    }
 
     setIsResolving(true);
     try {

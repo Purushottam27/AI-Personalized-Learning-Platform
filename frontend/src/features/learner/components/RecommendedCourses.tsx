@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { RecommendedCourse } from '../types/learner.types';
 
 interface RecommendedCoursesProps {
@@ -20,7 +21,11 @@ export const RecommendedCourses: React.FC<RecommendedCoursesProps> = ({ recommen
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {recommendations.map((course) => (
-          <div key={course.courseId} className="group rounded-2xl border border-border bg-surface hover:border-border-muted hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col cursor-pointer">
+          <Link
+            key={course.courseId}
+            to={`/learner/courses/${course.courseId}`}
+            className="group rounded-2xl border border-border bg-surface hover:border-border-muted hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col cursor-pointer block no-underline"
+          >
             <div className="p-5 flex-1">
               {course.level && (
                 <span className="inline-block px-2 py-1 rounded-md bg-surface-disabled text-xs font-semibold text-text-secondary mb-3">
@@ -41,7 +46,7 @@ export const RecommendedCourses: React.FC<RecommendedCoursesProps> = ({ recommen
               <span className="text-sm font-semibold text-signal">View Course</span>
               <ArrowRight className="w-4 h-4 text-signal transform group-hover:translate-x-1 transition-transform" />
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

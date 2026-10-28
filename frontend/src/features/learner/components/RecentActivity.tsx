@@ -32,6 +32,14 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) =>
     }
   };
 
+  const getActivityLink = (activity: RecentActivityItem): string | null => {
+    if (!/^[0-9a-fA-F]{24}$/.test(activity.id)) return null;
+    if (activity.type === 'PRACTICE_COMPLETED') return `/learner/practice-attempts/${activity.id}`;
+    if (activity.type === 'ASSESSMENT_PASSED') return `/learner/assessment-attempts/${activity.id}`;
+    if (activity.type === 'COURSE_ENROLLED') return `/learner/courses/${activity.id}`;
+    return null;
+  };
+
   return (
     <div className="mt-8">
       <div className="flex items-center gap-2 mb-6">
@@ -42,9 +50,7 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) =>
       <div className="rounded-2xl border border-border bg-surface overflow-hidden">
         <ul className="divide-y divide-border">
           {activities.map((activity) => {
-            const isPracticeAttempt =
-              activity.type === 'PRACTICE_COMPLETED' &&
-              /^[0-9a-fA-F]{24}$/.test(activity.id);
+            const link = getActivityLink(activity);
 
             const content = (
               <>
@@ -59,7 +65,7 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) =>
                 </div>
                 <div className="shrink-0 flex items-center gap-2 text-xs text-text-tertiary whitespace-nowrap">
                   <span>{activity.date}</span>
-                  {isPracticeAttempt && (
+                  {link && (
                     <ArrowUpRight className="h-3.5 w-3.5 text-signal" />
                   )}
                 </div>
@@ -68,9 +74,9 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) =>
 
             return (
               <li key={activity.id}>
-                {isPracticeAttempt ? (
+                {link ? (
                   <Link
-                    to={`/learner/practice-attempts/${activity.id}`}
+                    to={link}
                     className="p-4 sm:px-6 flex items-start sm:items-center gap-4 hover:bg-surface-elevated transition-colors cursor-pointer block"
                   >
                     {content}

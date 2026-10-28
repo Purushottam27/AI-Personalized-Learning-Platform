@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight, PlayCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { CourseProgress } from '../types/learner.types';
 
 interface ContinueLearningCardProps {
@@ -7,6 +8,8 @@ interface ContinueLearningCardProps {
 }
 
 export const ContinueLearningCard: React.FC<ContinueLearningCardProps> = ({ progress }) => {
+  const navigate = useNavigate();
+
   if (!progress) {
     return (
       <div 
@@ -18,7 +21,9 @@ export const ContinueLearningCard: React.FC<ContinueLearningCardProps> = ({ prog
           You haven't started a course yet. Explore available courses to begin your learning journey.
         </p>
         <button 
-          className="inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200 px-6 py-3 text-sm rounded-xl bg-signal text-paper hover:bg-signal-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          type="button"
+          onClick={() => navigate('/learner/explore')}
+          className="inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200 px-6 py-3 text-sm rounded-xl bg-signal text-paper hover:bg-signal-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus cursor-pointer"
           style={{ boxShadow: 'var(--shadow-premium-btn)' }}
         >
           Explore Courses <ArrowRight className="w-4 h-4" />
@@ -59,7 +64,9 @@ export const ContinueLearningCard: React.FC<ContinueLearningCardProps> = ({ prog
 
       <div className="z-10 md:w-auto w-full">
         <button 
-          className="w-full md:w-auto inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200 px-8 py-4 text-base rounded-xl bg-signal text-paper hover:bg-signal-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          type="button"
+          onClick={() => navigate(`/learner/courses/${progress.courseId}/learn`)}
+          className="w-full md:w-auto inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200 px-8 py-4 text-base rounded-xl bg-signal text-paper hover:bg-signal-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus cursor-pointer"
           style={{ boxShadow: 'var(--shadow-premium-btn)' }}
         >
           Resume Learning <ArrowRight className="w-5 h-5" />

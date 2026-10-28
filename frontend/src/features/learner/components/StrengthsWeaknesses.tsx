@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight, TrendingUp, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { LearningStrength, LearningWeakness } from '../types/learner.types';
 
 interface StrengthsWeaknessesProps {
@@ -8,6 +9,8 @@ interface StrengthsWeaknessesProps {
 }
 
 export const StrengthsWeaknesses: React.FC<StrengthsWeaknessesProps> = ({ strengths, needsAttention }) => {
+  const navigate = useNavigate();
+
   if (strengths.length === 0 && needsAttention.length === 0) {
     return null;
   }
@@ -26,7 +29,11 @@ export const StrengthsWeaknesses: React.FC<StrengthsWeaknessesProps> = ({ streng
             {needsAttention.map((item, index) => (
               <li key={`weakness-${index}`} className="flex items-center justify-between group">
                 <span className="text-sm font-medium text-text-secondary group-hover:text-text-primary transition-colors">{item.title}</span>
-                <button className="text-xs font-semibold text-signal flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity focus-visible:opacity-100">
+                <button 
+                  type="button"
+                  onClick={() => navigate(`/learner/practices/${item.topicId}`)}
+                  className="text-xs font-semibold text-signal flex items-center gap-1 opacity-80 group-hover:opacity-100 hover:underline transition-opacity focus-visible:opacity-100 cursor-pointer"
+                >
                   Review <ArrowRight className="w-3 h-3" />
                 </button>
               </li>
