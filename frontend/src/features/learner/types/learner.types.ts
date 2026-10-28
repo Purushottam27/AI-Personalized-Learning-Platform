@@ -56,3 +56,74 @@ export interface LearnerDashboardData {
   recommendations: RecommendedCourse[];
   recentActivity: RecentActivityItem[];
 }
+
+export interface TopicProgressItem {
+  topicId: string;
+  title: string;
+  order: number;
+  masteryScore: number;
+  status: string;
+  confidence: number;
+  evidenceCount: number;
+  practiceAttemptsCount: number;
+  assessmentAttemptsCount: number;
+  lastEvaluatedAt: string | null;
+}
+
+export interface LearnerCourseProgressDetail {
+  courseId: string;
+  courseTitle: string;
+  domain?: string;
+  category?: string;
+  enrolledAt: string;
+  totalTopics: number;
+  evaluatedTopics: number;
+  masteredTopics: number;
+  progressPercentage: number;
+  topics: TopicProgressItem[];
+}
+
+export interface ActivityTotals {
+  activeCoursesCount: number;
+  totalPracticesCompleted: number;
+  totalAssessmentsCompleted: number;
+  totalQuestionsAttempted: number;
+  totalQuestionsCorrect: number;
+  overallAccuracy: number;
+}
+
+export interface MasteryDistribution {
+  MASTERED: number;
+  STRONG: number;
+  FUNCTIONAL: number;
+  DEVELOPING: number;
+  NEEDS_IMPROVEMENT: number;
+  INSUFFICIENT_EVIDENCE: number;
+}
+
+export interface DailyTrendItem {
+  date: string;
+  practiceCount: number;
+  assessmentCount: number;
+  totalQuestions: number;
+  accuracyPercent: number;
+  averageScore: number;
+}
+
+export interface CourseProgressSummary {
+  courseId: string;
+  courseTitle: string;
+  domain?: string;
+  totalTopics: number;
+  evaluatedTopics: number;
+  masteredTopics: number;
+  progressPercentage: number;
+}
+
+export interface LearnerAnalyticsOverviewData {
+  activityTotals: ActivityTotals;
+  masteryDistribution: MasteryDistribution;
+  dailyTrends: DailyTrendItem[];
+  courseProgressList: CourseProgressSummary[];
+}
+
