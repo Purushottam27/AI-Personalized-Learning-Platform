@@ -21,6 +21,10 @@ import { practiceRouter } from "./modules/practice/routes/practice.route.js";
 import { assessmentAttemptRouter } from './modules/assessmentAttempt/routes/assessmentAttempt.route.js';
 import { assessmentRouter } from './modules/assessment/routes/assessment.route.js';
 import { learningEvidenceRouter } from './modules/learningEvidence/routes/learningEvidence.route.js';
+import { topicMasteryRouter } from './modules/topicMastery/routes/topicMastery.route.js';
+import { recommendationRouter } from './modules/recommendation/routes/recommendation.route.js';
+import { aiAssistantRouter } from './modules/aiAssistant/routes/aiAssistant.route.js';
+import { learnerAnalyticsRouter } from './modules/analytics/routes/learnerAnalytics.route.js';
 
 const app = express();
 const logger = pino();
@@ -54,6 +58,10 @@ app.use('/api/v1', practiceRouter);
 app.use('/api/v1', assessmentAttemptRouter);
 app.use('/api/v1', assessmentRouter);
 app.use('/api/v1', learningEvidenceRouter);
+app.use('/api/v1', topicMasteryRouter);
+app.use('/api/v1', recommendationRouter);
+app.use('/api/v1', aiAssistantRouter);
+app.use('/api/v1', learnerAnalyticsRouter);
 
 // Global Error-handling response Middleware
 app.use(errorMiddleware);
