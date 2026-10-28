@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import Button from '../../../components/ui/Button';
 import { useCourse } from '../hooks/useCourse';
+import { publishCourse, archiveCourse } from '../api/instructor.api';
 import TopicManagement from '../components/TopicManagement/TopicManagement';
 import type { CourseDifficulty, CourseStatus } from '../types/instructor.types';
 import type { Topic } from '../types/topic.types';
@@ -50,7 +51,9 @@ const MetaItem: React.FC<{ label: string; value: React.ReactNode }> = ({ label, 
 export const CourseWorkspacePage: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
-  const { course, isLoading, error } = useCourse(courseId);
+  const { course, isLoading, error, refetch } = useCourse(courseId);
+  const [isActing, setIsActing] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -86,6 +89,35 @@ export const CourseWorkspacePage: React.FC = () => {
     navigate(`/instructor/courses/${course._id}/topics/${topic._id}`);
   };
 
+  const handlePublish = async () => {
+    try {
+      setIsActing(true);
+      setActionError(null);
+      await publishCourse(course._id);
+      await refetch();
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || 'Failed to publish course.');
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    if (!window.confirm('Are you sure you want to archive this course? Learners will no longer be able to discover or enroll in it.')) {
+      return;
+    }
+    try {
+      setIsActing(true);
+      setActionError(null);
+      await archiveCourse(course._id);
+      await refetch();
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || 'Failed to archive course.');
+    } finally {
+      setIsActing(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-5xl space-y-7 pb-14">
       <motion.header
@@ -109,13 +141,35 @@ export const CourseWorkspacePage: React.FC = () => {
             <h1 className="break-words font-serif text-3xl font-semibold leading-tight text-text-primary sm:text-4xl">{course.title}</h1>
             <StatusBadge status={course.status} />
           </div>
-          {course.status === 'DRAFT' && (
-            <Button onClick={() => navigate(`/instructor/courses/${course._id}/setup`)} className="w-full shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.98] sm:w-auto">
-              <FileText className="h-4 w-4" aria-hidden="true" />
-              Continue Setup
-            </Button>
-          )}
+
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            {course.status === 'DRAFT' && (
+              <>
+                <Button variant="secondary" onClick={() => navigate(`/instructor/courses/${course._id}/setup`)} className="w-full shrink-0 sm:w-auto">
+                  <FileText className="h-4 w-4" aria-hidden="true" />
+                  Continue Setup
+                </Button>
+                <Button onClick={handlePublish} disabled={isActing} className="w-full shrink-0 sm:w-auto">
+                  {isActing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
+                  Publish Course
+                </Button>
+              </>
+            )}
+            {course.status === 'PUBLISHED' && (
+              <Button variant="secondary" onClick={handleArchive} disabled={isActing} className="w-full shrink-0 sm:w-auto text-error hover:border-error/40">
+                {isActing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+                Archive Course
+              </Button>
+            )}
+          </div>
         </div>
+
+        {actionError && (
+          <div className="flex items-center gap-2 rounded-xl border border-error/20 bg-error-soft p-3 text-xs text-error">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{actionError}</span>
+          </div>
+        )}
 
         {course.status === 'DRAFT' && (
           <div className="flex items-start gap-3 rounded-xl border border-signal/20 bg-signal-soft p-4 text-signal">

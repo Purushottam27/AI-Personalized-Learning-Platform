@@ -16,9 +16,15 @@ import '../App.css';
 import LearnerLayout from '../layouts/LearnerLayout';
 import { LearnerDashboardPage } from '../features/learner/pages/LearnerDashboardPage';
 import { LearnerAnalyticsPage } from '../features/learner/pages/LearnerAnalyticsPage';
+import { ExploreCoursesPage } from '../features/learner/pages/ExploreCoursesPage';
+import { MyCoursesPage } from '../features/learner/pages/MyCoursesPage';
+import { CourseDetailPage } from '../features/learner/pages/CourseDetailPage';
+import { CourseStudyPage } from '../features/learner/pages/CourseStudyPage';
 import { PlaceholderPage } from '../features/learner/pages/PlaceholderPage';
 import { PracticeOverviewPage } from '../features/learner/pages/PracticeOverviewPage';
 import { PracticeSessionPage } from '../features/learner/pages/PracticeSessionPage';
+import { AssessmentOverviewPage } from '../features/learner/pages/AssessmentOverviewPage';
+import { AssessmentSessionPage } from '../features/learner/pages/AssessmentSessionPage';
 
 // Instructor App
 import InstructorLayout from '../features/instructor/layouts/InstructorLayout';
@@ -60,13 +66,18 @@ function App() {
                 {/* Learner application */}
                 <Route path="/learner" element={<LearnerLayout />}>
                   <Route path="dashboard" element={<LearnerDashboardPage />} />
-                  <Route path="courses" element={<PlaceholderPage title="My Courses" description="View and manage your active and completed courses." />} />
-                  <Route path="explore" element={<PlaceholderPage title="Explore" description="Discover new courses tailored to your interests and level." />} />
+                  <Route path="courses" element={<MyCoursesPage />} />
+                  <Route path="courses/:courseId" element={<CourseDetailPage />} />
+                  <Route path="courses/:courseId/learn" element={<CourseStudyPage />} />
+                  <Route path="explore" element={<ExploreCoursesPage />} />
                   <Route path="recommended" element={<PlaceholderPage title="Recommended" description="AI-powered learning recommendations based on your profile." />} />
                   <Route path="analytics" element={<LearnerAnalyticsPage />} />
                   <Route path="profile" element={<LearnerProfilePage />} />
                   <Route path="practices/:practiceId" element={<PracticeOverviewPage />} />
                   <Route path="practice-attempts/:attemptId" element={<PracticeSessionPage />} />
+                  <Route path="assessments/:topicId" element={<AssessmentOverviewPage />} />
+                  <Route path="courses/:courseId/diagnostic" element={<AssessmentOverviewPage />} />
+                  <Route path="assessment-attempts/:attemptId" element={<AssessmentSessionPage />} />
                 </Route>
 
                 {/* Instructor application */}

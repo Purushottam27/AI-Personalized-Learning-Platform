@@ -15,6 +15,7 @@ interface UseCourseResult {
   course: Course | null;
   isLoading: boolean;
   error: string | null;
+  refetch: () => Promise<void>;
 }
 
 export const useCourse = (courseId: string | undefined): UseCourseResult => {
@@ -22,46 +23,37 @@ export const useCourse = (courseId: string | undefined): UseCourseResult => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchCourse = async () => {
     if (!courseId) {
       setError('Invalid course reference.');
       setIsLoading(false);
       return;
     }
-
-    let isMounted = true;
-
-    const fetchCourse = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const data = await getCourseById(courseId);
-        if (isMounted) setCourse(data);
-      } catch (err: unknown) {
-        if (!isMounted) return;
-
-        if (isApiError(err)) {
-          if (err.status === 404) {
-            setError('This course could not be found.');
-          } else if (err.status === 403 || err.status === 401) {
-            setError("You're not authorized to access this course.");
-          } else {
-            setError('Failed to load the course. Please try again.');
-          }
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await getCourseById(courseId);
+      setCourse(data);
+    } catch (err: unknown) {
+      if (isApiError(err)) {
+        if (err.status === 404) {
+          setError('This course could not be found.');
+        } else if (err.status === 403 || err.status === 401) {
+          setError("You're not authorized to access this course.");
         } else {
-          setError('An unexpected error occurred.');
+          setError('Failed to load the course. Please try again.');
         }
-      } finally {
-        if (isMounted) setIsLoading(false);
+      } else {
+        setError('An unexpected error occurred.');
       }
-    };
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchCourse();
-
-    return () => {
-      isMounted = false;
-    };
   }, [courseId]);
 
-  return { course, isLoading, error };
+  return { course, isLoading, error, refetch: fetchCourse };
 };

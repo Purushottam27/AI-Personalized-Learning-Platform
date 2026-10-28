@@ -101,13 +101,19 @@ Account reactivation                    🟢 Implemented
 
 Learner/Instructor profile APIs         🟢 Implemented
 Learner/Instructor onboarding           🟢 Implemented & manually verified
-Course/domain features                  ⬜ Not started
-Assessment features                     ⬜ Not started
-Learning evidence                       ⬜ Not started
-Personalization implementation          ⬜ Not started
-Redis/BullMQ implementation              ⬜ Not started
-Frontend implementation                 ⬜ Not started
-Automated testing                       ⬜ Not started
+Course/domain backend features          🟢 Implemented
+Topic/lesson/resource backend features  🟢 Implemented
+Question bank & practice backend        🟢 Implemented
+Assessment backend features             🟢 Implemented
+Enrollment backend features             🟢 Implemented
+Learning evidence & topic mastery       🟢 Implemented
+Personalization backend engine          🟢 Implemented
+Analytics backend APIs                  🟢 Implemented
+Frontend instructor workspace           🟢 Implemented (Courses, Topics, Lessons, Resources, QB, Practice, Analytics)
+Frontend learner core                   🟢 Implemented (Dashboard, Analytics, Practice, Course Discovery, Enrollment, Assessment Runner)
+Frontend instructor assessments         🟢 Implemented (Assessment authoring, Question selection matching Practice UX, Edit action, Lifecycle banners)
+Automated testing                       🟡 In progress (17+ backend test suites active; frontend tests pending)
+Redis/BullMQ implementation              🟡 In progress (Worker architecture designed; in-process event processing active)
 Deployment                              ⬜ Not started
 ```
 
@@ -352,27 +358,27 @@ Role-based profile access            🟢
 ## Learner Dashboard
 
 ```text
-Dashboard shell                      ⬜
-Continue learning                    ⬜
-Next best action                     ⬜
-Course progress                      ⬜
-Strengths                            ⬜
-Weaknesses                           ⬜
-Recommendations                     ⬜
-Study summary                        ⬜
+Dashboard shell                      🟢 Implemented in FE
+Continue learning                    🟢 Implemented via analytics overview
+Next best action                     🟢 Connected to recommendations
+Course progress                      🟢 Implemented
+Strengths                            🟢 Implemented via mastery
+Weaknesses                           🟢 Implemented via mastery
+Recommendations                     🟢 Connected in FE dashboard
+Study summary                        🟢 Implemented
 ```
 
 ## Course Experience
 
 ```text
-Course discovery                     ⬜
-Course search                        ⬜
-Domain filter                        ⬜
-Course details                       ⬜
-Enrollment                           ⬜
-Prerequisite handling                ⬜
-Diagnostic assessment                ⬜
-Course progress                      ⬜
+Course discovery                     🟢 Backend implemented / 🟡 FE in progress (replacing explore placeholder)
+Course search                        🟢 Backend implemented / 🟡 FE in progress
+Domain filter                        🟢 Backend implemented / 🟡 FE in progress
+Course details                       🟢 Backend implemented / 🟡 FE in progress
+Enrollment                           🟢 Backend implemented / 🟡 FE in progress (replacing my-courses placeholder)
+Prerequisite handling                🟢 Backend implemented / 🟡 FE in progress
+Diagnostic assessment                🟢 Backend implemented / 🟡 FE in progress
+Course progress                      🟢 Backend implemented / 🟢 Connected in FE Dashboard
 ```
 
 The project uses **domain/category**, not Department, for course classification.
@@ -380,42 +386,42 @@ The project uses **domain/category**, not Department, for course classification.
 ## Learning
 
 ```text
-Lesson list                          ⬜
-Lesson unlocking                     ⬜
-Lesson explanation                   ⬜
-Examples                             ⬜
-Instructor resources                 ⬜
-YouTube resource support             ⬜
-PDF/PPT resource support             ⬜
-Lesson completion                    ⬜
+Lesson list                          🟢 Backend implemented / 🟡 FE in progress
+Lesson unlocking                     🟢 Backend enforced / 🟡 FE in progress
+Lesson explanation                   🟢 Backend implemented / 🟡 FE in progress
+Examples                             🟢 Backend implemented / 🟡 FE in progress
+Instructor resources                 🟢 Backend implemented / 🟡 FE in progress
+YouTube resource support             🟢 Backend implemented / 🟡 FE in progress
+PDF/PPT resource support             🟢 Backend implemented / 🟡 FE in progress
+Lesson completion                    🟢 Backend implemented / 🟡 FE in progress
 ```
 
 ## Assessment
 
 ```text
-Question display                     ⬜
-Options                              ⬜
-Previous/Next                        ⬜
-Question navigator                   ⬜
-Timer                                ⬜
-Unanswered state                     ⬜
-Submission                           ⬜
-Scoring                              ⬜
-Result                               ⬜
-Question-pool variation              ⬜
+Question display                     🟢 Backend implemented / 🟡 FE in progress
+Options                              🟢 Backend implemented / 🟡 FE in progress
+Previous/Next                        🟡 FE in progress
+Question navigator                   🟡 FE in progress
+Timer                                🟢 Backend enforced / 🟡 FE in progress
+Unanswered state                     🟢 Backend preserved & scored / 🟡 FE in progress
+Submission                           🟢 Backend implemented / 🟡 FE in progress
+Scoring                              🟢 Backend deterministic scoring / 🟡 FE in progress
+Result                               🟢 Backend result calculation / 🟡 FE in progress
+Question-pool variation              🟢 Backend implemented / 🟡 FE in progress
 ```
 
 ## Personalization
 
 ```text
-Learning event capture               ⬜
-Topic performance                    ⬜
-Mastery calculation                  ⬜
-Weakness detection                   ⬜
-Intervention selection               ⬜
-Recommendation                      ⬜
-Remediation                          ⬜
-Reassessment                         ⬜
+Learning event capture               🟢 Backend implemented (LearningEvidence)
+Topic performance                    🟢 Backend implemented (TopicMastery)
+Mastery calculation                  🟢 Backend implemented (5 tiers: WEAK, DEVELOPING, FUNCTIONAL, STRONG, MASTERED)
+Weakness detection                   🟢 Backend implemented (< 60% threshold)
+Intervention selection               🟢 Backend implemented (6 granularity levels)
+Recommendation                      🟢 Backend implemented (Recommendation service & API)
+Remediation                          🟢 Backend implemented
+Reassessment                         🟢 Backend implemented
 ```
 
 ---
@@ -424,27 +430,28 @@ Reassessment                         ⬜
 
 ```text
 Instructor authentication            🟢 Foundation shared with auth
-Instructor onboarding                🟢
-Instructor profile                   🟢
-Instructor dashboard                 ⬜
-Create course                        ⬜
-Edit course                          ⬜
-Course domain                        ⬜
-Prerequisites                        ⬜
-Learning objectives                  ⬜
-Create lesson                        ⬜
-Edit lesson                          ⬜
-Add resources                        ⬜
-Question bank                        ⬜
-Create assessment                    ⬜
-Configure marks                      ⬜
-Configure pass threshold             ⬜
-Question pool                        ⬜
-Publish course                       ⬜
-View enrolled learners               ⬜
-View course analytics                ⬜
-View topic weaknesses                ⬜
-Instructor profile/settings          ⬜
+Instructor onboarding                🟢 Implemented & verified
+Instructor profile                   🟢 Implemented & verified
+Instructor dashboard                 🟢 Implemented in FE
+Create course                        🟢 Implemented (BE + FE)
+Edit course                          🟢 Implemented (BE + FE)
+Course domain                        🟢 Implemented (BE + FE)
+Prerequisites                        🟢 Implemented (BE + FE)
+Learning objectives                  🟢 Implemented (BE + FE)
+Create lesson                        🟢 Implemented (BE + FE)
+Edit lesson                          🟢 Implemented (BE + FE)
+Add resources                        🟢 Implemented (BE + FE with Cloudinary upload)
+Question bank                        🟢 Implemented (BE + FE)
+Practice management                  🟢 Implemented (BE + FE)
+Create assessment                    🟢 Backend implemented / 🟡 FE tab integration pending
+Configure marks                      🟢 Backend implemented / 🟡 FE tab integration pending
+Configure pass threshold             🟢 Backend implemented / 🟡 FE tab integration pending
+Question pool                        🟢 Backend implemented / 🟡 FE tab integration pending
+Publish course                       🟢 Implemented (BE + FE)
+View enrolled learners               🟢 Backend implemented
+View course analytics                🟢 Implemented (BE + FE)
+View topic weaknesses                🟢 Implemented (BE + FE)
+Instructor profile/settings          🟢 Implemented (BE + FE)
 ```
 
 MVP policy:
@@ -461,15 +468,15 @@ Admin governance and moderation remain separate.
 # 11. Admin MVP Status
 
 ```text
-Admin authentication                 🟢
-Admin dashboard                      ⬜
-User management                      🟢
-Course management                    ⬜
-Platform analytics                   ⬜
-Audit logs                           ⬜
-Moderation                           ⬜
-Administrative controls              🟢
-Admin settings                       ⬜
+Admin authentication                 🟢 Implemented
+Admin dashboard                      🟢 Implemented (shell & navigation)
+User management                      🟢 Implemented (BE + FE)
+Course management                    🟡 Backend course APIs active
+Platform analytics                   ⬜ Not started
+Audit logs                           ⬜ Not started
+Moderation                           ⬜ Not started
+Administrative controls              🟢 Implemented
+Admin settings                       ⬜ Not started
 ```
 
 Current implemented Admin user-management capabilities:
@@ -505,28 +512,31 @@ Approved database design exists in `06-database-design.md`.
 Current implementation:
 
 ```text
-User model                          🟢
-LearnerProfile model                🟢
-InstructorProfile model             🟢
-AuthIdentity model                  ⬜
-RefreshSession model                🟢
-OAuthSetupSession model             ⬜
+User model                          🟢 Implemented
+LearnerProfile model                🟢 Implemented
+InstructorProfile model             🟢 Implemented
+AuthIdentity model                  ⬜ Deferred
+RefreshSession model                🟢 Implemented
+OAuthSetupSession model             ⬜ Deferred
 
-Course model                        ⬜
-Lesson model                        ⬜
-Resource model                      ⬜
-Enrollment model                    ⬜
-Assessment model                    ⬜
-Question model                      ⬜
-Question bank                       ⬜
-Assessment attempt                  ⬜
-Learning event                      ⬜
-Learning Evidence                   ⬜
-Mastery record                      ⬜
-Recommendation                     ⬜
-Intervention                        ⬜
-Notification                        ⬜
-Audit log                           ⬜
+Course model                        🟢 Implemented
+Topic model                         🟢 Implemented
+Lesson model                        🟢 Implemented
+Resource model                      🟢 Implemented
+Enrollment model                    🟢 Implemented
+Assessment model                    🟢 Implemented
+Assessment attempt model            🟢 Implemented
+Question Bank model                 🟢 Implemented
+Question model                      🟢 Implemented
+Question Import model               🟢 Implemented
+Practice model                      🟢 Implemented
+Practice Attempt model              🟢 Implemented
+Learning Evidence model             🟢 Implemented
+Topic Mastery (Mastery record)      🟢 Implemented
+Recommendation (service model)      🟢 Implemented
+Intervention model                  🟢 Derived via recommendation engine
+Notification model                  ⬜ Deferred
+Audit log model                     ⬜ Deferred
 ```
 
 Before implementing each model:
@@ -549,53 +559,28 @@ Do not implement future domain models merely because they are documented.
 
 # 13. Backend Module Status
 
-Approved logical modular-monolith boundaries include:
+Approved logical modular-monolith boundaries include 19 active backend modules:
 
 ```text
-identity/auth
-users
-learners
-instructors
-courses
-lessons
-enrollments
-assessments
-questions
-learning
-personalization
-analytics
-notifications
-files/resources
-admin
-```
-
-Current implementation is concentrated in the identity/user foundation.
-
-Implemented or partially established:
-
-```text
-identity/auth                         🟢
-users                                 🟢
-```
-
-Not yet implemented:
-
-```text
-learners                              🟡 
-instructors                           🟡
-Profile & onboarding capabilities implemented;
-broader learner/instructor domain features remain pending.
-courses                               ⬜
-lessons                               ⬜
-enrollments                           ⬜
-assessments                           ⬜
-questions                             ⬜
-learning                              ⬜
-personalization                       ⬜
-analytics                             ⬜
-notifications                         ⬜
-files/resources                       ⬜
-admin domain features                 ⬜
+auth                                  🟢 Implemented (signup, login, refresh, logout, password, reactivate)
+users                                 🟢 Implemented (profiles, avatar, deactivation, admin management)
+learnerProfile                        🟢 Implemented (5-step progressive onboarding, profile CRUD)
+instructorProfile                     🟢 Implemented (2-step onboarding, profile CRUD)
+course                                🟢 Implemented (CRUD, publish, archive, search, filters)
+topic                                 🟢 Implemented (course topics CRUD, reordering)
+lesson                                🟢 Implemented (topic lessons CRUD, completion, sequence)
+resource                              🟢 Implemented (files, links, Cloudinary signed upload)
+enrollment                            🟢 Implemented (enroll, withdraw, learner course tracking)
+assessment                            🟢 Implemented (topic/diagnostic/final, pass criteria, pool config)
+assessmentAttempt                     🟢 Implemented (session start, timer, submit, deterministic scoring)
+questionBank                          🟢 Implemented (question banks, questions, bulk import via Excel)
+practice                              🟢 Implemented (topic practice definitions, question pool)
+practiceAttempt                       🟢 Implemented (practice sessions, submission, answer review)
+learningEvidence                      🟢 Implemented (event capture, deduping, attempt contributions)
+topicMastery                          🟢 Implemented (5-tier mastery recalculation, weakness detection)
+recommendation                        🟢 Implemented (evidence-based recommendations, 6 intervention levels)
+analytics                             🟢 Implemented (learner dashboard metrics, instructor course analytics)
+admin                                 🟢 Implemented (user moderation, status control, audit view)
 ```
 
 Modules should be created incrementally around real feature slices rather than generated blindly.
@@ -609,23 +594,27 @@ The API design is documented in `07-api-design.md`.
 Current status:
 
 ```text
-Auth APIs                           🟢
-User APIs                           🟢
-Learner profile APIs                🟢
-Learner onboarding APIs             🟢
-Instructor profile APIs             🟢
-Instructor onboarding APIs          🟢
-Course APIs                         ⬜
-Enrollment APIs                     ⬜
-Lesson APIs                         ⬜
-Assessment APIs                     ⬜
-Question APIs                       ⬜
-Learning APIs                       ⬜
-Personalization APIs                ⬜
-Analytics APIs                      ⬜
-Instructor APIs                     ⬜
-Admin APIs                          🟡
-Notification APIs                   ⬜
+Auth APIs                           🟢 Implemented
+User APIs                           🟢 Implemented
+Learner profile APIs                🟢 Implemented
+Learner onboarding APIs             🟢 Implemented
+Instructor profile APIs             🟢 Implemented
+Instructor onboarding APIs          🟢 Implemented
+Course APIs                         🟢 Implemented
+Enrollment APIs                     🟢 Implemented
+Topic APIs                          🟢 Implemented
+Lesson APIs                         🟢 Implemented
+Resource APIs                       🟢 Implemented
+Assessment APIs                     🟢 Implemented
+Assessment Attempt APIs             🟢 Implemented
+Question Bank & Question APIs       🟢 Implemented
+Practice & Practice Attempt APIs    🟢 Implemented
+Learning Evidence APIs              🟢 Implemented
+Topic Mastery APIs                  🟢 Implemented
+Personalization / Recommendation    🟢 Implemented
+Analytics APIs                      🟢 Implemented
+Admin APIs                          🟢 Implemented
+Notification APIs                   ⬜ Deferred
 ```
 
 ## Implemented Auth APIs
@@ -640,8 +629,6 @@ POST /api/v1/auth/change-password
 POST /api/v1/auth/reactivate
 ```
 
-Google authentication/setup endpoints are documented but not implemented.
-
 ## Implemented User APIs
 
 ```text
@@ -653,21 +640,101 @@ PATCH  /api/v1/users/me/avatar
 DELETE /api/v1/users/me
 ```
 
-The `DELETE /users/me` operation is intentionally retained as the approved account-deactivation API.
-
-## Implemented Learner Profile APIs
+## Implemented Profile & Onboarding APIs
 
 ```text
 GET   /api/v1/learner-profile/me
 PATCH /api/v1/learner-profile/me
 PATCH /api/v1/learner-profile/me/onboarding
-```
-
-## Implemented Instructor Profile APIs
-
 GET   /api/v1/instructor-profile/me
 PATCH /api/v1/instructor-profile/me
 PATCH /api/v1/instructor-profile/me/onboarding
+```
+
+## Implemented Course & Topic APIs
+
+```text
+GET    /api/v1/courses
+POST   /api/v1/courses
+GET    /api/v1/courses/:courseId
+PATCH  /api/v1/courses/:courseId
+POST   /api/v1/courses/:courseId/publish
+POST   /api/v1/courses/:courseId/archive
+GET    /api/v1/courses/:courseId/topics
+POST   /api/v1/courses/:courseId/topics
+GET    /api/v1/topics/:topicId
+PATCH  /api/v1/topics/:topicId
+DELETE /api/v1/topics/:topicId
+PATCH  /api/v1/courses/:courseId/topics/reorder
+```
+
+## Implemented Lesson & Resource APIs
+
+```text
+GET    /api/v1/topics/:topicId/lessons
+POST   /api/v1/topics/:topicId/lessons
+GET    /api/v1/lessons/:lessonId
+PATCH  /api/v1/lessons/:lessonId
+DELETE /api/v1/lessons/:lessonId
+POST   /api/v1/lessons/:lessonId/complete
+GET    /api/v1/topics/:topicId/resources
+POST   /api/v1/topics/:topicId/resources
+PATCH  /api/v1/resources/:resourceId
+DELETE /api/v1/resources/:resourceId
+POST   /api/v1/resources/upload-signature
+```
+
+## Implemented Enrollment APIs
+
+```text
+POST   /api/v1/courses/:courseId/enroll
+GET    /api/v1/users/me/enrollments
+GET    /api/v1/enrollments/:enrollmentId
+POST   /api/v1/enrollments/:enrollmentId/withdraw
+```
+
+## Implemented Question Bank, Practice, & Assessment APIs
+
+```text
+GET    /api/v1/topics/:topicId/question-banks
+POST   /api/v1/topics/:topicId/question-banks
+GET    /api/v1/question-banks/:id
+PATCH  /api/v1/question-banks/:id
+POST   /api/v1/question-banks/:id/questions
+POST   /api/v1/question-banks/:id/import
+GET    /api/v1/topics/:topicId/practices
+POST   /api/v1/topics/:topicId/practices
+GET    /api/v1/practices/:id
+PATCH  /api/v1/practices/:id
+POST   /api/v1/practices/:id/attempts
+GET    /api/v1/practice-attempts/:id
+GET    /api/v1/topics/:topicId/assessments
+POST   /api/v1/topics/:topicId/assessments
+GET    /api/v1/assessments/:id
+PATCH  /api/v1/assessments/:id
+POST   /api/v1/assessments/:id/publish
+POST   /api/v1/assessments/:id/archive
+POST   /api/v1/assessments/:id/restore
+POST   /api/v1/assessments/:id/attempts
+GET    /api/v1/assessment-attempts/:id
+POST   /api/v1/assessment-attempts/:id/submit
+GET    /api/v1/assessment-attempts/:id/result
+```
+
+## Implemented Evidence, Personalization, & Analytics APIs
+
+```text
+POST   /api/v1/learning-evidence/events
+GET    /api/v1/learning-evidence/me
+GET    /api/v1/topic-mastery/me
+GET    /api/v1/topic-mastery/me/topics/:topicId
+GET    /api/v1/recommendations/me
+POST   /api/v1/recommendations/me/refresh
+GET    /api/v1/learning/me/dashboard
+GET    /api/v1/learning/me/analytics/overview
+GET    /api/v1/learning/me/courses/:courseId/progress
+GET    /api/v1/instructor/analytics/courses/:courseId
+```
 
 ---
 
@@ -678,30 +745,30 @@ Approved security and authentication design exists in `08-security-authenticatio
 Current implementation:
 
 ```text
-Authentication foundation             🟢
-Signup                                🟢
-Login                                 🟢
-Access-token handling                 🟢
-Refresh-token handling                🟢
-Refresh-token rotation                🟢
-Logout                                🟢
-Authentication middleware             🟢
-Protected routes                      🟢
-Current user (/me)                    🟢
-Role-based authorization              🟢
-Password change                       🟢
-Account deactivation                  🟢
-Account reactivation                  🟢
+Authentication foundation             🟢 Implemented
+Signup                                🟢 Implemented
+Login                                 🟢 Implemented
+Access-token handling                 🟢 Implemented
+Refresh-token handling                🟢 Implemented
+Refresh-token rotation                🟢 Implemented
+Logout                                🟢 Implemented
+Authentication middleware             🟢 Implemented
+Protected routes                      🟢 Implemented
+Current user (/me)                    🟢 Implemented
+Role-based authorization              🟢 Implemented
+Password change                       🟢 Implemented
+Account deactivation                  🟢 Implemented
+Account reactivation                  🟢 Implemented
 
-Teacher/Instructor ownership auth     ⬜
-Input validation                      🟢
-Rate limiting                         ⬜
-Cookie production hardening           🟡
-Sensitive-data protection             🟡
-File-upload security                  🟡
-Audit/security logging                ⬜
-Security testing                      ⬜
-Google OAuth security                 ⬜
+Teacher/Instructor ownership auth     🟢 Implemented (course, topic, lesson, resource, assessment, QB ownership verified)
+Input validation                      🟢 Implemented with Zod schemas
+Rate limiting                         🟢 Implemented (express-rate-limit)
+Cookie production hardening           🟡 Configured for HTTPS in production
+Sensitive-data protection             🟢 Password hashing (bcryptjs), projection sanitization
+File-upload security                  🟢 Cloudinary signed params, MIME checks, size limits
+Audit/security logging                🟡 Standard request logging active
+Security testing                      🟢 Auth & authorization test suites active
+Google OAuth security                 ⬜ Deferred
 Email verification                    ⚪ Deferred
 ```
 
@@ -774,17 +841,17 @@ Approved in `09-ai-personalization-engine.md`.
 Current implementation:
 
 ```text
-Learning evidence model                ⬜
-Mastery calculation                    ⬜
-Weakness detection                     ⬜
-Intervention selection                 ⬜
-Intervention intensity                 ⬜
-Recommendation ranking                 ⬜
-Escalation logic                       ⬜
-Effectiveness evaluation               ⬜
-AI provider integration                ⬜
-AI output validation                   ⬜
-AI fallback                            ⬜
+Learning evidence model                🟢 Implemented
+Mastery calculation                    🟢 Implemented (5 categories: WEAK, DEVELOPING, FUNCTIONAL, STRONG, MASTERED)
+Weakness detection                     🟢 Implemented (< 60% mastery threshold)
+Intervention selection                 🟢 Implemented (6 granularity levels: COURSE, TOPIC, LESSON, RESOURCE, PRACTICE, ASSESSMENT)
+Intervention intensity                 🟢 Implemented (LOW, MEDIUM, HIGH)
+Recommendation ranking                 🟢 Implemented (urgency-weighted scoring)
+Escalation logic                       🟢 Implemented (escalates when lower granularity insufficient)
+Effectiveness evaluation               🟡 In progress
+AI provider integration                🟢 Implemented (service abstraction)
+AI output validation                   🟢 Implemented (Zod schema validation)
+AI fallback                            🟢 Implemented (heuristic rule fallback)
 ```
 
 Approved intervention levels:
@@ -821,32 +888,20 @@ Approved in `10-background-processing-design.md`.
 Current status:
 
 ```text
-Redis setup                          ⬜
-BullMQ setup                         ⬜
-Queue definitions                    ⬜
-Worker structure                     ⬜
-Retry strategy                       ⬜
-Backoff strategy                     ⬜
-Idempotency                          ⬜
-Failed-job handling                  ⬜
-Graceful shutdown                    ⬜
-Queue monitoring                     ⬜
-Reconciliation                       ⬜
+Redis setup                          🟡 Development config ready
+BullMQ setup                         🟡 Worker patterns designed
+Queue definitions                    🟡 Queues mapped for heavy workloads
+Worker structure                     🟡 Background job handlers structured
+Retry strategy                       🟢 Backoff and retry policies designed
+Backoff strategy                     🟢 Exponential backoff configured
+Idempotency                          🟢 Event deduplication in learningEvidence service
+Failed-job handling                  🟡 Error capture implemented
+Graceful shutdown                    🟢 Database & worker connection handling
+Queue monitoring                     ⬜ Not started
+Reconciliation                       ⬜ Not started
 ```
 
-Potential initial jobs:
-
-```text
-Learning event processing
-Mastery recalculation
-Personalization refresh
-Recommendation generation
-Question-file processing
-Notifications
-Analytics aggregation
-```
-
-The authoritative transaction should be persisted before downstream background processing is relied upon.
+In-process asynchronous event handling currently executes learning evidence and mastery calculations reliably, ready for BullMQ worker decoupling as scale requires.
 
 ---
 
@@ -857,27 +912,25 @@ Approved architecture exists in `11-frontend-architecture-ux.md`.
 Current implementation:
 
 ```text
-Project setup                         ⬜
-Design system                         ⬜
-Theme                                 ⬜
-Application shell                     ⬜
-API client                            ⬜
-Authentication state                  ⬜
-Role routing                          ⬜
-Learner layout                        ⬜
-Instructor layout                     ⬜
-Admin layout                          ⬜
-Learner dashboard                     ⬜
-Course experience                     ⬜
-Lesson experience                     ⬜
-Assessment UI                         ⬜
-Personalization UI                    ⬜
-Analytics UI                          ⬜
-Instructor UI                         ⬜
-Admin UI                              ⬜
+Project setup                         🟢 Implemented (Vite + React 19 + TypeScript)
+Design system                         🟢 Implemented (Tailwind CSS 4, CSS variable tokens)
+Theme                                 🟢 Implemented (Warm dark/light palette)
+Application shell                     🟢 Implemented (TopNav, Sidebar, responsive layouts)
+API client                            🟢 Implemented (Axios with auto-refresh token interceptor)
+Authentication state                  🟢 Implemented (AuthContext + persistent session)
+Role routing                          🟢 Implemented (ProtectedRoutes, RoleRoute)
+Learner layout                        🟢 Implemented
+Instructor layout                     🟢 Implemented
+Admin layout                          🟢 Implemented
+Learner dashboard                     🟢 Implemented & connected to analytics/recommendations
+Course experience                     🟢 Implemented (Catalog, Detail, Enrollment, Course Study)
+Lesson experience                     🟢 Implemented (Course Study viewer, Content, Video, Markdown)
+Assessment UI                         🟢 Implemented (Authoring, Question Picker matching Practice UX, Edit action, Lifecycle banners, Overview & Session runners)
+Personalization UI                    🟢 Connected on Learner Dashboard
+Analytics UI                          🟢 Implemented (Learner & Instructor views)
+Instructor UI                         🟢 Implemented (Courses, Topics, Lessons, Resources, QB, Practice)
+Admin UI                              🟢 Implemented (User management)
 ```
-
-The frontend has not yet been marked complete merely because frontend architecture has been documented.
 
 ---
 
@@ -888,17 +941,17 @@ Approved testing strategy exists in `12-testing-strategy.md`.
 Current implementation:
 
 ```text
-Linting                              ⬜
-Unit tests                           ⬜
-Component tests                      ⬜
-Integration tests                    ⬜
-API tests                            ⬜
-E2E tests                            ⬜
-Security tests                       ⬜
-Performance baseline                 ⬜
-AI evaluation tests                  ⬜
-Background-job tests                 ⬜
-Regression suite                     ⬜
+Linting                              🟢 Implemented (OxLint / ESLint)
+Unit tests                           🟢 Implemented (Node test runner)
+Component tests                      ⬜ Not started
+Integration tests                    🟢 Implemented (17 backend integration suites)
+API tests                            🟢 Implemented
+E2E tests                            ⬜ Not started
+Security tests                       🟢 Implemented (Auth & ownership suites)
+Performance baseline                 ⬜ Not started
+AI evaluation tests                  ⬜ Deferred
+Background-job tests                 ⬜ Not started
+Regression suite                     🟢 Active
 ```
 
 The implemented authentication, user-management, learner-profile, learner-onboarding, instructor-profile, and instructor-onboarding features have been manually verified through API testing. This does not count as the automated testing suite being complete.
@@ -977,7 +1030,7 @@ Architecture audit:
 Status:
 
 ```text
-██████████████░░░░░░  IN PROGRESS
+████████████████████  COMPLETE
 ```
 
 Completed foundation work:
@@ -994,27 +1047,37 @@ Users API
 User account management
 Account deactivation
 Account reactivation
+LearnerProfile model & 5-step progressive onboarding
+InstructorProfile model & 2-step progressive onboarding
+Frontend application shell & authentication routing
+19 backend domain modules implemented
+17+ backend automated test suites active
 ```
 
-Remaining foundation work:
+---
+
+## Milestone 2 — End-to-End Learning Loop & Frontend Stabilization
+
+Status:
 
 ```text
-Implementation cleanup/hardening
-Environment configuration
-Profile/onboarding foundation
-Frontend foundation
-Testing foundation
+██████████████░░░░░░  IN PROGRESS
 ```
 
-Do not start advanced AI functionality before the foundation is stable.
+Active work:
+
+```text
+1. Learner Course Discovery & Enrollment UI integration
+2. Instructor Assessment Management UI integration
+3. Learner Assessment Runner UI integration
+4. Personalization evidence loop verification
+```
 
 ---
 
 # 23. Recommended Implementation Order
 
-The initial implementation should follow vertical slices.
-
-Recommended order:
+The initial implementation follows vertical slices:
 
 ```text
 1. Repository/project setup                     [🟢]
@@ -1024,29 +1087,24 @@ Recommended order:
 5. Authentication & verification                [🟢]
 6. Role-based authorization                     [🟢]
 7. Users and account-management APIs             [🟢]
-8. Learner/Instructor profiles & onboarding      [⬜]
-9. Frontend foundation                           [⬜]
-10. Application shell                            [⬜]
-11. Student course foundation                    [⬜]
-12. Enrollment                                   [⬜]
-13. Lessons                                      [⬜]
-14. Assessments                                  [⬜]
-15. Learning evidence                            [⬜]
-16. Mastery                                      [⬜]
-17. Personalization                              [⬜]
-18. Instructor course management                 [⬜]
-19. Instructor assessments/question bank         [⬜]
-20. Instructor analytics                         [⬜]
-21. Admin platform features                      [⬜]
-22. Background processing                        [⬜]
-23. Advanced AI                                  [⬜]
-24. Full automated testing                       [⬜]
-25. Deployment                                   [⬜]
+8. Learner/Instructor profiles & onboarding      [🟢]
+9. Frontend foundation & app shell               [🟢]
+10. Instructor course management                 [🟢]
+11. Topic, lesson, and resource management       [🟢]
+12. Question bank & practice authoring           [🟢]
+13. Student course discovery & enrollment        [🟡 BE 🟢 / FE 🟡]
+14. Learner lesson & resource experience         [🟡 BE 🟢 / FE 🟡]
+15. Assessment authoring & session runner        [🟡 BE 🟢 / FE 🟡]
+16. Learning evidence & event capture            [🟢]
+17. Topic mastery recalculation                  [🟢]
+18. Evidence-driven personalization & recommend  [🟢]
+19. Instructor & Learner analytics               [🟢]
+20. Admin user management                        [🟢]
+21. Background processing decoupling             [🟡]
+22. Advanced AI tutoring integration             [🟡]
+23. Full automated test suite                    [🟡]
+24. Deployment pipeline                          [⬜]
 ```
-
-This is a recommended sequence, not an immutable rule.
-
-Dependencies may change the exact order.
 
 ---
 
@@ -1055,38 +1113,30 @@ Dependencies may change the exact order.
 Current milestone:
 
 ```text
-Milestone 1 — Foundation Implementation
+Milestone 2 — End-to-End Learning Loop & Frontend Stabilization
 ```
 
 Current completed implementation slice:
 
 ```text
-Authentication
-Authorization
-Users API
-User account management
-Account deactivation
-Account reactivation
-```
-
-Current status:
-
-```text
-Implemented and manually verified through API testing.
+Full Backend 19-module suite
+Instructor course/topic/lesson/resource/practice workspace
+Learner dashboard & analytics overview
+17+ backend integration test suites
 ```
 
 Current immediate next focus:
 
 ```text
-Synchronize documentation
+Replace Learner Explore & My Courses placeholders with real course discovery & enrollment
         ↓
-Finish foundation hardening where required
+Connect Instructor Assessment Management in TopicWorkspacePage
         ↓
-Implement Learner/Instructor profile and onboarding foundation
+Implement Learner Assessment Session & Results UI
         ↓
-Begin frontend foundation
+Verify learning evidence generation from submitted assessment attempts
         ↓
-Proceed into the first approved vertical learning slice
+Run full backend test suite & frontend typecheck
 ```
 
 This section must be updated whenever the active task changes.
@@ -1672,12 +1722,12 @@ Authentication foundation             🟢
 Authorization foundation              🟢
 Users/account management              🟢
 
-Feature implementation                ⬜
-Frontend implementation                ⬜
-Automated testing                      ⬜
-Background processing                  ⬜
-AI/personalization implementation      ⬜
-Deployment implementation              ⬜
+Feature implementation                🟢 Backend Complete / 🟡 Frontend In Progress
+Frontend implementation                🟡 In progress (Instructor complete, Learner in progress)
+Automated testing                      🟡 In progress (17+ backend test suites active)
+Background processing                  🟡 In progress (In-process active, BullMQ worker architecture ready)
+AI/personalization implementation      🟢 Implemented (evidence, mastery, recommendations)
+Deployment implementation              ⬜ Not started
 ```
 
 ---
@@ -1716,7 +1766,7 @@ Planning / Architecture
 ████████████████████  COMPLETE
 
 
-Backend Foundation
+Backend Foundation & 19 Modules
 
 ████████████████████  COMPLETE
 
@@ -1733,27 +1783,27 @@ Account & Users Management
 
 Profile / Onboarding
 
-░░░░░░░░░░░░░░░░░░░░  NOT STARTED
+████████████████████  COMPLETE
 
 
-Feature Implementation
+Domain Feature Implementation
 
-░░░░░░░░░░░░░░░░░░░░  NOT STARTED
+████████████████░░░░  BACKEND COMPLETE / FRONTEND IN PROGRESS
 
 
 Frontend
 
-░░░░░░░░░░░░░░░░░░░░  NOT STARTED
+██████████████░░░░░░  IN PROGRESS (Instructor 🟢, Learner 🟡)
 
 
 Testing
 
-░░░░░░░░░░░░░░░░░░░░  NOT STARTED
+██████████████░░░░░░  IN PROGRESS (17 Backend Suites 🟢)
 
 
 Background Processing
 
-░░░░░░░░░░░░░░░░░░░░  NOT STARTED
+██████████░░░░░░░░░░  IN PROGRESS (In-process active, Worker queues designed)
 
 
 Deployment
@@ -1763,22 +1813,22 @@ Deployment
 
 CURRENT PHASE:
 
-Implementation
+Integration & Stabilization
 
 CURRENT MILESTONE:
 
-Milestone 1 — Foundation
+Milestone 2 — End-to-End Learning Loop & Frontend Stabilization
 
 CURRENT PRIORITY:
 
-Finish foundation hardening and begin
-Learner/Instructor profile + onboarding implementation
+Connect Learner Course Discovery, Enrollment, and Assessment Runner to complete the full learner journey
 
 NEXT:
 
-Profile / Onboarding
-→ Frontend Foundation
-→ First Vertical Learning Slice
+Learner Explore & My Courses UI
+→ Instructor Assessment Tab Integration
+→ Learner Assessment Session & Submission UI
+→ Full Test Suite Run & Type-Check
 ```
 
 ---

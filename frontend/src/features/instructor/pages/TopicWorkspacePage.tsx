@@ -24,6 +24,7 @@ import LessonManagement from '../components/LessonManagement/LessonManagement';
 import ResourceManagement from '../components/ResourceManagement/ResourceManagement';
 import QuestionBankManagement from '../components/QuestionBankManagement/QuestionBankManagement';
 import { PracticeManagement } from '../components/PracticeManagement/PracticeManagement';
+import { AssessmentManagement } from '../components/AssessmentManagement/AssessmentManagement';
 import type { Topic, TopicPayload } from '../types/topic.types';
 
  type TopicSection = 'LESSONS' | 'RESOURCES' | 'QUESTION_BANK' | 'PRACTICE' | 'ASSESSMENT';
@@ -262,7 +263,6 @@ export const TopicWorkspacePage: React.FC = () => {
 >
   {SECTION_ITEMS.map(({ id, label, Icon }) => {
     const selected = activeSection === id;
-    const comingSoon = id === 'ASSESSMENT';
 
     return (
       <button
@@ -297,12 +297,6 @@ export const TopicWorkspacePage: React.FC = () => {
           <span className="block whitespace-nowrap text-sm font-semibold">
             {label}
           </span>
-
-          {comingSoon && (
-            <span className="mt-0.5 block whitespace-nowrap text-[10px] font-medium text-text-tertiary">
-              Coming soon
-            </span>
-          )}
         </span>
       </button>
     );
@@ -327,6 +321,10 @@ export const TopicWorkspacePage: React.FC = () => {
             ) : activeSection === 'PRACTICE' ? (
               <motion.div key="practice" initial={{ opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
                 <PracticeManagement topicId={topic._id} topicTitle={topic.title} courseStatus={course.status} />
+              </motion.div>
+            ) : activeSection === 'ASSESSMENT' ? (
+              <motion.div key="assessment" initial={{ opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
+                <AssessmentManagement courseId={course._id} topicId={topic._id} topicTitle={topic.title} courseStatus={course.status} />
               </motion.div>
             ) : (
               <ComingSoonPanel key={activeSection} section={activeSection} onGoToLessons={() => setActiveSection('LESSONS')} />

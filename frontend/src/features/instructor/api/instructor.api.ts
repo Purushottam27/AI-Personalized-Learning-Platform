@@ -25,3 +25,15 @@ export const getCourseById = async (courseId: string): Promise<Course> => {
   return response.data.data;
 };
 
+/** POST /api/v1/courses/:courseId/publish — publish a DRAFT course */
+export const publishCourse = async (courseId: string): Promise<Course> => {
+  const response = await api.post<{ data: Course }>(`/courses/${courseId}/publish`);
+  return response.data.data;
+};
+
+/** POST /api/v1/courses/:courseId/archive — archive a PUBLISHED course */
+export const archiveCourse = async (courseId: string): Promise<Course> => {
+  const response = await api.post<{ data: Course }>(`/courses/${courseId}/archive`);
+  return response.data.data;
+};
+
