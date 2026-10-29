@@ -5,6 +5,7 @@ import { Topic } from "../../topic/models/topic.model.js";
 import { QuestionBank } from "../../questionBank/models/questionBank.model.js";
 import { Question } from "../../question/models/question.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
+import { assertTopicUnlockedForLearner } from "../../topic/services/topicProgression.service.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 const TYPES = new Set(["TOPIC", "DIAGNOSTIC", "FINAL"]);
@@ -490,6 +491,23 @@ export async function archiveAssessmentService(instructorId, assessmentId) {
         error(404, "ASSESSMENT_NOT_FOUND", "Assessment not found");
     }
     if (assessment.status === "ARCHIVED") error(409, "ASSESSMENT_ALREADY_ARCHIVED", "Assessment is already archived");
+
+    const course = await Course.findById(assessment.courseId);
+    if (course && course.status === "PUBLISHED") {
+        const topic = assessment.topicId ? await Topic.findById(assessment.topicId) : null;
+        const isRequiredInTopic = topic?.requiredAssessmentIds?.some((id) => sameId(id, assessment._id));
+        const isRequiredFinal = course.publicationRequirements?.finalAssessmentId && sameId(course.publicationRequirements.finalAssessmentId, assessment._id);
+        const isRequiredDiag = course.publicationRequirements?.diagnosticAssessmentId && sameId(course.publicationRequirements.diagnosticAssessmentId, assessment._id);
+
+        if (isRequiredInTopic || isRequiredFinal || isRequiredDiag) {
+            error(
+                409,
+                "CANNOT_ARCHIVE_REQUIRED_ASSESSMENT",
+                "Cannot archive an assessment that is required for progression in a published course"
+            );
+        }
+    }
+
     const archived = await Assessment.findOneAndUpdate(
         { _id: assessment._id, createdBy: instructorId, status: assessment.status, __v: assessment.__v ?? 0 },
         { $set: { status: "ARCHIVED" }, $inc: { __v: 1 } },

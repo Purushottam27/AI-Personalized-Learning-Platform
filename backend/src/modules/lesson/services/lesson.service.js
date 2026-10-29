@@ -3,6 +3,7 @@ import { Lesson } from "../models/lesson.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
 import { Course } from "../../course/models/course.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
+import { assertTopicUnlockedForLearner } from "../../topic/services/topicProgression.service.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 async function getOwnedTopicAndCourse(instructorId, topicId) {
@@ -105,6 +106,7 @@ const getLessonsByTopicService = async(userId, topicId, userRole = "INSTRUCTOR")
                 "Active course enrollment is required to access lessons"
             );
         }
+        await assertTopicUnlockedForLearner(userId, course, topic);
     } else if (userRole !== "ADMIN") {
         throw new ApiError(403, "FORBIDDEN", "Access denied");
     }
@@ -153,6 +155,7 @@ const getLessonByIdService = async(userId, lessonId, userRole = "INSTRUCTOR")=>{
                 "Active course enrollment is required to access lessons"
             );
         }
+        await assertTopicUnlockedForLearner(userId, course, topic);
     } else if (userRole !== "ADMIN") {
         throw new ApiError(403, "FORBIDDEN", "Access denied");
     }

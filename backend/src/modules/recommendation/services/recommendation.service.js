@@ -4,6 +4,7 @@ import { Topic } from "../../topic/models/topic.model.js";
 import { Lesson } from "../../lesson/models/lesson.model.js";
 import { Practice } from "../../practice/models/practice.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
+import { LearnerProfile } from "../../learner/models/learnerProfile.model.js";
 import { TopicMastery } from "../../topicMastery/models/topicMastery.model.js";
 import { MASTERY_STATUS } from "../../topicMastery/constants/mastery.constants.js";
 import {
@@ -22,6 +23,120 @@ function requireObjectId(value, field) {
     if (!value || !/^[0-9a-fA-F]{24}$/.test(String(value))) {
         fail(400, "INVALID_ID", `${field} is invalid`);
     }
+}
+
+/**
+ * Discovers published courses matching a learner's onboarding profile (interests, goals, level).
+ * Excludes courses the learner is already enrolled in.
+ */
+export async function findCourseDiscoveryRecommendations(learnerId, excludedCourseIds = [], limit = 10) {
+    const profile = await LearnerProfile.findOne({ userId: learnerId }).lean();
+    if (!profile) return [];
+
+    const interests = Array.isArray(profile.interests)
+        ? profile.interests.map((s) => String(s).trim()).filter(Boolean)
+        : [];
+    const goals = Array.isArray(profile.goals)
+        ? profile.goals.map((s) => String(s).trim()).filter(Boolean)
+        : [];
+
+    if (interests.length === 0 && goals.length === 0) return [];
+
+    const query = { status: "PUBLISHED" };
+    if (excludedCourseIds && excludedCourseIds.length > 0) {
+        query._id = { $nin: excludedCourseIds };
+    }
+
+    const publishedCourses = await Course.find(query).lean();
+    if (publishedCourses.length === 0) return [];
+
+    const scoredCourses = [];
+
+    for (const course of publishedCourses) {
+        const textPool = [
+            course.title || "",
+            course.description || "",
+            course.domain || "",
+            course.category || "",
+            ...(Array.isArray(course.objectives) ? course.objectives : []),
+        ].join(" ").toLowerCase();
+
+        let matchScore = 0;
+        const matchedTerms = [];
+
+        for (const interest of interests) {
+            const lower = interest.toLowerCase();
+            if (textPool.includes(lower)) {
+                matchScore += 10;
+                matchedTerms.push(interest);
+            }
+        }
+
+        for (const goal of goals) {
+            const lower = goal.toLowerCase();
+            if (textPool.includes(lower)) {
+                matchScore += 5;
+                if (!matchedTerms.includes(goal)) {
+                    matchedTerms.push(goal);
+                }
+            }
+        }
+
+        if (profile.experienceLevel) {
+            const exp = profile.experienceLevel;
+            if (
+                (exp === "I have no prior knowledge" || exp === "I have a basic understanding") &&
+                course.difficulty === "BEGINNER"
+            ) {
+                matchScore += 2;
+            } else if (
+                exp === "I have substantial experience" &&
+                course.difficulty === "ADVANCED"
+            ) {
+                matchScore += 2;
+            }
+        }
+
+        if (matchScore > 0) {
+            scoredCourses.push({
+                course,
+                matchScore,
+                matchedTerms,
+            });
+        }
+    }
+
+    scoredCourses.sort((a, b) => {
+        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+        return (a.course.title || "").localeCompare(b.course.title || "");
+    });
+
+    return scoredCourses.slice(0, limit).map((item, index) => {
+        const c = item.course;
+        const topTerm = item.matchedTerms[0] || null;
+        const reason = topTerm
+            ? `Matches your interest in "${topTerm}"`
+            : "Recommended based on your learning goals and profile";
+
+        return {
+            id: `rec_course_${c._id}`,
+            actionType: "EXPLORE_COURSE",
+            courseId: c._id,
+            courseTitle: c.title,
+            title: `Explore Course: ${c.title}`,
+            description: c.description,
+            domain: c.domain,
+            category: c.category,
+            difficulty: c.difficulty,
+            targetId: c._id,
+            targetType: "COURSE",
+            priority: index + 1,
+            matchedInterest: topTerm,
+            reason,
+            explanation: reason,
+            isActionable: true,
+        };
+    });
 }
 
 /**
@@ -66,7 +181,9 @@ function compareRecommendations(a, b) {
 export async function getLearnerRecommendationsService(learnerId, options = {}) {
     requireObjectId(learnerId, "learnerId");
 
+    const limit = options.limit ? Math.min(Math.max(options.limit, 1), 50) : 10;
     let coursesToInspect = [];
+    let courseDiscoveryRecommendations = [];
 
     if (options.courseId) {
         requireObjectId(options.courseId, "courseId");
@@ -91,25 +208,79 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
             status: "ACTIVE",
         }).select("courseId").lean();
 
+        const activeCourseIds = activeEnrollments.map((e) => e.courseId);
+
+        // Fetch course discovery recommendations for unenrolled published courses
+        courseDiscoveryRecommendations = await findCourseDiscoveryRecommendations(
+            learnerId,
+            activeCourseIds,
+            limit
+        );
+
         if (activeEnrollments.length === 0) {
+            if (courseDiscoveryRecommendations.length === 0) {
+                return {
+                    nextBestAction: null,
+                    recommendations: [],
+                    courseRecommendations: [],
+                    totalCount: 0,
+                };
+            }
+
+            const topCourse = courseDiscoveryRecommendations[0];
             return {
-                nextBestAction: null,
+                nextBestAction: {
+                    type: "EXPLORE_COURSE",
+                    title: topCourse.title,
+                    description: topCourse.description,
+                    actionType: "EXPLORE_COURSE",
+                    courseId: topCourse.courseId,
+                    targetId: topCourse.targetId,
+                    targetType: "COURSE",
+                    priority: 1,
+                    reasonCode: "INTEREST_DISCOVERY",
+                    explanation: topCourse.reason,
+                    isActionable: true,
+                },
                 recommendations: [],
-                totalCount: 0,
+                courseRecommendations: courseDiscoveryRecommendations,
+                totalCount: courseDiscoveryRecommendations.length,
             };
         }
 
-        const activeCourseIds = activeEnrollments.map((e) => e.courseId);
         coursesToInspect = await Course.find({
             _id: { $in: activeCourseIds },
             status: "PUBLISHED",
         }).lean();
 
         if (coursesToInspect.length === 0) {
+            if (courseDiscoveryRecommendations.length === 0) {
+                return {
+                    nextBestAction: null,
+                    recommendations: [],
+                    courseRecommendations: [],
+                    totalCount: 0,
+                };
+            }
+
+            const topCourse = courseDiscoveryRecommendations[0];
             return {
-                nextBestAction: null,
+                nextBestAction: {
+                    type: "EXPLORE_COURSE",
+                    title: topCourse.title,
+                    description: topCourse.description,
+                    actionType: "EXPLORE_COURSE",
+                    courseId: topCourse.courseId,
+                    targetId: topCourse.targetId,
+                    targetType: "COURSE",
+                    priority: 1,
+                    reasonCode: "INTEREST_DISCOVERY",
+                    explanation: topCourse.reason,
+                    isActionable: true,
+                },
                 recommendations: [],
-                totalCount: 0,
+                courseRecommendations: courseDiscoveryRecommendations,
+                totalCount: courseDiscoveryRecommendations.length,
             };
         }
     }
@@ -122,9 +293,31 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
     }).sort({ courseId: 1, order: 1 }).lean();
 
     if (topics.length === 0) {
+        if (courseDiscoveryRecommendations.length > 0) {
+            const topCourse = courseDiscoveryRecommendations[0];
+            return {
+                nextBestAction: {
+                    type: "EXPLORE_COURSE",
+                    title: topCourse.title,
+                    description: topCourse.description,
+                    actionType: "EXPLORE_COURSE",
+                    courseId: topCourse.courseId,
+                    targetId: topCourse.targetId,
+                    targetType: "COURSE",
+                    priority: 1,
+                    reasonCode: "INTEREST_DISCOVERY",
+                    explanation: topCourse.reason,
+                    isActionable: true,
+                },
+                recommendations: [],
+                courseRecommendations: courseDiscoveryRecommendations,
+                totalCount: courseDiscoveryRecommendations.length,
+            };
+        }
         return {
             nextBestAction: null,
             recommendations: [],
+            courseRecommendations: [],
             totalCount: 0,
         };
     }
@@ -406,9 +599,31 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
     }
 
     if (candidates.length === 0) {
+        if (courseDiscoveryRecommendations.length > 0) {
+            const topCourse = courseDiscoveryRecommendations[0];
+            return {
+                nextBestAction: {
+                    type: "EXPLORE_COURSE",
+                    title: topCourse.title,
+                    description: topCourse.description,
+                    actionType: "EXPLORE_COURSE",
+                    courseId: topCourse.courseId,
+                    targetId: topCourse.targetId,
+                    targetType: "COURSE",
+                    priority: 1,
+                    reasonCode: "INTEREST_DISCOVERY",
+                    explanation: topCourse.reason,
+                    isActionable: true,
+                },
+                recommendations: [],
+                courseRecommendations: courseDiscoveryRecommendations,
+                totalCount: courseDiscoveryRecommendations.length,
+            };
+        }
         return {
             nextBestAction: null,
             recommendations: [],
+            courseRecommendations: [],
             totalCount: 0,
         };
     }
@@ -439,7 +654,6 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
         };
     }
 
-    const limit = options.limit ? Math.min(Math.max(options.limit, 1), 50) : 10;
     const limitedCandidates = candidates.slice(0, limit);
 
     const recommendations = limitedCandidates.map((c, index) => ({
@@ -467,6 +681,7 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
     return {
         nextBestAction,
         recommendations,
-        totalCount: candidates.length,
+        courseRecommendations: courseDiscoveryRecommendations,
+        totalCount: candidates.length + courseDiscoveryRecommendations.length,
     };
 }

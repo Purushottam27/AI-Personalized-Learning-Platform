@@ -324,6 +324,29 @@ test("Practice Execution & Attempt HTTP API", async (t) => {
     });
 
     // -------------------------------------------------------------------------
+    // 4b. Owning learner fetching IN_PROGRESS attempt by ID does not disclose correctness or answer keys
+    // -------------------------------------------------------------------------
+    await t.test("4b. Owning learner fetching IN_PROGRESS attempt by ID does not disclose correctness or answer keys", async () => {
+        const getRes = await request(`/api/v1/practice-attempts/${activeAttemptId}`);
+        assert.equal(getRes.status, 200);
+        const getBody = await getRes.json();
+        assert.equal(getBody.success, true);
+        assert.equal(getBody.data._id, activeAttemptId);
+        assert.equal(getBody.data.status, "IN_PROGRESS");
+        assert.equal(getBody.data.marksAwarded, null);
+        assert.equal(getBody.data.scorePercent, null);
+        assert.equal(getBody.data.correctCount, null);
+
+        for (const question of getBody.data.questions) {
+            assert.equal("correctAnswer" in question, false, "Question must not contain correctAnswer during IN_PROGRESS fetch");
+            assert.equal("explanation" in question, false, "Question must not contain explanation during IN_PROGRESS fetch");
+            assert.equal("isCorrect" in question, false, "Question must not contain isCorrect during IN_PROGRESS fetch");
+            assert.equal(question.isAnswered, false, "Unanswered question must have isAnswered: false");
+            assert.equal(question.answer, null, "Unanswered question must have null answer");
+        }
+    });
+
+    // -------------------------------------------------------------------------
     // 9. Invalid option IDs and malformed answer shapes are rejected
     // -------------------------------------------------------------------------
     await t.test("9. Invalid option IDs and malformed answer shapes are rejected", async () => {
@@ -362,6 +385,31 @@ test("Practice Execution & Attempt HTTP API", async (t) => {
             body: JSON.stringify({ answer: "B" }),
         });
         assert.equal(a1Res.status, 200);
+        const a1Body = await a1Res.json();
+        const savedQ1 = a1Body.data.questions.find((q) => q.questionId === qSingleId);
+        assert.equal("correctAnswer" in savedQ1, false, "correctAnswer must not leak when saving answer during in-progress attempt");
+        assert.equal("explanation" in savedQ1, false, "explanation must not leak when saving answer during in-progress attempt");
+        assert.equal("isCorrect" in savedQ1, false, "isCorrect must not leak when saving answer during in-progress attempt");
+        assert.equal(savedQ1.isAnswered, true, "isAnswered must be true for saved answer");
+
+        // Verify GET /api/v1/practice-attempts/:attemptId while in-progress with a saved answer
+        const midAttemptRes = await request(`/api/v1/practice-attempts/${activeAttemptId}`);
+        assert.equal(midAttemptRes.status, 200);
+        const midAttemptBody = await midAttemptRes.json();
+        assert.equal(midAttemptBody.data.status, "IN_PROGRESS");
+        assert.equal(midAttemptBody.data.marksAwarded, null);
+        const fetchedSingle = midAttemptBody.data.questions.find((q) => q.questionId === qSingleId);
+        assert.equal(fetchedSingle.answer, "B", "Saved answer must be returned to owner on fetch");
+        assert.equal(fetchedSingle.isAnswered, true);
+        assert.equal("correctAnswer" in fetchedSingle, false, "GET must not disclose correctAnswer for saved answer while in-progress");
+        assert.equal("explanation" in fetchedSingle, false, "GET must not disclose explanation for saved answer while in-progress");
+        assert.equal("isCorrect" in fetchedSingle, false, "GET must not disclose isCorrect for saved answer while in-progress");
+
+        const fetchedUnsaved = midAttemptBody.data.questions.find((q) => q.questionId === qMultiId);
+        assert.equal(fetchedUnsaved.isAnswered, false);
+        assert.equal("correctAnswer" in fetchedUnsaved, false);
+        assert.equal("explanation" in fetchedUnsaved, false);
+        assert.equal("isCorrect" in fetchedUnsaved, false);
 
         // qMulti: ["A", "B", "D"] (Exact match, 3 marks)
         const a2Res = await request(`/api/v1/practice-attempts/${activeAttemptId}/questions/${qMultiId}/answer`, {
@@ -396,6 +444,19 @@ test("Practice Execution & Attempt HTTP API", async (t) => {
             assert.ok("explanation" in question, "explanation must be revealed upon submission");
             assert.equal(question.isCorrect, true);
         }
+
+        // Verify GET /api/v1/practice-attempts/:attemptId after submission reveals full results
+        const postSubmitRes = await request(`/api/v1/practice-attempts/${activeAttemptId}`);
+        assert.equal(postSubmitRes.status, 200);
+        const postSubmitBody = await postSubmitRes.json();
+        assert.equal(postSubmitBody.data.status, "SUBMITTED");
+        assert.equal(postSubmitBody.data.marksAwarded, 6);
+        for (const question of postSubmitBody.data.questions) {
+            assert.ok("correctAnswer" in question, "correctAnswer must be revealed on GET after submission");
+            assert.ok("explanation" in question, "explanation must be revealed on GET after submission");
+            assert.equal(question.isCorrect, true);
+            assert.equal(question.isAnswered, true);
+        }
     });
 
     // -------------------------------------------------------------------------
@@ -425,6 +486,9 @@ test("Practice Execution & Attempt HTTP API", async (t) => {
         assert.equal(submitBody.data.marksAwarded, 1);
         const multiQ = submitBody.data.questions.find((q) => q.questionId === qMultiId);
         assert.equal(multiQ.isCorrect, false);
+        const singleQ = submitBody.data.questions.find((q) => q.questionId === qSingleId);
+        assert.equal(singleQ.isAnswered, false, "Unanswered question must have isAnswered false");
+        assert.equal(singleQ.isCorrect, false);
     });
 
     // -------------------------------------------------------------------------
@@ -616,11 +680,12 @@ test("Practice Execution & Attempt HTTP API", async (t) => {
     });
 
     // -------------------------------------------------------------------------
-    // 18. Per-question feedback: answered questions expose feedback while unanswered remain hidden
+    // 18. Submit-first workflow: answers are saved without leaking correctness or explanations until submission
     // -------------------------------------------------------------------------
-    await t.test("18. Per-question feedback: answered questions expose feedback while unanswered remain hidden", async () => {
+    await t.test("18. Submit-first workflow: answers are saved without leaking correctness or explanations until submission", async () => {
         const startRes = await request(`/api/v1/practices/${publishedPracticeId}/attempts`, { method: "POST" });
         const startBody = await startRes.json();
+        assert.equal(startRes.status, 201);
         const testAttemptId = startBody.data._id;
 
         // Save answer for qSingle only
@@ -633,31 +698,36 @@ test("Practice Execution & Attempt HTTP API", async (t) => {
 
         const qSingleResult = answerBody.data.questions.find((q) => q.questionId === qSingleId);
         assert.equal(qSingleResult.answer, "B");
-        assert.equal(qSingleResult.isCorrect, true);
-        assert.equal(qSingleResult.correctAnswer, "B");
-        assert.equal(qSingleResult.explanation, "2 plus 2 equals 4.");
+        assert.equal(qSingleResult.isAnswered, true);
+        assert.equal("isCorrect" in qSingleResult, false, "isCorrect must NOT be revealed during in-progress attempt");
+        assert.equal("correctAnswer" in qSingleResult, false, "correctAnswer must NOT be revealed during in-progress attempt");
+        assert.equal("explanation" in qSingleResult, false, "explanation must NOT be revealed during in-progress attempt");
 
-        // Unanswered questions must NOT reveal correctAnswer or explanation
+        // Unanswered questions must also NOT reveal correctAnswer, explanation, or isCorrect
         const qMultiResult = answerBody.data.questions.find((q) => q.questionId === qMultiId);
         assert.equal(qMultiResult.answer, null);
+        assert.equal(qMultiResult.isAnswered, false);
         assert.equal("correctAnswer" in qMultiResult, false);
         assert.equal("explanation" in qMultiResult, false);
         assert.equal("isCorrect" in qMultiResult, false);
 
-        // Changing answer to wrong answer updates feedback
-        const changeRes = await request(`/api/v1/practice-attempts/${testAttemptId}/questions/${qSingleId}/answer`, {
-            method: "PUT",
-            body: JSON.stringify({ answer: "A" }),
-        });
-        const changeBody = await changeRes.json();
-        assert.equal(changeRes.status, 200);
-        const changedSingle = changeBody.data.questions.find((q) => q.questionId === qSingleId);
-        assert.equal(changedSingle.answer, "A");
-        assert.equal(changedSingle.isCorrect, false);
-        assert.equal(changedSingle.correctAnswer, "B");
+        // Submit the attempt: results and explanations are now revealed
+        const submitRes = await request(`/api/v1/practice-attempts/${testAttemptId}/submit`, { method: "POST" });
+        const submitBody = await submitRes.json();
+        assert.equal(submitRes.status, 200);
 
-        // Cleanup attempt by submitting
-        await request(`/api/v1/practice-attempts/${testAttemptId}/submit`, { method: "POST" });
+        const submittedSingle = submitBody.data.questions.find((q) => q.questionId === qSingleId);
+        assert.equal(submittedSingle.answer, "B");
+        assert.equal(submittedSingle.isAnswered, true);
+        assert.equal(submittedSingle.isCorrect, true);
+        assert.equal(submittedSingle.correctAnswer, "B");
+        assert.equal(submittedSingle.explanation, "2 plus 2 equals 4.");
+
+        const submittedMulti = submitBody.data.questions.find((q) => q.questionId === qMultiId);
+        assert.equal(submittedMulti.isAnswered, false);
+        assert.equal(submittedMulti.isCorrect, false);
+        assert.ok("correctAnswer" in submittedMulti);
+        assert.ok("explanation" in submittedMulti);
     });
 
     // -------------------------------------------------------------------------

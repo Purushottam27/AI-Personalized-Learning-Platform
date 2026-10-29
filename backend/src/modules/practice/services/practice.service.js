@@ -8,6 +8,7 @@ import { Topic } from "../../topic/models/topic.model.js";
 
 import { Course } from "../../course/models/course.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
+import { assertTopicUnlockedForLearner } from "../../topic/services/topicProgression.service.js";
 
 import { withTransaction } from "../../../shared/utils/withTransaction.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
@@ -422,6 +423,7 @@ export async function getPracticeByIdService(userId, practiceId, userRole = "INS
         if (!enrollment) {
             throw new ApiError(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to view this practice");
         }
+        await assertTopicUnlockedForLearner(userId, course, practice.topicId);
         return serializeLearnerPractice(practice);
     }
 
@@ -470,6 +472,7 @@ export async function getPracticesByTopicService(userId, topicId, userRole = "IN
         if (!enrollment) {
             throw new ApiError(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to view topic practices");
         }
+        await assertTopicUnlockedForLearner(userId, course, topic);
         const practices = await Practice.find({ topicId: topic._id, status: "PUBLISHED" }).sort({ createdAt: -1 });
         return practices.map(serializeLearnerPractice);
     }

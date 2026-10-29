@@ -1,36 +1,9 @@
 import { Course } from "../models/course.model.js";
+import { Topic } from "../../topic/models/topic.model.js";
 import { Assessment } from "../../assessment/models/assessment.model.js";
 import { withTransaction } from "../../../shared/utils/withTransaction.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
-
-async function validatePrerequisiteCourses(courseIds) {
-    if (courseIds.length === 0) return;
-
-    // check for duplicate id's
-    const idStrings = courseIds.map((id) => id.toString());
-    const uniqueIds = new Set(idStrings);
-
-    if (uniqueIds.size !== idStrings.length) {
-        throw new ApiError(
-            400,
-            "DUPLICATE_PREREQUISITE",
-            "Duplicate prerequisite course references are not allowed"
-        );
-    }
-
-    // check whether all referenced courses exist
-    const existingCount = await Course.countDocuments({
-        _id: { $in: courseIds }
-    });
-
-    if (existingCount !== courseIds.length) {
-        throw new ApiError(
-            404,
-            "PREREQUISITE_NOT_FOUND",
-            "One or more prerequisite courses do not exist"
-        );
-    }
-}
+import { validatePrerequisiteCourses, checkCourseReadiness } from "./courseReadiness.service.js";
 
 function buildEstimatedDuration(estimatedDuration) {
     if (!estimatedDuration) return undefined;
@@ -262,7 +235,7 @@ const updateCourseServiceInternal = async (userId, courseId, updateData, session
 
         assertNoSelfReference(courseId, prerequisiteCourseIds);
 
-        await validatePrerequisiteCourses(prerequisiteCourseIds);
+        await validatePrerequisiteCourses(prerequisiteCourseIds, courseId, session);
 
         update.prerequisites = {
             courses: prerequisiteCourseIds,
@@ -309,38 +282,65 @@ const updateCourseService = async (userId, courseId, updateData) => {
     return updateCourseServiceInternal(userId, courseId, updateData);
 };
 
-const publishCourseService = async(userId, courseId)=>{
-    const course = await Course.findById(courseId);
+const publishCourseService = async (userId, courseId) => {
+    return withTransaction(async (session) => {
+        const readiness = await checkCourseReadiness(courseId, userId, session);
+        const { course, topics, topicAssessmentsMap, finalAssessment, diagnosticAssessment } = readiness;
 
-    if (!course) {
-        throw new ApiError(404, "COURSE_NOT_FOUND", "Course not found");
-    }
-
-    if (course.createdBy.toString() !== userId.toString()) {
-        throw new ApiError(
-            403,
-            "COURSE_ACCESS_DENIED",
-            "You are not authorized to publish this course"
+        // Write fence against concurrent course modifications
+        const courseFence = await Course.updateOne(
+            { _id: course._id, status: "DRAFT" },
+            { $inc: { lifecycleVersion: 1 } },
+            { session }
         );
-    }
+        if (courseFence.modifiedCount !== 1) {
+            throw new ApiError(409, "COURSE_STATE_CHANGED", "Course state changed during publication; reload and retry");
+        }
 
-    if (course.status !== "DRAFT") {
-        throw new ApiError(
-            400,
-            "INVALID_COURSE_STATUS",
-            "Only draft courses can be published"
+        // Snapshot publication-time required assessments onto each Topic
+        const topicSnapshots = [];
+        for (const topic of topics) {
+            const publishedAssessments = topicAssessmentsMap.get(topic._id.toString()) || [];
+            const requiredAssessmentIds = publishedAssessments.map((a) => a._id);
+            await Topic.updateOne(
+                { _id: topic._id, courseId: course._id },
+                { $set: { requiredAssessmentIds } },
+                { session }
+            );
+            topicSnapshots.push({
+                topicId: topic._id,
+                requiredAssessmentIds
+            });
+        }
+
+        // Write fence all evaluated assessments
+        const allEvaluatedAssessmentIds = [
+            ...topicSnapshots.flatMap((t) => t.requiredAssessmentIds),
+            finalAssessment._id,
+            diagnosticAssessment ? diagnosticAssessment._id : null
+        ].filter(Boolean);
+
+        const assessmentFence = await Assessment.updateMany(
+            { _id: { $in: allEvaluatedAssessmentIds }, status: "PUBLISHED" },
+            { $inc: { attemptVersion: 1 } },
+            { session }
         );
-    }
+        if (assessmentFence.modifiedCount !== allEvaluatedAssessmentIds.length) {
+            throw new ApiError(409, "ASSESSMENT_STATE_CHANGED", "An assessment state changed during publication; reload and retry");
+        }
 
-    // TODO: Before publishing, validate course learning-content
-    // readiness once Topic, Resource, Practice, and Assessment
-    // modules are implemented.
+        course.status = "PUBLISHED";
+        course.publicationRequirements = {
+            publishedAt: new Date(),
+            finalAssessmentId: finalAssessment._id,
+            diagnosticAssessmentId: diagnosticAssessment ? diagnosticAssessment._id : null,
+            topics: topicSnapshots
+        };
 
-    course.status = "PUBLISHED";
-    await course.save();
-
-    return course;
-}
+        await course.save({ session });
+        return course;
+    });
+};
 
 const archiveCourseService = async(userId, courseId)=>{
     const course = await Course.findById(courseId);

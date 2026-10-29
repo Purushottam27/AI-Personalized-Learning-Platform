@@ -1,5 +1,7 @@
 import { Topic } from "../models/topic.model.js";
 import { Course } from "../../course/models/course.model.js";
+import { Enrollment } from "../../enrollment/models/enrollment.model.js";
+import { isTopicUnlockedForLearner, assertTopicUnlockedForLearner } from "./topicProgression.service.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 import mongoose from "mongoose";
 
@@ -24,7 +26,7 @@ const createTopicService = async (courseId, userId, topicData) => {
 
     if (course.status === "ARCHIVED") {
         throw new ApiError(
-            409,
+            27,
             "COURSE_NOT_EDITABLE",
             "Topics cannot  be created while the course is archived"
         );
@@ -74,7 +76,23 @@ const getTopicsByCourseService = async (courseId, userId, userRole = "INSTRUCTOR
                 "Course not found"
             );
         }
-        return Topic.find({ courseId }).sort({ order: 1 });
+        const topics = await Topic.find({ courseId }).sort({ order: 1 });
+        if (!course.progressionPolicy?.lockingEnabled) {
+            return topics;
+        }
+        const enrollment = await Enrollment.findOne({ learnerId: userId, courseId: course._id, status: "ACTIVE" });
+        if (!enrollment) {
+            return topics;
+        }
+        const topicsWithLock = [];
+        for (const t of topics) {
+            const unlockStatus = await isTopicUnlockedForLearner(userId, course, t);
+            topicsWithLock.push({
+                ...t.toObject(),
+                isLocked: !unlockStatus.isUnlocked
+            });
+        }
+        return topicsWithLock;
     }
 
     if (userRole === "ADMIN") {
@@ -129,6 +147,15 @@ const getTopicByIdService = async (topicId, userId, userRole = "INSTRUCTOR") => 
                 "Topic not found"
             );
         }
+        const enrollment = await Enrollment.findOne({ learnerId: userId, courseId: course._id, status: "ACTIVE" });
+        if (!enrollment) {
+            throw new ApiError(
+                403,
+                "ACTIVE_ENROLLMENT_REQUIRED",
+                "Active course enrollment is required to access this topic"
+            );
+        }
+        await assertTopicUnlockedForLearner(userId, course, topic);
         return topic;
     }
 

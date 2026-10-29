@@ -6,6 +6,7 @@ import { Topic } from "../../topic/models/topic.model.js";
 import { Course } from "../../course/models/course.model.js";
 import { Lesson } from "../../lesson/models/lesson.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
+import { assertTopicUnlockedForLearner } from "../../topic/services/topicProgression.service.js";
 
 import { ApiError } from "../../../shared/errors/ApiError.js";
 import { uploadOnCloudinary } from "../../../shared/utils/cloudinary.js";
@@ -276,6 +277,7 @@ export async function getResourcesByTopicService(userId, topicId, userRole = "IN
                 "Active course enrollment is required to access resources"
             );
         }
+        await assertTopicUnlockedForLearner(userId, course, topic);
         return Resource.find({ topicId, status: "ACTIVE" }).sort({ order: 1 });
     }
 
@@ -325,6 +327,7 @@ export async function getResourceByIdService(userId, resourceId, userRole = "INS
                 "Active course enrollment is required to access resources"
             );
         }
+        await assertTopicUnlockedForLearner(userId, course, topic);
         return resource;
     }
 
@@ -407,6 +410,7 @@ export async function getResourceDownloadUrlService(userId, resourceId, userRole
                 "Active course enrollment is required to download resources"
             );
         }
+        await assertTopicUnlockedForLearner(userId, course, topic);
     } else if (userRole !== "ADMIN") {
         throw new ApiError(403, "FORBIDDEN", "Access denied");
     }

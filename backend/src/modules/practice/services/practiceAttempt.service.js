@@ -4,6 +4,7 @@ import { PracticeAttempt } from "../models/practiceAttempt.model.js";
 import { Course } from "../../course/models/course.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
+import { assertTopicUnlockedForLearner } from "../../topic/services/topicProgression.service.js";
 import { Question } from "../../question/models/question.model.js";
 import { recordPracticeEvidenceService } from "../../learningEvidence/services/learningEvidence.service.js";
 import { withTransaction } from "../../../shared/utils/withTransaction.js";
@@ -124,11 +125,14 @@ export function serializePublicAttempt(attempt, { revealResults = attempt.status
                 marks: question.marks,
                 difficulty: question.difficulty,
                 answer: answers.get(question.questionId.toString()) ?? null,
+                isAnswered: hasAnswer,
             };
-            if (revealResults || hasAnswer) {
+            if (revealResults) {
                 item.correctAnswer = question.correctAnswer;
                 item.explanation = question.explanation;
-                item.isCorrect = answersEqual(question.type, item.answer, question.correctAnswer);
+                item.isCorrect = hasAnswer
+                    ? answersEqual(question.type, item.answer, question.correctAnswer)
+                    : false;
             }
             return item;
         }),
@@ -166,6 +170,8 @@ export async function startPracticeAttemptService(learnerId, practiceId) {
             if (!enrollment) {
                 fail(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required to practice");
             }
+
+            await assertTopicUnlockedForLearner(learnerId, course, topic, session);
 
             const inProgress = await PracticeAttempt.findOne({ practiceId, learnerId, status: "IN_PROGRESS" }).session(session);
             if (inProgress) {

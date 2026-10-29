@@ -102,8 +102,16 @@ const courseSchema = new mongoose.Schema({
             type:Boolean,
             default:false
         }
+    },
+    publicationRequirements: {
+        publishedAt: { type: Date, default: null },
+        finalAssessmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Assessment', default: null },
+        diagnosticAssessmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Assessment', default: null },
+        topics: [{
+            topicId: { type: mongoose.Schema.Types.ObjectId, ref: 'Topic' },
+            requiredAssessmentIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Assessment' }]
+        }]
     }
-
 
 },{timestamps:true})
 

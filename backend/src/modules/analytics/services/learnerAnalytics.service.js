@@ -228,6 +228,8 @@ export async function getLearnerDashboardService(learnerId) {
                 mappedType = "REVIEW_TOPIC";
             } else if (nba.actionType === "TAKE_ASSESSMENT") {
                 mappedType = "TAKE_ASSESSMENT";
+            } else if (nba.actionType === "EXPLORE_COURSE") {
+                mappedType = "EXPLORE_COURSE";
             }
 
             nextBestAction = {
@@ -238,7 +240,7 @@ export async function getLearnerDashboardService(learnerId) {
             };
         }
 
-        if (Array.isArray(recomResult?.recommendations)) {
+        if (Array.isArray(recomResult?.recommendations) && recomResult.recommendations.length > 0) {
             // Deduplicate courses recommended
             const seenCourseIds = new Set();
             for (const rec of recomResult.recommendations) {
@@ -253,6 +255,16 @@ export async function getLearnerDashboardService(learnerId) {
                         level: rec.tier,
                     });
                 }
+            }
+        } else if (Array.isArray(recomResult?.courseRecommendations) && recomResult.courseRecommendations.length > 0) {
+            for (const cr of recomResult.courseRecommendations) {
+                recommendations.push({
+                    courseId: cr.courseId.toString(),
+                    title: cr.title,
+                    description: cr.description,
+                    reason: cr.reason,
+                    level: cr.difficulty || "BEGINNER",
+                });
             }
         }
     } catch {

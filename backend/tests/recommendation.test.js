@@ -25,6 +25,7 @@ import { Practice } from "../src/modules/practice/models/practice.model.js";
 import { QuestionBank } from "../src/modules/questionBank/models/questionBank.model.js";
 import { Enrollment } from "../src/modules/enrollment/models/enrollment.model.js";
 import { LearningEvidence } from "../src/modules/learningEvidence/models/learningEvidence.model.js";
+import { LearnerProfile } from "../src/modules/learner/models/learnerProfile.model.js";
 import { TopicMastery } from "../src/modules/topicMastery/models/topicMastery.model.js";
 import { MASTERY_STATUS } from "../src/modules/topicMastery/constants/mastery.constants.js";
 import { getLearnerRecommendationsService } from "../src/modules/recommendation/services/recommendation.service.js";
@@ -454,6 +455,33 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
                 assert.equal(rec.masteryScore, 0);
             }
         });
+
+        await t.test("2.4 New learner with persisted interests receives course discovery recommendations", async () => {
+            // Unenrolled learner creates onboarding profile with interest in "Databases"
+            await LearnerProfile.create({
+                userId: unenrolledLearnerId,
+                interests: ["Databases"],
+                goals: ["Master SQL and Relational Systems"],
+                experienceLevel: "I have a basic understanding",
+                onboardingState: "COMPLETED",
+            });
+
+            const res = await getLearnerRecommendationsService(unenrolledLearnerId);
+            assert.ok(res.courseRecommendations, "Must return courseRecommendations array");
+            assert.equal(res.courseRecommendations.length > 0, true, "Must recommend matching published course");
+            assert.equal(res.courseRecommendations[0].courseId.toString(), course1Id.toString());
+            assert.equal(res.courseRecommendations[0].targetType, "COURSE");
+            assert.equal(res.courseRecommendations[0].actionType, "EXPLORE_COURSE");
+            assert.equal(res.courseRecommendations[0].matchedInterest, "Databases");
+            assert.ok(res.nextBestAction);
+            assert.equal(res.nextBestAction.actionType, "EXPLORE_COURSE");
+            assert.equal(res.nextBestAction.courseId.toString(), course1Id.toString());
+            assert.equal(res.recommendations.length, 0, "No enrolled learning actions for unenrolled learner");
+            assert.equal(res.totalCount, res.courseRecommendations.length);
+
+            // Cleanup profile for this test
+            await LearnerProfile.deleteOne({ userId: unenrolledLearnerId });
+        });
     });
 
     // Test Group 3: Data Immutability & No Competing State
@@ -552,6 +580,7 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
 
     // Cleanup
     t.after(async () => {
+        await LearnerProfile.deleteMany({ userId: { $in: createdUserIds } });
         await User.deleteMany({ _id: { $in: createdUserIds } });
         await Course.deleteMany({ _id: { $in: createdCourseIds } });
         await Topic.deleteMany({ _id: { $in: createdTopicIds } });

@@ -29,6 +29,10 @@ const topicSchema =  new mongoose.Schema({
         type: Number,
         required:true,
         min:1
+    },
+    requiredAssessmentIds: {
+        type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Assessment' }],
+        default: []
     }
 },{timestamps:true})
 
