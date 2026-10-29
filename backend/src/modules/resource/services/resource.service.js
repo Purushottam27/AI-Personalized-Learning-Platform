@@ -11,6 +11,7 @@ import { assertTopicUnlockedForLearner } from "../../topic/services/topicProgres
 import { ApiError } from "../../../shared/errors/ApiError.js";
 import { uploadOnCloudinary } from "../../../shared/utils/cloudinary.js";
 import cloudinary from "../../../config/cloudinary.js";
+import { withTransaction } from "../../../shared/utils/withTransaction.js";
 
 const FILE_FORMAT_BY_EXTENSION = {
     ".pdf": "PDF",
@@ -52,20 +53,23 @@ async function getOwnedTopicAndCourse(instructorId, topicId) {
     return { topic, course };
 }
 
-async function getOwnedResourceContext(instructorId, resourceId) {
-    const resource = await Resource.findById(resourceId);
+async function getOwnedResourceContext(instructorId, resourceId, session = null) {
+    const resourceQuery = Resource.findById(resourceId);
+    const resource = await (session ? resourceQuery.session(session) : resourceQuery);
 
     if (!resource) {
         throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
     }
 
-    const topic = await Topic.findById(resource.topicId);
+    const topicQuery = Topic.findById(resource.topicId);
+    const topic = await (session ? topicQuery.session(session) : topicQuery);
 
     if (!topic) {
         throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
     }
 
-    const course = await Course.findById(topic.courseId);
+    const courseQuery = Course.findById(topic.courseId);
+    const course = await (session ? courseQuery.session(session) : courseQuery);
 
     if (!course || course.createdBy.toString() !== instructorId.toString()) {
         throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
@@ -528,18 +532,54 @@ export async function reorderResourcesService(instructorId, topicId, resourceIds
 }
 
 export async function archiveResourceService(instructorId, resourceId) {
-    const { resource, course } = await getOwnedResourceContext(instructorId, resourceId);
+    return withTransaction(async (session) => {
+        const { resource, course } = await getOwnedResourceContext(instructorId, resourceId, session);
 
-    assertCourseNotArchived(course);
+        assertCourseNotArchived(course);
 
-    if (resource.status === "ARCHIVED") {
-        throw new ApiError(409, "RESOURCE_ALREADY_ARCHIVED", "Resource is already archived");
-    }
+        if (resource.status === "ARCHIVED") {
+            throw new ApiError(409, "RESOURCE_ALREADY_ARCHIVED", "Resource is already archived");
+        }
 
-    resource.status = "ARCHIVED";
-    await resource.save();
+        // Write fence against concurrent course publication and lifecycle changes
+        const courseFence = await Course.updateOne(
+            { _id: course._id, status: { $ne: "ARCHIVED" } },
+            { $inc: { lifecycleVersion: 1 } },
+            { session }
+        );
+        if (courseFence.modifiedCount !== 1) {
+            throw new ApiError(409, "COURSE_STATE_CHANGED", "Course state changed during resource archival; reload and retry");
+        }
 
-    return resource;
+        // When a course is PUBLISHED, do not allow a Resource to be archived if that operation would leave its Topic without any ACTIVE Resources
+        if (course.status === "PUBLISHED") {
+            const remainingActiveCount = await Resource.countDocuments({
+                topicId: resource.topicId,
+                status: "ACTIVE",
+                _id: { $ne: resource._id }
+            }).session(session);
+
+            if (remainingActiveCount === 0) {
+                throw new ApiError(
+                    409,
+                    "CANNOT_ARCHIVE_LAST_ACTIVE_RESOURCE",
+                    "Cannot archive the last active resource for a topic in a published course"
+                );
+            }
+        }
+
+        const archived = await Resource.findOneAndUpdate(
+            { _id: resource._id, status: "ACTIVE" },
+            { $set: { status: "ARCHIVED" }, $inc: { __v: 1 } },
+            { returnDocument: "after", runValidators: true, session }
+        );
+
+        if (!archived) {
+            throw new ApiError(409, "RESOURCE_STATE_CHANGED", "Resource state changed during archival; reload and retry");
+        }
+
+        return archived;
+    });
 }
 
 export async function restoreResourceService(instructorId, resourceId) {

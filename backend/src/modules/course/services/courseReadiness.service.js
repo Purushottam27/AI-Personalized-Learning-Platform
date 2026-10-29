@@ -316,7 +316,8 @@ export async function checkCourseReadiness(courseId, userId = null, session = nu
         topics,
         topicAssessmentsMap,
         finalAssessment: publishedFinalAssessment,
-        diagnosticAssessment: publishedDiagnosticAssessment
+        diagnosticAssessment: publishedDiagnosticAssessment,
+        activeResources
     };
 }
 

@@ -1,5 +1,6 @@
 import { Course } from "../models/course.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
+import { Resource } from "../../resource/models/resource.model.js";
 import { Assessment } from "../../assessment/models/assessment.model.js";
 import { withTransaction } from "../../../shared/utils/withTransaction.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
@@ -285,7 +286,7 @@ const updateCourseService = async (userId, courseId, updateData) => {
 const publishCourseService = async (userId, courseId) => {
     return withTransaction(async (session) => {
         const readiness = await checkCourseReadiness(courseId, userId, session);
-        const { course, topics, topicAssessmentsMap, finalAssessment, diagnosticAssessment } = readiness;
+        const { course, topics, topicAssessmentsMap, finalAssessment, diagnosticAssessment, activeResources } = readiness;
 
         // Write fence against concurrent course modifications
         const courseFence = await Course.updateOne(
@@ -295,6 +296,19 @@ const publishCourseService = async (userId, courseId) => {
         );
         if (courseFence.modifiedCount !== 1) {
             throw new ApiError(409, "COURSE_STATE_CHANGED", "Course state changed during publication; reload and retry");
+        }
+
+        // Write fence all active resources validating topic readiness against concurrent archival
+        if (activeResources && activeResources.length > 0) {
+            const activeResourceIds = activeResources.map((r) => r._id);
+            const resourceFence = await Resource.updateMany(
+                { _id: { $in: activeResourceIds }, status: "ACTIVE" },
+                { $inc: { __v: 1 } },
+                { session }
+            );
+            if (resourceFence.modifiedCount !== activeResourceIds.length) {
+                throw new ApiError(409, "RESOURCE_STATE_CHANGED", "A resource state changed during publication; reload and retry");
+            }
         }
 
         // Snapshot publication-time required assessments onto each Topic
