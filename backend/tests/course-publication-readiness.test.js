@@ -332,6 +332,53 @@ test("Course Publication Readiness & Learner Assessment Progression Integration 
         assert.equal(published.publicationRequirements.diagnosticAssessmentId, null);
     });
 
+    await t.test("9b. Multiple published diagnostic assessments are allowed if a matching one exists (cardinality restriction removed)", async () => {
+        const { course, topicQuestions } = await createValidCourseStructure({
+            diagnosticPolicy: {
+                enabled: true,
+                passingScore: 65,
+                questionsPerAttempt: 5,
+                randomizeQuestions: true
+            }
+        });
+
+        // Create first published diagnostic assessment matching the course policy
+        const matchingDiag = await Assessment.create({
+            courseId: course._id,
+            createdBy: instructorId,
+            type: "DIAGNOSTIC",
+            title: "Matching Diagnostic Assessment",
+            status: "PUBLISHED",
+            questionsPerAttempt: 5,
+            passingScore: 65,
+            randomizeQuestions: true,
+            maxAttempts: 1,
+            questionIds: topicQuestions.map((q) => q._id)
+        });
+
+        // Create second published diagnostic assessment (alternate/legacy settings)
+        await Assessment.create({
+            courseId: course._id,
+            createdBy: instructorId,
+            type: "DIAGNOSTIC",
+            title: "Alternate Diagnostic Assessment",
+            status: "PUBLISHED",
+            questionsPerAttempt: 5,
+            passingScore: 80,
+            randomizeQuestions: false,
+            maxAttempts: 1,
+            questionIds: topicQuestions.map((q) => q._id)
+        });
+
+        // Publication must succeed (MULTIPLE_DIAGNOSTIC_ASSESSMENTS restriction removed)
+        const published = await publishCourseService(instructorId, course._id);
+        assert.equal(published.status, "PUBLISHED");
+        assert.equal(
+            published.publicationRequirements.diagnosticAssessmentId.toString(),
+            matchingDiag._id.toString()
+        );
+    });
+
     await t.test("10. Courses with zero Lessons and zero Practice activities can publish when all mandatory conditions pass", async () => {
         const { course } = await createValidCourseStructure();
         // Zero lessons, zero practices exist
@@ -442,6 +489,53 @@ test("Course Publication Readiness & Learner Assessment Progression Integration 
 
         // Now enrollment in targetCourse succeeds
         const enrollment = await createEnrollmentService(learnerId, targetCourse._id);
+        assert.equal(enrollment.status, "ACTIVE");
+    });
+
+    await t.test("16b. An already-referenced prerequisite course that is archived later remains valid and does not block updates or publication", async () => {
+        const { course: prereqCourse } = await createValidCourseStructure();
+        await publishCourseService(instructorId, prereqCourse._id);
+
+        // Course A selects published Course B as prerequisite
+        const { course: courseA } = await createValidCourseStructure({
+            prerequisites: { courses: [prereqCourse._id] }
+        });
+
+        // Prerequisite Course B is later ARCHIVED
+        await Course.updateOne({ _id: prereqCourse._id }, { $set: { status: "ARCHIVED" } });
+
+        // 1. Unrelated metadata edits on Course A succeed
+        await assert.doesNotReject(
+            updateCourseService(instructorId, courseA._id, { title: "Updated Course A Title With 4+ Chars" })
+        );
+
+        // 2. Updating prerequisites on Course A keeping existing archived Course B succeeds
+        await assert.doesNotReject(
+            updateCourseService(instructorId, courseA._id, {
+                prerequisites: { courses: [prereqCourse._id] }
+            })
+        );
+
+        // 3. Publishing Course A succeeds without PREREQUISITE_NOT_PUBLISHED
+        const publishedA = await publishCourseService(instructorId, courseA._id);
+        assert.equal(publishedA.status, "PUBLISHED");
+
+        // 4. Newly selecting an archived course on another course is still rejected
+        const { course: otherCourse } = await createValidCourseStructure();
+        await assert.rejects(
+            updateCourseService(instructorId, otherCourse._id, {
+                prerequisites: { courses: [prereqCourse._id] }
+            }),
+            (err) => err.code === "PREREQUISITE_NOT_PUBLISHED" && err.statusCode === 400
+        );
+
+        // 5. Learner who completed prereqCourse before archival can still satisfy prerequisites and enroll
+        await Enrollment.create({
+            learnerId,
+            courseId: prereqCourse._id,
+            status: "COMPLETED"
+        });
+        const enrollment = await createEnrollmentService(learnerId, publishedA._id);
         assert.equal(enrollment.status, "ACTIVE");
     });
 

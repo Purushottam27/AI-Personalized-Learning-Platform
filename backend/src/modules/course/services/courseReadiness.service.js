@@ -12,9 +12,10 @@ function sameId(a, b) {
 
 /**
  * Validates prerequisite courses for existence, no duplicates, no self-reference,
- * and ensures every referenced course is in PUBLISHED status.
+ * and ensures newly selected courses are in PUBLISHED status.
+ * Already-existing prerequisite references remain valid if the referenced course was archived later.
  */
-export async function validatePrerequisiteCourses(courseIds, currentCourseId = null, session = null) {
+export async function validatePrerequisiteCourses(courseIds, currentCourseId = null, session = null, existingPrereqIds = []) {
     if (!courseIds || courseIds.length === 0) return;
 
     const idStrings = courseIds.map((id) => id.toString());
@@ -47,13 +48,23 @@ export async function validatePrerequisiteCourses(courseIds, currentCourseId = n
         );
     }
 
-    const nonPublished = existingCourses.filter((c) => c.status !== "PUBLISHED");
-    if (nonPublished.length > 0) {
-        throw new ApiError(
-            400,
-            "PREREQUISITE_NOT_PUBLISHED",
-            "Only published courses can be selected as prerequisites"
-        );
+    const existingIdSet = new Set((existingPrereqIds || []).map((id) => id.toString()));
+
+    for (const c of existingCourses) {
+        if (c.status === "DRAFT") {
+            throw new ApiError(
+                400,
+                "PREREQUISITE_NOT_PUBLISHED",
+                "Only published courses can be selected as prerequisites"
+            );
+        }
+        if (c.status === "ARCHIVED" && !existingIdSet.has(c._id.toString())) {
+            throw new ApiError(
+                400,
+                "PREREQUISITE_NOT_PUBLISHED",
+                "Only published courses can be selected as prerequisites"
+            );
+        }
     }
 }
 
@@ -165,10 +176,10 @@ export async function checkCourseReadiness(courseId, userId = null, session = nu
 
     validateCourseMetadata(course);
 
-    // Validate prerequisites
+    // Validate prerequisites (already-attached prerequisites remain valid if archived later)
     const prereqIds = course.prerequisites?.courses ?? [];
     if (prereqIds.length > 0) {
-        await validatePrerequisiteCourses(prereqIds, course._id, session);
+        await validatePrerequisiteCourses(prereqIds, course._id, session, prereqIds);
     }
 
     // Load topics
@@ -298,22 +309,16 @@ export async function checkCourseReadiness(courseId, userId = null, session = nu
                 { requirement: "MISSING_DIAGNOSTIC_ASSESSMENT" }
             );
         }
-        if (publishedDiagnosticAssessments.length > 1) {
-            throw new ApiError(
-                400,
-                "COURSE_NOT_READY",
-                "A course cannot have more than one published diagnostic assessment",
-                { requirement: "MULTIPLE_DIAGNOSTIC_ASSESSMENTS", count: publishedDiagnosticAssessments.length }
-            );
-        }
-        publishedDiagnosticAssessment = publishedDiagnosticAssessments[0];
 
         const p = course.diagnosticPolicy;
-        if (
-            publishedDiagnosticAssessment.passingScore !== p.passingScore ||
-            publishedDiagnosticAssessment.questionsPerAttempt !== p.questionsPerAttempt ||
-            publishedDiagnosticAssessment.randomizeQuestions !== p.randomizeQuestions
-        ) {
+        const matchingDiagnostic = publishedDiagnosticAssessments.find(
+            (a) =>
+                a.passingScore === p.passingScore &&
+                a.questionsPerAttempt === p.questionsPerAttempt &&
+                a.randomizeQuestions === p.randomizeQuestions
+        );
+
+        if (!matchingDiagnostic) {
             throw new ApiError(
                 400,
                 "COURSE_NOT_READY",
@@ -322,6 +327,7 @@ export async function checkCourseReadiness(courseId, userId = null, session = nu
             );
         }
 
+        publishedDiagnosticAssessment = matchingDiagnostic;
         await validateAssessmentPoolReadiness(publishedDiagnosticAssessment, course, null, session);
     }
 

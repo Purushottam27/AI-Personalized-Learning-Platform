@@ -236,7 +236,8 @@ const updateCourseServiceInternal = async (userId, courseId, updateData, session
 
         assertNoSelfReference(courseId, prerequisiteCourseIds);
 
-        await validatePrerequisiteCourses(prerequisiteCourseIds, courseId, session);
+        const existingPrereqIds = course.prerequisites?.courses ?? [];
+        await validatePrerequisiteCourses(prerequisiteCourseIds, courseId, session, existingPrereqIds);
 
         update.prerequisites = {
             courses: prerequisiteCourseIds,

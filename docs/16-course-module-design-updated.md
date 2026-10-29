@@ -332,15 +332,15 @@ Rules:
 
 - `courses[]` references prerequisite Course documents.
 - `knowledge[]` contains descriptive knowledge requirements.
-- **Prerequisite Course Selection Rule**: Only `PUBLISHED` courses can be selected as prerequisites. Draft and archived courses are strictly rejected by backend validation (`PREREQUISITE_NOT_PUBLISHED`) and filtered out of instructor course selection in the UI.
+- **Prerequisite Course Selection Rule**: Only `PUBLISHED` courses can be newly selected as prerequisites. Draft and archived courses are strictly rejected by backend validation (`PREREQUISITE_NOT_PUBLISHED`) and filtered out of instructor course selection in the UI. Already-existing prerequisite references remain valid if the referenced course is archived later.
 - Self-reference (a course listing itself) and duplicate prerequisite references are strictly rejected.
 - All declared prerequisites must be satisfied.
 - No nested AND/OR prerequisite rule engine in MVP.
-- A prerequisite Course is satisfied when the learner has **COMPLETED** it, not merely enrolled in it.
+- A prerequisite Course is satisfied when the learner has **COMPLETED** it (completed prerequisite course enrollment status `COMPLETED`), not merely enrolled in it.
 - Prerequisites affect course entry/enrollment readiness.
 - Prerequisites do not control individual Lesson progression.
 - Discovery remains open: a learner may discover a course even when prerequisites are not satisfied.
-- If an existing published course that was selected as a prerequisite is archived later, historical reference integrity is preserved because Course hard deletion is not part of MVP.
+- If an existing published course that was selected as a prerequisite is archived later, historical reference integrity is preserved because Course hard deletion is not part of MVP; such existing references remain valid and do not block course publication or unrelated course updates.
 
 Learner-specific prerequisite evaluation belongs to Enrollment/course-entry logic.
 
@@ -506,7 +506,8 @@ A course may transition from `DRAFT` to `PUBLISHED` only when all of the followi
 2. **Metadata Validity**:
    - Title (5–100 chars), description (20–1000 chars), domain, category, difficulty, objectives (at least 1 non-empty objective).
 3. **Prerequisite Validity**:
-   - Every prerequisite course ID in `prerequisites.courses` must exist and be in `PUBLISHED` status (`PREREQUISITE_NOT_PUBLISHED` if draft or archived).
+   - Every prerequisite course ID in `prerequisites.courses` must exist (`PREREQUISITE_NOT_FOUND` if missing).
+   - Only published courses can be newly selected as prerequisites; already-existing prerequisite references remain valid if the referenced course is archived later. Draft courses are always strictly rejected (`PREREQUISITE_NOT_PUBLISHED`).
    - Prerequisite list cannot contain self-references or duplicate IDs.
 4. **Topic Structure & Sequential Order**:
    - The course must have at least **1 Topic** (`NO_TOPICS`).
@@ -518,6 +519,7 @@ A course may transition from `DRAFT` to `PUBLISHED` only when all of the followi
 6. **Topic Assessments & Pool Eligibility**:
    - Every Topic must have at least **1 PUBLISHED TOPIC Assessment** (`TOPIC_MISSING_PUBLISHED_ASSESSMENT`).
    - Multiple published assessments per topic are supported.
+   - Every published Topic Assessment evaluated at publication is snapshotted into `requiredAssessmentIds`; all snapshotted assessments must be passed for learner topic progression when locking is enabled.
    - Every evaluated published assessment must have a valid eligible question pool where active questions meeting type and difficulty criteria is greater than or equal to `questionsPerAttempt` (`ASSESSMENT_INSUFFICIENT_POOL`).
 7. **Course Final Assessment**:
    - The course must have exactly **1 PUBLISHED FINAL Assessment** (`COURSE_MISSING_FINAL_ASSESSMENT`).
