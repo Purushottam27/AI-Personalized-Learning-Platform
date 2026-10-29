@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { MASTERY_STATUS } from "../constants/mastery.constants.js";
+import { MASTERY_STATUS, CURRENT_CALCULATION_VERSION } from "../constants/mastery.constants.js";
 
 const topicMasterySchema = new mongoose.Schema(
     {
@@ -100,7 +100,7 @@ const topicMasterySchema = new mongoose.Schema(
         calculationVersion: {
             type: String,
             required: true,
-            default: "1.0.0",
+            default: CURRENT_CALCULATION_VERSION,
         },
     },
     {

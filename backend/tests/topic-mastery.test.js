@@ -36,6 +36,7 @@ import {
     MASTERY_STATUS,
     MASTERY_THRESHOLDS,
     MASTERY_CONFIDENCE,
+    CURRENT_CALCULATION_VERSION,
 } from "../src/modules/topicMastery/constants/mastery.constants.js";
 
 test("Stage 5 — Topic Mastery & Weakness Detection Test Suite", async (t) => {
@@ -178,14 +179,14 @@ test("Stage 5 — Topic Mastery & Weakness Detection Test Suite", async (t) => {
         assert.equal(result.totalQuestionsAttempted, 0);
     });
 
-    await t.test("1.2 computeTopicMastery marks status as INSUFFICIENT_EVIDENCE when total questions < 5", () => {
-        // 1 attempt with only 3 questions and 0% score
+    await t.test("1.2 computeTopicMastery handles evidence with 0 total weight as INSUFFICIENT_EVIDENCE", () => {
+        // Attempt with 0 valid questions
         const evidence = [
             {
                 completedAt: new Date(),
-                totalQuestions: 3,
+                totalQuestions: 0,
                 correctCount: 0,
-                totalMarks: 3,
+                totalMarks: 0,
                 marksAwarded: 0,
                 scorePercent: 0,
                 sourceType: "PRACTICE",
@@ -193,100 +194,151 @@ test("Stage 5 — Topic Mastery & Weakness Detection Test Suite", async (t) => {
         ];
         const result = computeTopicMastery(evidence);
         assert.equal(result.masteryScore, 0);
-        // Crucial requirement: must NOT classify as NEEDS_IMPROVEMENT due to insufficient sample
         assert.equal(result.status, MASTERY_STATUS.INSUFFICIENT_EVIDENCE);
-        assert.ok(result.confidence < 0.3);
+        assert.equal(result.confidence, 0);
     });
 
-    await t.test("1.3 computeTopicMastery classifies NEEDS_IMPROVEMENT when sufficient questions attempted and score <= 39.99", () => {
+    await t.test("1.3 computeTopicMastery applies equal source-type weighting for practice and assessment", () => {
+        // Practice attempt: 5 questions, 100% score
+        // Assessment attempt: 5 questions, 50% score
+        // Equal weighting: (100 * 5 + 50 * 5) / (5 + 5) = 750 / 10 = 75.0%
+        const evidence1 = [
+            { completedAt: new Date("2026-01-01"), totalQuestions: 5, totalMarks: 10, marksAwarded: 10, scorePercent: 100, sourceType: "PRACTICE" },
+            { completedAt: new Date("2026-01-02"), totalQuestions: 5, totalMarks: 10, marksAwarded: 5, scorePercent: 50, sourceType: "ASSESSMENT", assessmentSubtype: "TOPIC" },
+        ];
+        const res1 = computeTopicMastery(evidence1);
+        assert.equal(res1.masteryScore, 75.0);
+
+        // Swapping source types: Practice with 50%, Assessment with 100%
+        const evidence2 = [
+            { completedAt: new Date("2026-01-01"), totalQuestions: 5, totalMarks: 10, marksAwarded: 5, scorePercent: 50, sourceType: "PRACTICE" },
+            { completedAt: new Date("2026-01-02"), totalQuestions: 5, totalMarks: 10, marksAwarded: 10, scorePercent: 100, sourceType: "ASSESSMENT", assessmentSubtype: "TOPIC" },
+        ];
+        const res2 = computeTopicMastery(evidence2);
+        assert.equal(res2.masteryScore, 75.0, "Practice and assessment must carry equal weight");
+    });
+
+    await t.test("1.4 computeTopicMastery does NOT apply a recency multiplier", () => {
+        // Attempt 1 (older): 5 questions, 100%
+        // Attempt 2 (newer): 5 questions, 50%
+        // Without recency multiplier: (100 * 5 + 50 * 5) / 10 = 75.0%
+        const chronological = [
+            { completedAt: new Date("2026-01-01"), totalQuestions: 5, totalMarks: 5, marksAwarded: 5, scorePercent: 100, sourceType: "PRACTICE" },
+            { completedAt: new Date("2026-01-02"), totalQuestions: 5, totalMarks: 5, marksAwarded: 2.5, scorePercent: 50, sourceType: "PRACTICE" },
+        ];
+        const res1 = computeTopicMastery(chronological);
+        assert.equal(res1.masteryScore, 75.0);
+
+        // Reverse order: Attempt 1 newer, Attempt 2 older
+        const reversed = [
+            { completedAt: new Date("2026-01-02"), totalQuestions: 5, totalMarks: 5, marksAwarded: 2.5, scorePercent: 50, sourceType: "PRACTICE" },
+            { completedAt: new Date("2026-01-01"), totalQuestions: 5, totalMarks: 5, marksAwarded: 5, scorePercent: 100, sourceType: "PRACTICE" },
+        ];
+        const res2 = computeTopicMastery(reversed);
+        assert.equal(res2.masteryScore, 75.0, "Result must not be affected by evidence chronological order");
+    });
+
+    await t.test("1.5 computeTopicMastery caps question-volume weighting at 20 per evidence event", () => {
+        // Attempt 1: 30 questions, 100% score (weight capped at 20)
+        // Attempt 2: 10 questions, 50% score (weight = 10)
+        // Expected: (100 * 20 + 50 * 10) / (20 + 10) = 2500 / 30 = 83.3%
+        // (Uncapped would be: (100 * 30 + 50 * 10) / 40 = 87.5%)
+        const evidence = [
+            { completedAt: new Date(), totalQuestions: 30, totalMarks: 30, marksAwarded: 30, scorePercent: 100, sourceType: "PRACTICE" },
+            { completedAt: new Date(), totalQuestions: 10, totalMarks: 10, marksAwarded: 5, scorePercent: 50, sourceType: "PRACTICE" },
+        ];
+        const result = computeTopicMastery(evidence);
+        assert.equal(result.masteryScore, 83.3);
+    });
+
+    await t.test("1.6 computeTopicMastery includes unanswered questions with zero marks in question counts and scoring", () => {
+        // Attempt with 10 questions: 4 answered correctly (4 marks), 6 unanswered (0 marks), total marks = 10
         const evidence = [
             {
-                completedAt: new Date(Date.now() - 60000),
-                totalQuestions: 5,
-                correctCount: 1,
+                completedAt: new Date(),
+                totalQuestions: 10,
+                correctCount: 4,
                 totalMarks: 10,
-                marksAwarded: 2,
-                scorePercent: 20,
+                marksAwarded: 4,
+                scorePercent: 40,
                 sourceType: "PRACTICE",
             },
         ];
         const result = computeTopicMastery(evidence);
-        assert.equal(result.masteryScore, 20);
+        assert.equal(result.masteryScore, 40.0);
         assert.equal(result.status, MASTERY_STATUS.NEEDS_IMPROVEMENT);
-        assert.equal(result.evidenceCount, 1);
-        assert.equal(result.totalQuestionsAttempted, 5);
-        assert.ok(result.confidence >= 0.25);
+        assert.equal(result.totalQuestionsAttempted, 10);
+        assert.equal(result.totalMarksPossible, 10);
+        assert.equal(result.totalMarksAwarded, 4);
     });
 
-    await t.test("1.4 computeTopicMastery classifies DEVELOPING (40-59.99)", () => {
-        const evidence = [
-            {
-                completedAt: new Date(),
-                totalQuestions: 5,
-                correctCount: 2,
-                totalMarks: 10,
-                marksAwarded: 5,
-                scorePercent: 50,
-                sourceType: "TOPIC",
-                assessmentSubtype: "TOPIC",
-            },
+    await t.test("1.7 computeTopicMastery confidence formula combines question volume (70%) and attempt count (30%)", () => {
+        // 1 attempt with 10 questions:
+        // questionRatio = 10 / 20 = 0.5
+        // attemptRatio = 1 / 5 = 0.2
+        // confidence = round(0.7 * 0.5 + 0.3 * 0.2, 2) = round(0.35 + 0.06, 2) = 0.41
+        const partialEvidence = [
+            { completedAt: new Date(), totalQuestions: 10, totalMarks: 10, marksAwarded: 8, scorePercent: 80, sourceType: "PRACTICE" },
         ];
-        const result = computeTopicMastery(evidence);
-        assert.equal(result.masteryScore, 50);
-        assert.equal(result.status, MASTERY_STATUS.DEVELOPING);
-    });
+        const partialRes = computeTopicMastery(partialEvidence);
+        assert.equal(partialRes.confidence, 0.41);
 
-    await t.test("1.5 computeTopicMastery classifies FUNCTIONAL (60-74.99)", () => {
-        const evidence = [
-            {
-                completedAt: new Date(),
-                totalQuestions: 5,
-                correctCount: 3,
-                totalMarks: 10,
-                marksAwarded: 7,
-                scorePercent: 70,
-                sourceType: "TOPIC",
-                assessmentSubtype: "TOPIC",
-            },
+        // Full confidence: 20 questions across 5 attempts:
+        // questionRatio = 20 / 20 = 1.0, attemptRatio = 5 / 5 = 1.0 -> confidence = 1.00
+        const fullEvidence = [
+            { completedAt: new Date(), totalQuestions: 4, totalMarks: 4, marksAwarded: 4, scorePercent: 100, sourceType: "PRACTICE" },
+            { completedAt: new Date(), totalQuestions: 4, totalMarks: 4, marksAwarded: 4, scorePercent: 100, sourceType: "PRACTICE" },
+            { completedAt: new Date(), totalQuestions: 4, totalMarks: 4, marksAwarded: 4, scorePercent: 100, sourceType: "PRACTICE" },
+            { completedAt: new Date(), totalQuestions: 4, totalMarks: 4, marksAwarded: 4, scorePercent: 100, sourceType: "PRACTICE" },
+            { completedAt: new Date(), totalQuestions: 4, totalMarks: 4, marksAwarded: 4, scorePercent: 100, sourceType: "PRACTICE" },
         ];
-        const result = computeTopicMastery(evidence);
-        assert.equal(result.masteryScore, 70);
-        assert.equal(result.status, MASTERY_STATUS.FUNCTIONAL);
+        const fullRes = computeTopicMastery(fullEvidence);
+        assert.equal(fullRes.confidence, 1.00);
     });
 
-    await t.test("1.6 computeTopicMastery classifies STRONG (75-89.99) and MASTERED (90-100)", () => {
-        const strong = computeTopicMastery([
-            { completedAt: new Date(), totalQuestions: 6, correctCount: 5, totalMarks: 10, marksAwarded: 8, scorePercent: 80, sourceType: "PRACTICE" },
+    await t.test("1.8 computeTopicMastery classifies exact boundary values (0-59.9 NEEDS_IMPROVEMENT, 60-79.9 DEVELOPING, 80-100 STRONG)", () => {
+        const makeAttempt = (score) => [
+            { completedAt: new Date(), totalQuestions: 5, totalMarks: 100, marksAwarded: score, scorePercent: score, sourceType: "PRACTICE" },
+        ];
+
+        // 0.0 -> NEEDS_IMPROVEMENT
+        assert.equal(computeTopicMastery(makeAttempt(0.0)).status, MASTERY_STATUS.NEEDS_IMPROVEMENT);
+        // 59.9 -> NEEDS_IMPROVEMENT
+        assert.equal(computeTopicMastery(makeAttempt(59.9)).status, MASTERY_STATUS.NEEDS_IMPROVEMENT);
+        // 60.0 -> DEVELOPING
+        assert.equal(computeTopicMastery(makeAttempt(60.0)).status, MASTERY_STATUS.DEVELOPING);
+        // 79.9 -> DEVELOPING
+        assert.equal(computeTopicMastery(makeAttempt(79.9)).status, MASTERY_STATUS.DEVELOPING);
+        // 80.0 -> STRONG
+        assert.equal(computeTopicMastery(makeAttempt(80.0)).status, MASTERY_STATUS.STRONG);
+        // 100.0 -> STRONG
+        assert.equal(computeTopicMastery(makeAttempt(100.0)).status, MASTERY_STATUS.STRONG);
+    });
+
+    await t.test("1.9 computeTopicMastery keeps INSUFFICIENT_EVIDENCE distinct from a low mastery score", () => {
+        // Zero evidence -> INSUFFICIENT_EVIDENCE, score 0, confidence 0
+        const zeroResult = computeTopicMastery([]);
+        assert.equal(zeroResult.status, MASTERY_STATUS.INSUFFICIENT_EVIDENCE);
+        assert.equal(zeroResult.masteryScore, 0);
+        assert.equal(zeroResult.confidence, 0);
+
+        // Evidence with 0% score -> NEEDS_IMPROVEMENT with calculated confidence
+        const lowResult = computeTopicMastery([
+            { completedAt: new Date(), totalQuestions: 5, totalMarks: 5, marksAwarded: 0, scorePercent: 0, sourceType: "PRACTICE" },
         ]);
-        assert.equal(strong.status, MASTERY_STATUS.STRONG);
-
-        const mastered = computeTopicMastery([
-            { completedAt: new Date(), totalQuestions: 10, correctCount: 10, totalMarks: 10, marksAwarded: 10, scorePercent: 95, sourceType: "PRACTICE" },
-        ]);
-        assert.equal(mastered.status, MASTERY_STATUS.MASTERED);
+        assert.equal(lowResult.status, MASTERY_STATUS.NEEDS_IMPROVEMENT);
+        assert.equal(lowResult.masteryScore, 0);
+        assert.ok(lowResult.confidence > 0, "Confidence must be non-zero when eligible evidence is recorded");
     });
 
-    await t.test("1.7 computeTopicMastery applies recency boost giving higher weight to newest evidence", () => {
-        // Attempt 1 (older): 100%
-        // Attempt 2 (newer): 50%
-        // In unweighted average: (100 + 50) / 2 = 75%
-        // With recency boost (attempt 2 gets 1.5x weight of attempt 1): (100*1.0 + 50*1.5) / 2.5 = 175 / 2.5 = 70.0%
+    await t.test("1.10 computeTopicMastery handles zero or invalid total possible marks safely", () => {
         const evidence = [
-            { completedAt: new Date("2026-01-01"), totalQuestions: 5, totalMarks: 5, marksAwarded: 5, scorePercent: 100, sourceType: "PRACTICE" },
-            { completedAt: new Date("2026-01-02"), totalQuestions: 5, totalMarks: 5, marksAwarded: 2.5, scorePercent: 50, sourceType: "PRACTICE" },
+            { completedAt: new Date(), totalQuestions: 5, totalMarks: 0, marksAwarded: 0, scorePercent: 50, sourceType: "PRACTICE" },
         ];
         const result = computeTopicMastery(evidence);
-        assert.equal(result.masteryScore, 70);
-    });
-
-    await t.test("1.8 computeTopicMastery is completely deterministic given identical evidence", () => {
-        const evidence = [
-            { completedAt: new Date("2026-02-01"), totalQuestions: 5, totalMarks: 5, marksAwarded: 4, scorePercent: 80, sourceType: "PRACTICE" },
-            { completedAt: new Date("2026-02-02"), totalQuestions: 5, totalMarks: 5, marksAwarded: 5, scorePercent: 100, sourceType: "ASSESSMENT", assessmentSubtype: "TOPIC" },
-        ];
-        const res1 = computeTopicMastery(evidence);
-        const res2 = computeTopicMastery(evidence);
-        assert.deepEqual(res1, res2);
+        assert.equal(Number.isNaN(result.masteryScore), false);
+        assert.equal(Number.isFinite(result.masteryScore), true);
+        assert.equal(result.masteryScore, 50.0);
     });
 
     // ==========================================
@@ -411,7 +463,7 @@ test("Stage 5 — Topic Mastery & Weakness Detection Test Suite", async (t) => {
 
         const topic2Mastery = await recalculateTopicMasteryService(learner1Id, courseId, topic2Id);
         assert.equal(topic2Mastery.masteryScore, 100);
-        assert.equal(topic2Mastery.status, MASTERY_STATUS.MASTERED);
+        assert.equal(topic2Mastery.status, MASTERY_STATUS.STRONG);
         assert.equal(topic2Mastery.assessmentAttemptsCount, 1);
 
         // Topic 1 is unchanged
@@ -426,7 +478,75 @@ test("Stage 5 — Topic Mastery & Weakness Detection Test Suite", async (t) => {
         const t1 = results.find((r) => r.topicId.toString() === topic1Id.toString());
         const t2 = results.find((r) => r.topicId.toString() === topic2Id.toString());
         assert.equal(t1.status, MASTERY_STATUS.NEEDS_IMPROVEMENT);
-        assert.equal(t2.status, MASTERY_STATUS.MASTERED);
+        assert.equal(t2.status, MASTERY_STATUS.STRONG);
+    });
+
+    await t.test("2.5 Recalculation failure preserves already-persisted LearningEvidence", async () => {
+        const isolatedLearnerId = new mongoose.Types.ObjectId();
+        const attemptId = new mongoose.Types.ObjectId();
+        const evidence = await LearningEvidence.create({
+            learnerId: isolatedLearnerId,
+            courseId,
+            topicId: topic1Id,
+            sourceType: "PRACTICE",
+            sourceId: new mongoose.Types.ObjectId(),
+            attemptId,
+            completedAt: new Date(),
+            totalQuestions: 5,
+            correctCount: 4,
+            totalMarks: 5,
+            marksAwarded: 4,
+            scorePercent: 80,
+            contributeToLearningEvidence: true,
+        });
+        assert.ok(evidence);
+
+        // Simulate a transient recalculation error (e.g. invalid course parameter)
+        await assert.rejects(
+            async () => {
+                await recalculateTopicMasteryService(isolatedLearnerId, "not-a-valid-id", topic1Id);
+            },
+            (err) => err.statusCode === 400 && err.code === "INVALID_ID"
+        );
+
+        // Evidence must still exist untouched
+        const persisted = await LearningEvidence.findById(evidence._id);
+        assert.ok(persisted, "Evidence must remain persisted even if recalculation encounters an error");
+    });
+
+    await t.test("2.6 Concurrent recalculations for the same learner and topic resolve safely without corruption", async () => {
+        const isolatedLearnerId = new mongoose.Types.ObjectId();
+        const attemptId = new mongoose.Types.ObjectId();
+        await LearningEvidence.create({
+            learnerId: isolatedLearnerId,
+            courseId,
+            topicId: topic1Id,
+            sourceType: "PRACTICE",
+            sourceId: new mongoose.Types.ObjectId(),
+            attemptId,
+            completedAt: new Date(),
+            totalQuestions: 5,
+            correctCount: 5,
+            totalMarks: 5,
+            marksAwarded: 5,
+            scorePercent: 100,
+            contributeToLearningEvidence: true,
+        });
+
+        const results = await Promise.all([
+            recalculateTopicMasteryService(isolatedLearnerId, courseId, topic1Id),
+            recalculateTopicMasteryService(isolatedLearnerId, courseId, topic1Id),
+            recalculateTopicMasteryService(isolatedLearnerId, courseId, topic1Id),
+            recalculateTopicMasteryService(isolatedLearnerId, courseId, topic1Id),
+            recalculateTopicMasteryService(isolatedLearnerId, courseId, topic1Id),
+        ]);
+
+        assert.equal(results.length, 5);
+        const count = await TopicMastery.countDocuments({ learnerId: isolatedLearnerId, courseId, topicId: topic1Id });
+        assert.equal(count, 1, "Exactly one TopicMastery document must exist despite concurrent recalculation");
+        const doc = await TopicMastery.findOne({ learnerId: isolatedLearnerId, courseId, topicId: topic1Id });
+        assert.ok(doc);
+        assert.equal(doc.calculationVersion, CURRENT_CALCULATION_VERSION);
     });
 
     // ==========================================
@@ -474,7 +594,7 @@ test("Stage 5 — Topic Mastery & Weakness Detection Test Suite", async (t) => {
         const body = await res.json();
         assert.equal(body.data.length, 2);
         assert.ok(body.data.some((t) => t.topicId.toString() === topic1Id.toString() && t.status === "NEEDS_IMPROVEMENT"));
-        assert.ok(body.data.some((t) => t.topicId.toString() === topic2Id.toString() && t.status === "MASTERED"));
+        assert.ok(body.data.some((t) => t.topicId.toString() === topic2Id.toString() && t.status === "STRONG"));
     });
 
     await t.test("3.5 GET /learning/me/weaknesses returns only topics in NEEDS_IMPROVEMENT", async () => {

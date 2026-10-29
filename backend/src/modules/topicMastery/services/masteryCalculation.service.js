@@ -18,7 +18,16 @@ function clamp(val, min, max) {
 
 /**
  * Pure, deterministic calculation function for topic mastery.
- * Calculates score, confidence, aggregates, and status from a sorted list of eligible LearningEvidence.
+ * Follows approved MVP specification:
+ * - 3.1 Attempt score: attemptScore = (earnedMarks / totalPossibleMarks) * 100
+ * - 3.2 Evidence weight: evidenceWeight = min(questionCount, 20)
+ *   Equal source-type weight; no assessment-specific or recency multipliers.
+ *   masteryScore = sum(evidenceWeight * attemptScore) / sum(evidenceWeight)
+ * - 3.3 Confidence: questionRatio = min(1, totalQuestions / 20)
+ *   attemptRatio = min(1, attempts / 5)
+ *   confidence = round(clamp(0.7 * questionRatio + 0.3 * attemptRatio, 0, 1), 2)
+ * - 3.4 Status: 0–59.9 NEEDS_IMPROVEMENT, 60–79.9 DEVELOPING, 80–100 STRONG.
+ *   Insufficient evidence is a separate state when no eligible evidence or total weight <= 0.
  *
  * @param {Array<Object>} evidenceList - LearningEvidence items sorted ascending by completedAt
  * @returns {Object} Calculated mastery result and aggregates
@@ -63,7 +72,15 @@ export function computeTopicMastery(evidenceList = []) {
         const correct = Math.max(0, Number(item.correctCount) || 0);
         const marks = Math.max(0, Number(item.marksAwarded) || 0);
         const possible = Math.max(0, Number(item.totalMarks) || 0);
-        const scorePercent = clamp(Number(item.scorePercent) || 0, 0, 100);
+
+        // 3.1 Attempt score from canonical grading: earned marks / total possible marks * 100
+        let attemptScore = 0;
+        if (possible > 0) {
+            attemptScore = (marks / possible) * 100;
+        } else if (typeof item.scorePercent === "number" && !Number.isNaN(item.scorePercent)) {
+            attemptScore = item.scorePercent;
+        }
+        attemptScore = clamp(attemptScore, 0, 100);
 
         totalQuestionsAttempted += questions;
         totalQuestionsCorrect += correct;
@@ -76,34 +93,40 @@ export function computeTopicMastery(evidenceList = []) {
             assessmentAttemptsCount += 1;
         }
 
-        // Determine source type weight
-        const sourceWeight =
-            item.sourceType === "ASSESSMENT" && item.assessmentSubtype === "TOPIC"
-                ? MASTERY_WEIGHTS.ASSESSMENT_TOPIC
-                : MASTERY_WEIGHTS.PRACTICE;
+        // 3.2 Evidence weight: min(questionCount, 20) with equal source-type weight, no recency multiplier
+        const evidenceWeight = Math.min(questions, MASTERY_WEIGHTS.MAX_ATTEMPT_QUESTION_WEIGHT);
 
-        // Recency factor: scales from 1.0 (oldest) up to 1.0 + MAX_RECENCY_BOOST (newest)
-        const recencyFactor = n > 1
-            ? 1.0 + (i / (n - 1)) * MASTERY_WEIGHTS.MAX_RECENCY_BOOST
-            : 1.0;
-
-        // Question volume weight (capped to prevent single huge attempt domination)
-        const volumeWeight = Math.min(
-            Math.max(questions, 1),
-            MASTERY_WEIGHTS.MAX_ATTEMPT_QUESTION_WEIGHT
-        );
-
-        const itemWeight = sourceWeight * recencyFactor * volumeWeight;
-        weightedScoreSum += scorePercent * itemWeight;
-        totalWeightSum += itemWeight;
+        weightedScoreSum += attemptScore * evidenceWeight;
+        totalWeightSum += evidenceWeight;
     }
 
-    // Determine final score
-    const rawScore = totalWeightSum > 0 ? weightedScoreSum / totalWeightSum : 0;
+    // If no eligible evidence or no positive total weight exists, represent as insufficient evidence
+    if (totalWeightSum <= 0) {
+        return {
+            masteryScore: 0,
+            status: MASTERY_STATUS.INSUFFICIENT_EVIDENCE,
+            confidence: 0,
+            evidenceCount: n,
+            totalQuestionsAttempted,
+            totalQuestionsCorrect,
+            totalMarksAwarded: round(totalMarksAwarded, 2),
+            totalMarksPossible: round(totalMarksPossible, 2),
+            practiceAttemptsCount,
+            assessmentAttemptsCount,
+            firstEvidenceAt,
+            lastEvidenceAt,
+            calculationVersion: CURRENT_CALCULATION_VERSION,
+        };
+    }
+
+    // Determine final score: sum(evidenceWeight * attemptScore) / sum(evidenceWeight)
+    const rawScore = weightedScoreSum / totalWeightSum;
     const masteryScore = round(clamp(rawScore, 0, 100), 1);
 
-    // Calculate confidence bounded between 0.0 and 1.0
-    // Combines question volume (70%) and attempt frequency (30%)
+    // 3.3 Confidence:
+    // questionRatio = min(1, totalEligibleQuestions / 20)
+    // attemptRatio = min(1, eligibleSubmittedAttemptCount / 5)
+    // confidence = round(clamp(0.7 * questionRatio + 0.3 * attemptRatio, 0, 1), 2)
     const questionRatio = Math.min(
         1.0,
         totalQuestionsAttempted / MASTERY_CONFIDENCE.TARGET_QUESTIONS_FULL_CONFIDENCE
@@ -115,21 +138,17 @@ export function computeTopicMastery(evidenceList = []) {
     const rawConfidence = questionRatio * 0.7 + attemptRatio * 0.3;
     const confidence = round(clamp(rawConfidence, 0.0, 1.0), 2);
 
-    // Determine status:
-    // If questions attempted is below sufficiency threshold, status is INSUFFICIENT_EVIDENCE
+    // 3.4 Mastery status:
+    // 0–59.9: Needs Improvement
+    // 60–79.9: Developing
+    // 80–100: Strong
     let status;
-    if (totalQuestionsAttempted < MASTERY_CONFIDENCE.MIN_QUESTIONS_FOR_SUFFICIENCY) {
-        status = MASTERY_STATUS.INSUFFICIENT_EVIDENCE;
-    } else if (masteryScore <= MASTERY_THRESHOLDS.WEAK_MAX) {
+    if (masteryScore <= MASTERY_THRESHOLDS.NEEDS_IMPROVEMENT_MAX) {
         status = MASTERY_STATUS.NEEDS_IMPROVEMENT;
     } else if (masteryScore <= MASTERY_THRESHOLDS.DEVELOPING_MAX) {
         status = MASTERY_STATUS.DEVELOPING;
-    } else if (masteryScore <= MASTERY_THRESHOLDS.FUNCTIONAL_MAX) {
-        status = MASTERY_STATUS.FUNCTIONAL;
-    } else if (masteryScore <= MASTERY_THRESHOLDS.STRONG_MAX) {
-        status = MASTERY_STATUS.STRONG;
     } else {
-        status = MASTERY_STATUS.MASTERED;
+        status = MASTERY_STATUS.STRONG;
     }
 
     return {
