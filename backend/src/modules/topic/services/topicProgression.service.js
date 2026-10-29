@@ -1,5 +1,6 @@
 import { Topic } from "../models/topic.model.js";
 import { Course } from "../../course/models/course.model.js";
+import { Assessment } from "../../assessment/models/assessment.model.js";
 import { AssessmentAttempt } from "../../assessmentAttempt/models/assessmentAttempt.model.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
@@ -22,7 +23,7 @@ export async function isTopicUnlockedForLearner(learnerId, courseIdOrCourse, top
     }
 
     let course = courseIdOrCourse;
-    if (!course || !course._id) {
+    if (!course || !course.status || !course.domain) {
         course = await Course.findById(courseIdOrCourse);
     }
     if (!course) {
@@ -34,7 +35,7 @@ export async function isTopicUnlockedForLearner(learnerId, courseIdOrCourse, top
     }
 
     let targetTopic = topicIdOrTopic;
-    if (!targetTopic || typeof targetTopic !== "object" || !("order" in targetTopic)) {
+    if (!targetTopic || typeof targetTopic.order !== "number") {
         targetTopic = await Topic.findById(topicIdOrTopic);
     }
     if (!targetTopic || !sameId(targetTopic.courseId, course._id)) {
@@ -52,34 +53,65 @@ export async function isTopicUnlockedForLearner(learnerId, courseIdOrCourse, top
         order: { $lt: targetTopic.order }
     }).sort({ order: 1 });
 
-    const allRequiredAssessmentIds = [];
     for (const pt of priorTopics) {
-        if (Array.isArray(pt.requiredAssessmentIds) && pt.requiredAssessmentIds.length > 0) {
-            allRequiredAssessmentIds.push(...pt.requiredAssessmentIds);
+        let reqIds = pt.requiredAssessmentIds;
+        if (!Array.isArray(reqIds) || reqIds.length === 0) {
+            const courseTopicReq = course.publicationRequirements?.topics?.find(
+                (ct) => sameId(ct.topicId, pt._id)
+            );
+            if (Array.isArray(courseTopicReq?.requiredAssessmentIds) && courseTopicReq.requiredAssessmentIds.length > 0) {
+                reqIds = courseTopicReq.requiredAssessmentIds;
+            }
         }
-    }
 
-    if (allRequiredAssessmentIds.length === 0) {
-        return { isUnlocked: true };
-    }
+        if (Array.isArray(reqIds) && reqIds.length > 0) {
+            // Must have passed every snapshotted required assessment
+            const passedAttempts = await AssessmentAttempt.find({
+                learnerId,
+                assessmentId: { $in: reqIds },
+                status: "SUBMITTED",
+                passed: true
+            }).select("assessmentId").lean();
 
-    const passedAttempts = await AssessmentAttempt.find({
-        learnerId,
-        assessmentId: { $in: allRequiredAssessmentIds },
-        status: "SUBMITTED",
-        passed: true
-    }).select("assessmentId").lean();
+            const passedSet = new Set(passedAttempts.map((a) => a.assessmentId.toString()));
+            for (const reqId of reqIds) {
+                if (!passedSet.has(reqId.toString())) {
+                    return {
+                        isUnlocked: false,
+                        lockedByTopicId: pt._id,
+                        missingAssessmentId: reqId,
+                        reason: "PRIOR_TOPIC_INCOMPLETE"
+                    };
+                }
+            }
+        } else {
+            // Safe fallback for legacy courses published before snapshots:
+            // Never silently treat a missing snapshot as proof of completion!
+            const publishedAssessments = await Assessment.find({
+                courseId: course._id,
+                topicId: pt._id,
+                status: "PUBLISHED"
+            }).select("_id").lean();
 
-    const passedAssessmentIdSet = new Set(passedAttempts.map((a) => a.assessmentId.toString()));
-
-    for (const pt of priorTopics) {
-        const reqs = pt.requiredAssessmentIds ?? [];
-        for (const reqId of reqs) {
-            if (!passedAssessmentIdSet.has(reqId.toString())) {
+            if (publishedAssessments.length === 0) {
                 return {
                     isUnlocked: false,
                     lockedByTopicId: pt._id,
-                    missingAssessmentId: reqId,
+                    reason: "PRIOR_TOPIC_INCOMPLETE"
+                };
+            }
+
+            const passedAttempt = await AssessmentAttempt.findOne({
+                learnerId,
+                assessmentId: { $in: publishedAssessments.map((a) => a._id) },
+                status: "SUBMITTED",
+                passed: true
+            }).select("_id").lean();
+
+            if (!passedAttempt) {
+                return {
+                    isUnlocked: false,
+                    lockedByTopicId: pt._id,
                     reason: "PRIOR_TOPIC_INCOMPLETE"
                 };
             }
@@ -115,7 +147,7 @@ export async function assertAllTopicsCompletedForCourse(learnerId, courseIdOrCou
     }
 
     let course = courseIdOrCourse;
-    if (!course || !course._id) {
+    if (!course || !course.status || !course.domain) {
         course = await Course.findById(courseIdOrCourse);
     }
     if (!course) {
@@ -124,35 +156,67 @@ export async function assertAllTopicsCompletedForCourse(learnerId, courseIdOrCou
 
     const topics = await Topic.find({ courseId: course._id }).sort({ order: 1 });
 
-    const allRequiredAssessmentIds = [];
     for (const t of topics) {
-        if (Array.isArray(t.requiredAssessmentIds) && t.requiredAssessmentIds.length > 0) {
-            allRequiredAssessmentIds.push(...t.requiredAssessmentIds);
+        let reqIds = t.requiredAssessmentIds;
+        if (!Array.isArray(reqIds) || reqIds.length === 0) {
+            const courseTopicReq = course.publicationRequirements?.topics?.find(
+                (ct) => sameId(ct.topicId, t._id)
+            );
+            if (Array.isArray(courseTopicReq?.requiredAssessmentIds) && courseTopicReq.requiredAssessmentIds.length > 0) {
+                reqIds = courseTopicReq.requiredAssessmentIds;
+            }
         }
-    }
 
-    if (allRequiredAssessmentIds.length === 0) {
-        return true;
-    }
+        if (Array.isArray(reqIds) && reqIds.length > 0) {
+            const passedAttempts = await AssessmentAttempt.find({
+                learnerId,
+                assessmentId: { $in: reqIds },
+                status: "SUBMITTED",
+                passed: true
+            }).select("assessmentId").lean();
 
-    const passedAttempts = await AssessmentAttempt.find({
-        learnerId,
-        assessmentId: { $in: allRequiredAssessmentIds },
-        status: "SUBMITTED",
-        passed: true
-    }).select("assessmentId").lean();
+            const passedSet = new Set(passedAttempts.map((a) => a.assessmentId.toString()));
+            for (const reqId of reqIds) {
+                if (!passedSet.has(reqId.toString())) {
+                    throw new ApiError(
+                        403,
+                        "TOPICS_NOT_COMPLETED",
+                        "All required topic assessments must be completed before taking the final assessment",
+                        { incompleteTopicId: t._id, missingAssessmentId: reqId }
+                    );
+                }
+            }
+        } else {
+            // Snapshot missing for topic in a published course:
+            // Must have passed at least one published topic assessment
+            const publishedAssessments = await Assessment.find({
+                courseId: course._id,
+                topicId: t._id,
+                status: "PUBLISHED"
+            }).select("_id").lean();
 
-    const passedAssessmentIdSet = new Set(passedAttempts.map((a) => a.assessmentId.toString()));
-
-    for (const t of topics) {
-        const reqs = t.requiredAssessmentIds ?? [];
-        for (const reqId of reqs) {
-            if (!passedAssessmentIdSet.has(reqId.toString())) {
+            if (publishedAssessments.length === 0) {
                 throw new ApiError(
                     403,
                     "TOPICS_NOT_COMPLETED",
                     "All required topic assessments must be completed before taking the final assessment",
-                    { incompleteTopicId: t._id, missingAssessmentId: reqId }
+                    { incompleteTopicId: t._id }
+                );
+            }
+
+            const passedAttempt = await AssessmentAttempt.findOne({
+                learnerId,
+                assessmentId: { $in: publishedAssessments.map((a) => a._id) },
+                status: "SUBMITTED",
+                passed: true
+            }).select("_id").lean();
+
+            if (!passedAttempt) {
+                throw new ApiError(
+                    403,
+                    "TOPICS_NOT_COMPLETED",
+                    "All required topic assessments must be completed before taking the final assessment",
+                    { incompleteTopicId: t._id }
                 );
             }
         }

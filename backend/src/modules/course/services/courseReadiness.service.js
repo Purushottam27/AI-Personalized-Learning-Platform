@@ -232,8 +232,8 @@ export async function checkCourseReadiness(courseId, userId = null, session = nu
     const publishedAssessments = await (session ? assessmentsQuery.session(session) : assessmentsQuery);
 
     const topicAssessmentsMap = new Map();
-    let publishedFinalAssessment = null;
-    let publishedDiagnosticAssessment = null;
+    const publishedFinalAssessments = [];
+    const publishedDiagnosticAssessments = [];
 
     for (const a of publishedAssessments) {
         if (a.type === "TOPIC" && a.topicId) {
@@ -243,13 +243,9 @@ export async function checkCourseReadiness(courseId, userId = null, session = nu
             }
             topicAssessmentsMap.get(key).push(a);
         } else if (a.type === "FINAL") {
-            if (!publishedFinalAssessment) {
-                publishedFinalAssessment = a;
-            }
+            publishedFinalAssessments.push(a);
         } else if (a.type === "DIAGNOSTIC") {
-            if (!publishedDiagnosticAssessment) {
-                publishedDiagnosticAssessment = a;
-            }
+            publishedDiagnosticAssessments.push(a);
         }
     }
 
@@ -271,8 +267,8 @@ export async function checkCourseReadiness(courseId, userId = null, session = nu
         }
     }
 
-    // Mandatory Course FINAL Assessment
-    if (!publishedFinalAssessment) {
+    // Mandatory Course FINAL Assessment (Approved rule: exactly one published final assessment)
+    if (publishedFinalAssessments.length === 0) {
         throw new ApiError(
             400,
             "COURSE_NOT_READY",
@@ -280,18 +276,37 @@ export async function checkCourseReadiness(courseId, userId = null, session = nu
             { requirement: "FINAL_ASSESSMENT_REQUIRED" }
         );
     }
+    if (publishedFinalAssessments.length > 1) {
+        throw new ApiError(
+            400,
+            "COURSE_NOT_READY",
+            "A course must contain exactly one published final assessment",
+            { requirement: "MULTIPLE_FINAL_ASSESSMENTS", count: publishedFinalAssessments.length }
+        );
+    }
+    const publishedFinalAssessment = publishedFinalAssessments[0];
     await validateAssessmentPoolReadiness(publishedFinalAssessment, course, null, session);
 
     // Conditional Diagnostic Assessment
+    let publishedDiagnosticAssessment = null;
     if (course.diagnosticPolicy?.enabled === true) {
-        if (!publishedDiagnosticAssessment) {
+        if (publishedDiagnosticAssessments.length === 0) {
             throw new ApiError(
                 400,
                 "COURSE_NOT_READY",
-                "A published diagnostic assessment matching the course diagnostic policy is required",
-                { requirement: "DIAGNOSTIC_ASSESSMENT_REQUIRED" }
+                "Course diagnostic policy is enabled but no published diagnostic assessment was found",
+                { requirement: "MISSING_DIAGNOSTIC_ASSESSMENT" }
             );
         }
+        if (publishedDiagnosticAssessments.length > 1) {
+            throw new ApiError(
+                400,
+                "COURSE_NOT_READY",
+                "A course cannot have more than one published diagnostic assessment",
+                { requirement: "MULTIPLE_DIAGNOSTIC_ASSESSMENTS", count: publishedDiagnosticAssessments.length }
+            );
+        }
+        publishedDiagnosticAssessment = publishedDiagnosticAssessments[0];
 
         const p = course.diagnosticPolicy;
         if (
