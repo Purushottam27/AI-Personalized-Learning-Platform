@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Brain, Target, BookOpen, FileText, Loader2 } from 'lucide-react';
+import { ArrowRight, Brain, Target, BookOpen, FileText, Loader2, Compass } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { NextBestAction as NextBestActionType } from '../types/learner.types';
 import {
@@ -24,6 +24,7 @@ export const NextBestAction: React.FC<NextBestActionProps> = ({ action }) => {
       case 'START_PRACTICE': return <Target className="w-5 h-5 text-signal" />;
       case 'REVIEW_TOPIC': return <Brain className="w-5 h-5 text-signal" />;
       case 'TAKE_ASSESSMENT': return <FileText className="w-5 h-5 text-signal" />;
+      case 'EXPLORE_COURSE': return <Compass className="w-5 h-5 text-signal" />;
       default: return <BookOpen className="w-5 h-5 text-signal" />;
     }
   };
@@ -33,12 +34,22 @@ export const NextBestAction: React.FC<NextBestActionProps> = ({ action }) => {
       case 'START_PRACTICE': return 'Start Practice';
       case 'REVIEW_TOPIC': return 'Review Topic';
       case 'TAKE_ASSESSMENT': return 'Take Assessment';
+      case 'EXPLORE_COURSE': return 'Explore Course';
       default: return 'Continue Lesson';
     }
   };
 
   const handleActionClick = async () => {
-    if (!action.targetId && action.type !== 'CONTINUE_LESSON') return;
+    if (!action.targetId && action.type !== 'CONTINUE_LESSON' && action.type !== 'EXPLORE_COURSE') return;
+
+    if (action.type === 'EXPLORE_COURSE') {
+      if (action.targetId) {
+        navigate(`/learner/courses/${action.targetId}`);
+      } else {
+        navigate('/learner/courses');
+      }
+      return;
+    }
 
     if (action.type === 'TAKE_ASSESSMENT') {
       navigate(`/learner/assessments/${action.targetId}`);

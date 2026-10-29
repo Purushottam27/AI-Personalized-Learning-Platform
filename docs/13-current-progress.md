@@ -566,13 +566,13 @@ auth                                  🟢 Implemented (signup, login, refresh, 
 users                                 🟢 Implemented (profiles, avatar, deactivation, admin management)
 learnerProfile                        🟢 Implemented (5-step progressive onboarding, profile CRUD)
 instructorProfile                     🟢 Implemented (2-step onboarding, profile CRUD)
-course                                🟢 Implemented (CRUD, publish, archive, search, filters)
-topic                                 🟢 Implemented (course topics CRUD, reordering)
-lesson                                🟢 Implemented (topic lessons CRUD, completion, sequence)
-resource                              🟢 Implemented (files, links, Cloudinary signed upload)
+course                                🟢 Implemented (CRUD, deterministic publication readiness checks, archive, search, filters)
+topic                                 🟢 Implemented (course topics CRUD, reordering, requiredAssessmentIds snapshotting, learner locking)
+lesson                                🟢 Implemented (topic lessons CRUD, completion, sequence, topic locking enforcement)
+resource                              🟢 Implemented (files, links, Cloudinary signed upload, topic locking enforcement)
 enrollment                            🟢 Implemented (enroll, withdraw, learner course tracking)
-assessment                            🟢 Implemented (topic/diagnostic/final, pass criteria, pool config)
-assessmentAttempt                     🟢 Implemented (session start, timer, submit, deterministic scoring)
+assessment                            🟢 Implemented (topic/diagnostic/final, pass criteria, pool config, publication snapshotting, archive protection)
+assessmentAttempt                     🟢 Implemented (session start with topic unlock & final assessment gating, timer, submit, scoring)
 questionBank                          🟢 Implemented (question banks, questions, bulk import via Excel)
 practice                              🟢 Implemented (topic practice definitions, question pool)
 practiceAttempt                       🟢 Implemented (practice sessions, submission, answer review)
@@ -584,6 +584,30 @@ admin                                 🟢 Implemented (user moderation, status 
 ```
 
 Modules should be created incrementally around real feature slices rather than generated blindly.
+
+### Course Publication Readiness & Learner Assessment Progression Status (Fully Implemented & Verified)
+
+```text
+Readiness Checklist Validation        🟢 Implemented (courseReadiness.service.js)
+  - Ownership & Draft Status check    🟢 Verified
+  - Sequential Topic Order (1..N)     🟢 Verified
+  - Active Resources per Topic (>=1)  🟢 Verified
+  - Published Topic Assessment(s)     🟢 Verified (multiple allowed, pool >= questionsPerAttempt)
+  - Published Course FINAL Assessment 🟢 Verified (pool >= questionsPerAttempt)
+  - Conditional Diagnostic Assessment 🟢 Verified (enforced iff diagnosticPolicy.enabled)
+  - Optional Lessons & Practice       🟢 Verified (publish allowed with 0 lessons and 0 practice)
+  - Prerequisite Courses (PUBLISHED)  🟢 Verified (draft & archived rejected, UI filtered)
+Transactional Publication & Fencing   🟢 Implemented (course.service.js with withTransaction)
+  - Durable Snapshotting              🟢 Implemented (Topic.requiredAssessmentIds & Course.publicationRequirements)
+  - Lifecycle & Attempt Fences        🟢 Implemented (lifecycleVersion + 1, attemptVersion + 1)
+  - Post-publication Non-interference 🟢 Verified (new assessments don't alter existing requirements)
+  - Required Assessment Archiving     🟢 Implemented (blocked with 409 CANNOT_ARCHIVE_REQUIRED_ASSESSMENT)
+Learner Topic Progression & Locking    🟢 Implemented (topicProgression.service.js)
+  - Sequential Topic Unlocking        🟢 Verified (passing all snapshotted required assessments for prior topics)
+  - Direct API Locking Protection     🟢 Verified (403 TOPIC_LOCKED for topic, lessons, resources, practice, attempts)
+  - Final Assessment Gating           🟢 Verified (403 TOPICS_NOT_COMPLETED if any prior topic incomplete)
+Test Suite (25 Tests)                 🟢 100% Passing (backend/tests/course-publication-readiness.test.js)
+```
 
 ---
 

@@ -300,9 +300,9 @@ export const PracticeQuestionCard: React.FC<PracticeQuestionCardProps> = ({
                   : 'Unsaved selection'}
               </span>
             ) : isAnsweredOnServer ? (
-              'Answer recorded'
+              'Answer saved'
             ) : (
-              'Select an option and check your answer'
+              'Select an option and save your answer'
             )}
           </p>
 
@@ -330,12 +330,12 @@ export const PracticeQuestionCard: React.FC<PracticeQuestionCardProps> = ({
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Checking...
+                  <Loader2 className="h-4 w-4 animate-spin" /> Saving...
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  {isAnsweredOnServer && isAnswerDirty ? 'Update Answer' : 'Check Answer'}
+                  {isAnsweredOnServer && isAnswerDirty ? 'Update Answer' : 'Save Answer'}
                 </>
               )}
             </Button>
@@ -343,11 +343,13 @@ export const PracticeQuestionCard: React.FC<PracticeQuestionCardProps> = ({
         </div>
       )}
 
-      {/* Immediate Formative Feedback (Revealed if server provided isCorrect) */}
-      <ImmediateFeedbackCard
-        question={question}
-        isSubmitted={isSubmitted}
-      />
+      {/* Review Feedback (Revealed after submission) */}
+      {isSubmitted && (
+        <ImmediateFeedbackCard
+          question={question}
+          isSubmitted={isSubmitted}
+        />
+      )}
 
       {/* Bottom Navigation Toolbar */}
       <div className="flex items-center justify-between pt-6 border-t border-border">

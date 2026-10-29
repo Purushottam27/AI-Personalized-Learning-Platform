@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -443,6 +443,11 @@ export const CreateCoursePage: React.FC = () => {
   const { update: updateApi } = useUpdateCourse();
 
   const { courses: existingCourses } = useInstructorCourses();
+
+  const publishedPrereqCourses = useMemo(
+    () => existingCourses.filter(c => c.status === 'PUBLISHED' && (!courseId || c._id !== courseId)),
+    [existingCourses, courseId]
+  );
 
 
 
@@ -917,13 +922,13 @@ export const CreateCoursePage: React.FC = () => {
 
                         <h3 className="text-sm font-medium text-text-primary">Prerequisite courses</h3>
 
-                        {existingCourses.length === 0 ? (
+                        {publishedPrereqCourses.length === 0 ? (
 
                           <div className="p-4 rounded-lg border border-border-muted bg-surface-elevated text-center">
 
                             <BookOpen className="w-5 h-5 text-text-disabled mx-auto mb-2" />
 
-                            <p className="text-xs text-text-tertiary">No courses available yet.</p>
+                            <p className="text-xs text-text-tertiary">No published courses available as prerequisites yet.</p>
 
                           </div>
 
@@ -931,7 +936,7 @@ export const CreateCoursePage: React.FC = () => {
 
                           <div className="space-y-2 max-h-52 overflow-y-auto rounded-lg border border-border divide-y divide-border-muted">
 
-                            {existingCourses.map(course => {
+                            {publishedPrereqCourses.map((course: any) => {
 
                               const sel = form.prereqCourseIds.includes(course._id);
 

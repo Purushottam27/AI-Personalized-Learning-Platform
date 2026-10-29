@@ -18,6 +18,7 @@ export interface PracticeQuestionSnapshot {
   correctAnswer?: string | string[];
   explanation?: string;
   isCorrect?: boolean;
+  isAnswered?: boolean;
 }
 
 export interface LearnerPractice {

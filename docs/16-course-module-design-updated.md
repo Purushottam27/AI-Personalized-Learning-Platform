@@ -332,13 +332,15 @@ Rules:
 
 - `courses[]` references prerequisite Course documents.
 - `knowledge[]` contains descriptive knowledge requirements.
+- **Prerequisite Course Selection Rule**: Only `PUBLISHED` courses can be selected as prerequisites. Draft and archived courses are strictly rejected by backend validation (`PREREQUISITE_NOT_PUBLISHED`) and filtered out of instructor course selection in the UI.
+- Self-reference (a course listing itself) and duplicate prerequisite references are strictly rejected.
 - All declared prerequisites must be satisfied.
 - No nested AND/OR prerequisite rule engine in MVP.
 - A prerequisite Course is satisfied when the learner has **COMPLETED** it, not merely enrolled in it.
 - Prerequisites affect course entry/enrollment readiness.
 - Prerequisites do not control individual Lesson progression.
 - Discovery remains open: a learner may discover a course even when prerequisites are not satisfied.
-- Archived prerequisite Courses remain valid references because Course hard deletion is not part of MVP.
+- If an existing published course that was selected as a prerequisite is archived later, historical reference integrity is preserved because Course hard deletion is not part of MVP.
 
 Learner-specific prerequisite evaluation belongs to Enrollment/course-entry logic.
 
@@ -494,7 +496,44 @@ POST /api/v1/courses/:courseId/publish
 POST /api/v1/courses/:courseId/archive
 ```
 
-The final publication-readiness checklist depends on the completed Topic, Resource, Practice, Question Bank, and Assessment designs.
+### Course Publication Readiness Checklist — Finalized
+
+A course may transition from `DRAFT` to `PUBLISHED` only when all of the following deterministic readiness rules pass:
+
+1. **Course Identity & Ownership**:
+   - Course must exist and be in `DRAFT` status (`INVALID_COURSE_STATUS` if already published or archived).
+   - Only the course instructor owner can publish the course (`COURSE_ACCESS_DENIED` for unauthorized users).
+2. **Metadata Validity**:
+   - Title (5–100 chars), description (20–1000 chars), domain, category, difficulty, objectives (at least 1 non-empty objective).
+3. **Prerequisite Validity**:
+   - Every prerequisite course ID in `prerequisites.courses` must exist and be in `PUBLISHED` status (`PREREQUISITE_NOT_PUBLISHED` if draft or archived).
+   - Prerequisite list cannot contain self-references or duplicate IDs.
+4. **Topic Structure & Sequential Order**:
+   - The course must have at least **1 Topic** (`NO_TOPICS`).
+   - Topic `order` values across all topics in the course must form a strict, contiguous sequence starting at 1 with no gaps and no duplicate orders (`TOPIC_ORDER_NOT_SEQUENTIAL`).
+5. **Topic Readiness & Learning Material**:
+   - Every Topic in the course must have at least **1 ACTIVE Resource** (`TOPIC_MISSING_ACTIVE_RESOURCE`). Topics with 0 resources or only archived resources cannot be published.
+   - Lessons are optional (0..N).
+   - Practice activities are optional (0..N). A course with 0 lessons and 0 practice is publishable if all mandatory conditions are met.
+6. **Topic Assessments & Pool Eligibility**:
+   - Every Topic must have at least **1 PUBLISHED TOPIC Assessment** (`TOPIC_MISSING_PUBLISHED_ASSESSMENT`).
+   - Multiple published assessments per topic are supported.
+   - Every evaluated published assessment must have a valid eligible question pool where active questions meeting type and difficulty criteria is greater than or equal to `questionsPerAttempt` (`ASSESSMENT_INSUFFICIENT_POOL`).
+7. **Course Final Assessment**:
+   - The course must have exactly **1 PUBLISHED FINAL Assessment** (`COURSE_MISSING_FINAL_ASSESSMENT`).
+   - The final assessment must have a valid eligible question pool (`activeQuestions >= questionsPerAttempt`).
+8. **Conditional Diagnostic Assessment**:
+   - If `course.diagnosticPolicy.enabled` is `true`, the course must have a **PUBLISHED DIAGNOSTIC Assessment** (`MISSING_DIAGNOSTIC_ASSESSMENT`) with an eligible pool (`activeQuestions >= questionsPerAttempt`).
+   - If `course.diagnosticPolicy.enabled` is `false`, no diagnostic assessment is required or enforced (`DIAGNOSTIC_NOT_REQUIRED`).
+9. **Atomic Snapshotting & Concurrency Protection**:
+   - Publication runs inside a database transaction (`withTransaction`).
+   - Fences course lifecycle with `lifecycleVersion + 1`.
+   - Fences all publication-evaluated assessments with `attemptVersion + 1`.
+   - Durably snapshots `requiredAssessmentIds` on each `Topic` document (capturing all published topic assessments at publication time).
+   - Durably snapshots `publicationRequirements` on the `Course` document (`publishedAt`, `finalAssessmentId`, `diagnosticAssessmentId`, and topic snapshot mappings).
+10. **Post-Publication Assessments & Progression Stability**:
+    - Topic assessments created or published *after* course publication do not retroactively alter the publication-time required assessment set and do not block existing learner progression.
+    - Archiving a required assessment associated with a `PUBLISHED` course is strictly blocked with `409 CANNOT_ARCHIVE_REQUIRED_ASSESSMENT` to prevent stranding learners.
 
 ---
 
@@ -1026,17 +1065,29 @@ Topic 3 ─┘
 
 Rules:
 
-- First Topic is accessible after general course-entry requirements.
-- Next Topic unlocks after previous required Topic is completed when locking is enabled.
-- Failed/exhausted Topic Assessment keeps the next Topic locked when locking is enabled.
+- First Topic (order 1) is always accessible after course enrollment.
+- When `course.progressionPolicy.lockingEnabled` is `true`:
+  - Topic K (K > 1) is unlocked only when the learner has passed every publication-time required assessment in `requiredAssessmentIds` for all prior topics (orders 1 to K - 1).
+  - Passing only one of several required assessments for a topic does NOT unlock subsequent topics.
+  - Passing requires an `AssessmentAttempt` with `status: "EVALUATED"` and `isPassed: true`.
+- When `course.progressionPolicy.lockingEnabled` is `false`:
+  - All Topics are independently accessible once enrolled.
+- **Strict Backend Locking Enforcement**:
+  - Direct API access to locked topic content cannot bypass locking.
+  - Locked topics reject requests for:
+    - Topic details (`403 TOPIC_LOCKED`)
+    - Topic lessons and lesson content (`403 TOPIC_LOCKED`)
+    - Topic resources and resource download/external URLs (`403 TOPIC_LOCKED`)
+    - Topic practice lists and practice details (`403 TOPIC_LOCKED`)
+    - Topic assessment attempt starts and practice attempt starts (`403 TOPIC_LOCKED`)
+- Failed or unattempted Topic Assessments keep subsequent Topics locked when locking is enabled.
 - Assessment cooldown does not lock the current Topic's learning material or Practice.
 - Completed Topics remain revisit-able.
 - Topic order is immutable after Course publication.
-- Locking policy should be immutable after Course publication in MVP.
+- Locking policy is immutable after Course publication in MVP.
 - Do not store global `Topic.isLocked`.
-- Lock status is derived per learner.
-- Locking affects access only.
-- Locking does not affect mastery, analytics, evidence, personalization, or recommendations.
+- Lock status is derived dynamically per learner based on snapshotted `requiredAssessmentIds`.
+- Locking affects access only; it does not dictate mastery or learning evidence models.
 
 ---
 
@@ -1054,12 +1105,15 @@ It is:
 Eligibility:
 
 ```text
-All required Topics COMPLETED
+All Topics in Course COMPLETED (all required topic assessments passed)
         ↓
-Course Final Assessment available
+Course Final Assessment attempt available
 ```
 
-This remains true even when Topic locking is disabled.
+Rules:
+- The learner must have passed all publication-time required topic assessments across every Topic in the Course before starting an attempt on the Course Final Assessment (`assertAllTopicsCompletedForCourse`).
+- Starting an attempt while any topic is incomplete is strictly rejected with `403 TOPICS_NOT_COMPLETED`.
+- This completion prerequisite remains enforced regardless of whether Topic locking is enabled or disabled.
 
 The final assessment has:
 

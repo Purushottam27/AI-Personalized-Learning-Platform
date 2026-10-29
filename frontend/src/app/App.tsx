@@ -20,6 +20,7 @@ import { ExploreCoursesPage } from '../features/learner/pages/ExploreCoursesPage
 import { MyCoursesPage } from '../features/learner/pages/MyCoursesPage';
 import { CourseDetailPage } from '../features/learner/pages/CourseDetailPage';
 import { CourseStudyPage } from '../features/learner/pages/CourseStudyPage';
+import { LearnerRecommendationsPage } from '../features/learner/pages/LearnerRecommendationsPage';
 import { PlaceholderPage } from '../features/learner/pages/PlaceholderPage';
 import { PracticeOverviewPage } from '../features/learner/pages/PracticeOverviewPage';
 import { PracticeSessionPage } from '../features/learner/pages/PracticeSessionPage';
@@ -70,7 +71,7 @@ function App() {
                   <Route path="courses/:courseId" element={<CourseDetailPage />} />
                   <Route path="courses/:courseId/learn" element={<CourseStudyPage />} />
                   <Route path="explore" element={<ExploreCoursesPage />} />
-                  <Route path="recommended" element={<PlaceholderPage title="Recommended" description="AI-powered learning recommendations based on your profile." />} />
+                  <Route path="recommended" element={<LearnerRecommendationsPage />} />
                   <Route path="analytics" element={<LearnerAnalyticsPage />} />
                   <Route path="profile" element={<LearnerProfilePage />} />
                   <Route path="practices/:practiceId" element={<PracticeOverviewPage />} />

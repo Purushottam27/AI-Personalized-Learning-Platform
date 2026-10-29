@@ -113,17 +113,27 @@ export const PracticeProgressHeader: React.FC<PracticeProgressHeaderProps> = ({
       <div className="flex flex-wrap items-center gap-2 pt-1">
         {questions.map((q, idx) => {
           const isCurrent = idx === currentIndex;
-          const isAnswered = q.answer !== undefined && q.answer !== null;
+          const isAnswered =
+            q.isAnswered ??
+            (q.answer !== undefined &&
+              q.answer !== null &&
+              (Array.isArray(q.answer) ? q.answer.length > 0 : Boolean(q.answer)));
           const isCorrect = q.isCorrect;
 
           let pillStyles = 'border-border bg-surface-elevated text-text-secondary hover:border-text-tertiary';
 
-          if (isCorrect === true) {
-            pillStyles = 'border-sage/40 bg-sage-soft text-sage font-bold';
-          } else if (isCorrect === false) {
-            pillStyles = 'border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold';
-          } else if (isAnswered) {
-            pillStyles = 'border-signal/30 bg-signal-soft text-signal font-semibold';
+          if (isSubmitted) {
+            if (isCorrect === true) {
+              pillStyles = 'border-sage/40 bg-sage-soft text-sage font-bold';
+            } else if (isAnswered) {
+              pillStyles = 'border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold';
+            } else {
+              pillStyles = 'border-border bg-surface-disabled text-text-tertiary';
+            }
+          } else {
+            if (isAnswered) {
+              pillStyles = 'border-signal/30 bg-signal-soft text-signal font-semibold';
+            }
           }
 
           if (isCurrent) {

@@ -34,16 +34,10 @@ export async function isTopicUnlockedForLearner(learnerId, courseIdOrCourse, top
     }
 
     let targetTopic = topicIdOrTopic;
-    if (!targetTopic || !targetTopic._id) {
+    if (!targetTopic || typeof targetTopic !== "object" || !("order" in targetTopic)) {
         targetTopic = await Topic.findById(topicIdOrTopic);
     }
     if (!targetTopic || !sameId(targetTopic.courseId, course._id)) {
-        console.error("DEBUG TOPIC_NOT_FOUND in isTopicUnlockedForLearner:", {
-            targetTopicFound: !!targetTopic,
-            topicIdOrTopic: String(topicIdOrTopic),
-            courseId: String(course?._id),
-            targetTopicCourseId: String(targetTopic?.courseId)
-        });
         throw new ApiError(404, "TOPIC_NOT_FOUND", "Topic not found");
     }
 

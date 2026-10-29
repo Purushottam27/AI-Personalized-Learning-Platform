@@ -9,7 +9,7 @@ export interface CourseProgress {
 }
 
 export interface NextBestAction {
-  type: 'CONTINUE_LESSON' | 'START_PRACTICE' | 'REVIEW_TOPIC' | 'TAKE_ASSESSMENT';
+  type: 'CONTINUE_LESSON' | 'START_PRACTICE' | 'REVIEW_TOPIC' | 'TAKE_ASSESSMENT' | 'EXPLORE_COURSE';
   title: string;
   description: string;
   targetId: string;
