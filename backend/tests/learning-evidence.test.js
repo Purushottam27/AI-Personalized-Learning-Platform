@@ -58,6 +58,8 @@ test("Learning Evidence Foundation", async (t) => {
     let q1Id;
     let q2Id;
     let q3Id;
+    let q4Id;
+    let q5Id;
     let practiceContributeId;
     let practiceExcludedId;
     let diagnosticAssessmentId;
@@ -227,6 +229,8 @@ test("Learning Evidence Foundation", async (t) => {
     q1Id = createdQuestions[0]._id;
     q2Id = createdQuestions[1]._id;
     q3Id = createdQuestions[2]._id;
+    q4Id = createdQuestions[3]._id;
+    q5Id = createdQuestions[4]._id;
     const questionIds = createdQuestions.map((q) => q._id);
 
     // Create Practices: one contributing to evidence, one excluded
@@ -440,10 +444,26 @@ test("Learning Evidence Foundation", async (t) => {
         const startBody = await startRes.json();
         const attemptId = startBody.data._id;
 
-        // Save answer for q1
+        // Save answers to pass the topic assessment (required for later course progression)
         await api(`/api/v1/assessment-attempts/${attemptId}/questions/${q1Id}/answer`, {
             method: "PUT",
             body: { answer: "B" },
+        });
+        await api(`/api/v1/assessment-attempts/${attemptId}/questions/${q2Id}/answer`, {
+            method: "PUT",
+            body: { answer: "TRUE" },
+        });
+        await api(`/api/v1/assessment-attempts/${attemptId}/questions/${q3Id}/answer`, {
+            method: "PUT",
+            body: { answer: "A" },
+        });
+        await api(`/api/v1/assessment-attempts/${attemptId}/questions/${q4Id}/answer`, {
+            method: "PUT",
+            body: { answer: "TRUE" },
+        });
+        await api(`/api/v1/assessment-attempts/${attemptId}/questions/${q5Id}/answer`, {
+            method: "PUT",
+            body: { answer: "TRUE" },
         });
 
         // Submit assessment

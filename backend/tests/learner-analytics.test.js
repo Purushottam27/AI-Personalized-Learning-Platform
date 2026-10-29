@@ -637,5 +637,6 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
         await AssessmentAttempt.deleteMany({ _id: { $in: createdAttemptIds } });
 
         await new Promise((resolve) => server.close(resolve));
+        await mongoose.disconnect();
     });
 });
