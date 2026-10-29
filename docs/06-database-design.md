@@ -1467,6 +1467,8 @@ TopicMastery
 
 ├── evidenceCount
 
+├── calculationVersion
+
 └── lastEvaluatedAt
 
 \`\`\`
@@ -1475,15 +1477,19 @@ Possible statuses:
 
 \`\`\`text
 
-STRONG
+INSUFFICIENT_EVIDENCE (provisional / baseline state; separate from low mastery)
 
-DEVELOPING
+NEEDS_IMPROVEMENT (0.0 – 59.9)
 
-NEEDS\_IMPROVEMENT
+DEVELOPING (60.0 – 79.9)
+
+STRONG (80.0 – 100.0)
 
 \`\`\`
 
-Exact formulas remain a personalization-design decision.
+Note: Performance categories require at least one eligible submitted evidence event. Trends are derived dynamically from chronological evidence rather than persisted in the schema.
+
+Exact calculation formulas and weights follow the approved specification in `docs/09-ai-personalization-engine-design.md`.
 
 **## 29. Mastery Is Derived**
 

@@ -1121,45 +1121,23 @@ associated with correct learner/course/topic
 
 # 33. Mastery Calculation Testing
 
-Mastery is a central personalization input.
+Mastery is a central personalization input (`calculationVersion = "1.1.0"`).
 
-Test:
-
-```text
-
-Strong performance
-
-Weak performance
-
-Repeated attempts
-
-Recent performance
-
-Topic-specific evidence
-
-Limited evidence
-
-No evidence
-
-```
-
-Also test boundary values:
-
-```text
-
-0
-
-0.01
-
-0.50
-
-0.85
-
-1.00
-
-```
-
-The exact formula follows the approved personalization design.
+Test coverage requirements:
+- Equal source-type weighting for practice attempts and topic assessments.
+- Absence of recency multipliers (attempts weighted solely by valid question volume).
+- Question-volume weighting capped at 20 (`min(questionCount, 20)`).
+- Inclusion of unanswered questions with zero marks in question counts and scoring.
+- Confidence formula combining question volume (70%) and attempt count (30%) with named constants (20 questions, 5 attempts).
+- Insufficient evidence state (`INSUFFICIENT_EVIDENCE`) strictly distinct from low performance (`NEEDS_IMPROVEMENT`).
+- Exact performance category boundary values:
+  - `0.0` and `59.9` -> `NEEDS_IMPROVEMENT`
+  - `60.0` and `79.9` -> `DEVELOPING`
+  - `80.0` and `100.0` -> `STRONG`
+- Excluded practice attempts (`contributeToLearningEvidence: false`), in-progress attempts, and course-level assessments (`topicId: null`) do not contribute.
+- Idempotent deduplication of evidence.
+- Recalculation failure does not corrupt or roll back already persisted evidence.
+- Concurrency safety of recalculation without record corruption or lost updates.
 
 ---
 

@@ -897,25 +897,26 @@ Potential evidence includes:
 
 - completed learning activities
 
-The exact formula will be designed separately.
+The exact formula follows the approved MVP specification in `docs/09-ai-personalization-engine-design.md`:
+- Each eligible completed evidence event is scored canonically: `attemptScore = (earnedMarks / totalPossibleMarks) * 100`.
+- Unanswered questions receive 0 marks and count towards total questions and total marks.
+- Equal source-type weight is used for practice and topic assessments without any recency multiplier: `evidenceWeight = min(questionCount, 20)`.
+- `masteryScore = sum(evidenceWeight * attemptScore) / sum(evidenceWeight)` (clamped to 0–100, rounded to 1 decimal place).
+- Confidence is calculated independently: `round(clamp(0.7 * min(1, questions/20) + 0.3 * min(1, attempts/5), 0, 1), 2)`.
 
-## 26. Initial Mastery Categories**
+## 26. Approved MVP Mastery Categories**
 
-A provisional v1 classification:
+The approved MVP performance categories:
 
 ```text
-
-0–39       Weak
-
-40–59      Developing
-
-60–74      Functional
-
-75–89      Strong
-
-90–100     Mastered
-
+0.0 – 59.9    Needs Improvement (NEEDS_IMPROVEMENT)
+60.0 – 79.9   Developing (DEVELOPING)
+80.0 – 100.0  Strong (STRONG)
 ```
+
+- **Insufficient Evidence (`INSUFFICIENT_EVIDENCE`):** A distinct provisional baseline state representing the absence of eligible submitted evidence. It is never classified as a performance weakness.
+- At least one eligible submitted evidence event is required before assigning a performance category.
+- **Progression Boundary:** Mastery estimates do not independently unlock topics or override formal assessment passing requirements; formal passing thresholds defined by instructors remain deterministic and authoritative.
 
 These values are intentionally simple and may be improved after the
 

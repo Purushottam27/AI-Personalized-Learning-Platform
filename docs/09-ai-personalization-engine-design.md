@@ -446,38 +446,51 @@ These intervention thresholds must not be interpreted as additional mastery cate
 
 ---
 
-# 12. Mastery Calculation Principle
+# 12. Approved MVP Mastery Calculation Specification
 
-The MVP should use a transparent weighted model.
+The platform implements a transparent, deterministic, weighted model for topic mastery calculation (`calculationVersion = "1.1.0"`).
 
-Conceptually:
-
+## 12.1 Attempt Score
+For each eligible completed evidence event:
 ```text
-Mastery =
-Performance
-+
-Consistency
-+
-Recency
-+
-Difficulty
-+
-Coverage
-+
-Assessment Evidence
+attemptScore = (earnedMarks / totalPossibleMarks) * 100
 ```
+- Derived from canonical grading results.
+- Unanswered questions earn zero marks and remain counted in `totalQuestions` and `totalPossibleMarks`.
+- Zero or invalid total possible marks are handled safely (clamped to 0–100; never produces `NaN` or `Infinity`).
 
-The system must not simply use:
-
+## 12.2 Evidence Weight & Aggregation
 ```text
-lastQuizPercentage
+evidenceWeight = min(questionCount, 20)
+masteryScore = sum(evidenceWeight * attemptScore) / sum(evidenceWeight)
 ```
+- **Equal Source Weighting:** Practice attempts and topic assessments use equal weight (`sourceWeight = 1.0`).
+- **No Recency Multiplier:** Attempts are weighted strictly by valid question volume capped at 20 (`MAX_ATTEMPT_QUESTION_WEIGHT = 20`); no chronological recency multiplier is applied.
+- **Bounding:** Bounded between 0 and 100 and rounded to one decimal place.
+- **Insufficient Evidence Representation:** If no eligible submitted evidence exists or total evidence weight is zero, `masteryScore = 0` and status is assigned `INSUFFICIENT_EVIDENCE`.
 
-as mastery.
+## 12.3 Confidence Formula
+Confidence evaluates evidence depth and breadth independently of mastery score:
+```text
+questionRatio = min(1, totalEligibleQuestions / 20)
+attemptRatio = min(1, eligibleSubmittedAttemptCount / 5)
+confidence = round(clamp(0.7 * questionRatio + 0.3 * attemptRatio, 0, 1), 2)
+```
+- `TARGET_QUESTIONS_FULL_CONFIDENCE = 20` (70% weight).
+- `TARGET_ATTEMPTS_FULL_CONFIDENCE = 5` (30% weight).
+- Configurable named product defaults, not empirical absolutes.
+- Evaluates eligible submitted evidence only.
 
-Exact weights are intentionally not finalized in this document. They should be configurable, tested, and tuned using evaluation data.
+## 12.4 Performance Categories
+- **0.0 – 59.9:** Needs Improvement (`NEEDS_IMPROVEMENT`)
+- **60.0 – 79.9:** Developing (`DEVELOPING`)
+- **80.0 – 100.0:** Strong (`STRONG`)
+- **Insufficient Evidence (`INSUFFICIENT_EVIDENCE`):** A distinct state representing absence of sufficient eligible evidence events, not a low performance category. At least one eligible submitted evidence event is required before a performance category is assigned.
 
-Do not scatter arbitrary constants throughout the codebase.
+## 12.5 Recalculation Resilience & Versioning
+- Recalculation failure in the mastery service logs an error but never rolls back or invalidates already-persisted `LearningEvidence`.
+- Concurrent recalculation is safely handled via atomic `findOneAndUpdate` upserts on `{ learnerId, courseId, topicId }`.
+- Current formula version is tracked as `calculationVersion: "1.1.0"`.
 
 ---
 
@@ -582,15 +595,7 @@ suggests unstable understanding.
 
 ## 13.6 Recency
 
-Recent evidence should usually carry more influence than very old evidence.
-
-Old evidence should not simply disappear because it can still help identify:
-
-```text
-Recent improvement
-Knowledge decay
-Instability
-```
+In future advanced iterations, decay or recency weighting may be explored. For the approved MVP implementation, however, no recency multiplier is applied to evidence weighting (`recencyMultiplier = 1.0`). Every eligible completed attempt is weighted strictly by question volume (`min(questionCount, 20)`) regardless of submission date, ensuring transparent auditability and preventing arbitrary score swings.
 
 ---
 
