@@ -8,6 +8,7 @@ import {
     getActivePlan,
     generatePlan,
     getPlanHistory,
+    getPlanQuota,
     proposePlanRevision,
     acceptPlanRevision,
     chatAssistant,
@@ -42,6 +43,7 @@ studyPlanRouter.patch("/learning/me/study-preferences", validateBody(updateStudy
 // Active Study Plan & Generation
 studyPlanRouter.get("/learning/me/study-plan", getActivePlan);
 studyPlanRouter.post("/learning/me/study-plan/generate", generatePlan);
+studyPlanRouter.get("/learning/me/study-plan/quota", getPlanQuota);
 studyPlanRouter.get("/learning/me/study-plan/history", getPlanHistory);
 
 // Plan Revisions

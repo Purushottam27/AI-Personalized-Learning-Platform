@@ -76,6 +76,14 @@ export interface PlanHistoryItem {
   createdAt: string;
 }
 
+export interface StudyPlanQuota {
+  dateKey: string;
+  count: number;
+  remaining: number;
+  maxAllowed: number;
+  resetAt: string;
+}
+
 export interface ProposedPlanRevision {
   proposalId?: string;
   isRevisionRecommended: boolean;
@@ -94,12 +102,14 @@ export interface ChatMessage {
   metadata?: {
     usedCourseContext?: boolean;
     referencedActivityId?: string | null;
+    fallbackUsed?: boolean;
   };
   timestamp?: string;
 }
 
 export interface ChatReplyResponse {
   reply: string;
+  fallbackUsed?: boolean;
   referencedActivity: ScheduledActivity | null;
   timestamp: string;
 }

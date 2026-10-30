@@ -18,6 +18,7 @@ export const StudyPlannerPage: React.FC = () => {
   const {
     plan,
     preferences,
+    quota,
     history,
     proposedRevision,
     messages,
@@ -135,12 +136,26 @@ export const StudyPlannerPage: React.FC = () => {
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0">
+          {quota && (
+            <div className="text-right sm:mr-1">
+              <span className="text-[11px] font-medium text-text-tertiary block">
+                Daily Generations: <strong className="text-text-primary">{quota.remaining}/{quota.maxAllowed}</strong> remaining
+              </span>
+              {quota.remaining === 0 && (
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 block">
+                  Resets at UTC 00:00
+                </span>
+              )}
+            </div>
+          )}
           <button
             onClick={() => generatePlan('Learner requested plan refresh')}
-            className="px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-text-primary hover:border-signal text-xs font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+            disabled={isLoading || quota?.remaining === 0}
+            title={quota?.remaining === 0 ? 'Daily plan generation limit reached (max 2 per calendar day)' : 'Regenerate study plan'}
+            className="px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-text-primary hover:border-signal disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             <span>Regenerate Plan</span>
           </button>
           <button
@@ -276,73 +291,135 @@ export const StudyPlannerPage: React.FC = () => {
         </button>
       </div>
 
-      {/* TAB 1: WEEKLY SCHEDULE */}
+      {/* TAB 1: WEEKLY SCHEDULE (VERTICAL DAY-BY-DAY CARDS) */}
       {activeTab === 'SCHEDULE' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between pb-1">
+            <h2 className="text-sm font-bold text-text-tertiary uppercase tracking-wider">
+              Weekly Timeline ({plan?.startDate} to {plan?.endDate})
+            </h2>
+            <span className="text-xs text-text-tertiary">
+              {plan?.summary.totalScheduled || 0} scheduled sessions
+            </span>
+          </div>
+
+          <div className="space-y-4">
             {allDays.map((day) => {
               const dayActivities = plan?.scheduledActivities.filter((a) => a.dayOfWeek === day) || [];
               const isToday = plan?.todayActivities.some((a) => a.dayOfWeek === day);
+              const dayTotalMinutes = dayActivities.reduce((acc, a) => acc + (a.estimatedDurationMinutes || 0), 0);
 
               return (
                 <div
                   key={day}
-                  className={`rounded-2xl border p-3 flex flex-col justify-between space-y-3 min-h-[160px] ${
+                  className={`rounded-2xl border transition-all duration-150 ${
                     isToday
-                      ? 'border-signal bg-signal-soft/10 ring-1 ring-signal'
+                      ? 'border-signal bg-surface shadow-xs ring-1 ring-signal/30'
                       : 'border-border bg-surface'
                   }`}
                 >
-                  <div className="flex items-center justify-between border-b border-border/60 pb-2">
-                    <span className="text-[11px] font-bold text-text-primary">{day.slice(0, 3)}</span>
-                    {isToday && (
-                      <span className="text-[9px] font-bold uppercase tracking-wider bg-signal text-white px-1.5 py-0.5 rounded">
-                        Today
+                  {/* Day Header Row */}
+                  <div className="px-5 py-3.5 border-b border-border/70 flex flex-wrap items-center justify-between gap-2 bg-surface-elevated/40 rounded-t-2xl">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xs font-bold uppercase tracking-wider text-text-primary">
+                        {day}
                       </span>
-                    )}
+                      {isToday && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-signal text-white px-2 py-0.5 rounded-full">
+                          Today
+                        </span>
+                      )}
+                      {dayActivities.length > 0 && dayActivities[0]?.scheduledDate && (
+                        <span className="text-xs text-text-tertiary">
+                          • {dayActivities[0].scheduledDate}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-text-secondary">
+                      {dayActivities.length > 0 ? (
+                        <span>
+                          {dayActivities.length} {dayActivities.length === 1 ? 'activity' : 'activities'} ({dayTotalMinutes}m)
+                        </span>
+                      ) : (
+                        <span className="text-text-tertiary italic">Rest / Flex Day</span>
+                      )}
+                    </div>
                   </div>
 
-                  {dayActivities.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center text-[11px] text-text-tertiary">
-                      Rest / Flex Day
-                    </div>
-                  ) : (
-                    <div className="space-y-2 flex-1">
-                      {dayActivities.map((act) => {
-                        let statusColor = 'border-border bg-surface-elevated text-text-secondary';
-                        if (act.actualStatus === 'COMPLETED') {
-                          statusColor = 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400';
-                        } else if (act.actualStatus === 'MISSED') {
-                          statusColor = 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400';
-                        }
+                  {/* Day Activities List */}
+                  <div className="p-4">
+                    {dayActivities.length === 0 ? (
+                      <div className="py-4 text-center text-xs text-text-tertiary">
+                        No scheduled activities for this day. Free time for self-directed review, projects, or rest.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {dayActivities.map((act) => {
+                          const isComplete = act.actualStatus === 'COMPLETED';
+                          const isMissed = act.actualStatus === 'MISSED';
 
-                        return (
-                          <div
-                            key={act.activityId}
-                            className={`p-2.5 rounded-xl border text-xs space-y-1 ${statusColor}`}
-                          >
-                            <span className="text-[10px] font-bold uppercase tracking-wider block opacity-75">
-                              {act.activityType}
-                            </span>
-                            <span className="font-semibold block line-clamp-2 text-text-primary">
-                              {act.title}
-                            </span>
-                            <div className="flex items-center justify-between pt-1">
-                              <span className="text-[10px] text-text-tertiary">
-                                {act.estimatedDurationMinutes}m
-                              </span>
-                              <Link
-                                to={act.actionUrl}
-                                className="text-[11px] font-bold text-signal hover:underline inline-flex items-center gap-0.5"
-                              >
-                                {act.isCompleted ? 'Review' : 'Start'} &rarr;
-                              </Link>
+                          return (
+                            <div
+                              key={act.activityId}
+                              className={`p-4 rounded-xl border flex flex-col justify-between gap-3 transition-colors ${
+                                isComplete
+                                  ? 'border-emerald-500/20 bg-emerald-500/5'
+                                  : isMissed
+                                  ? 'border-amber-500/20 bg-amber-500/5'
+                                  : 'border-border bg-surface-elevated/60 hover:border-signal/40'
+                              }`}
+                            >
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-signal bg-signal-soft px-2 py-0.5 rounded">
+                                    {act.activityType}
+                                  </span>
+                                  <div className="flex items-center gap-1.5 text-xs">
+                                    {isComplete && (
+                                      <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                                      </span>
+                                    )}
+                                    {isMissed && (
+                                      <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                        <AlertCircle className="w-3.5 h-3.5" /> Missed
+                                      </span>
+                                    )}
+                                    <span className="text-[11px] text-text-tertiary">
+                                      {act.estimatedDurationMinutes}m
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <h4 className="text-sm font-bold text-text-primary line-clamp-1">
+                                  {act.title}
+                                </h4>
+                                <p className="text-xs text-text-secondary line-clamp-2">
+                                  {act.rationale}
+                                </p>
+                                <span className="text-[11px] text-text-tertiary block pt-0.5">
+                                  Course: {act.courseTitle}
+                                </span>
+                              </div>
+
+                              <div className="pt-2 border-t border-border/50 flex items-center justify-between">
+                                <span className="text-[11px] text-text-tertiary">
+                                  {act.durationAllocationType === 'ESTIMATED' ? 'Exact lesson/exam duration' : 'Targeted session'}
+                                </span>
+                                <Link
+                                  to={act.actionUrl}
+                                  className="text-xs font-semibold text-signal hover:underline inline-flex items-center gap-1"
+                                >
+                                  {isComplete ? 'Review Activity' : 'Start Session'}
+                                  <ChevronRight className="w-3.5 h-3.5" />
+                                </Link>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -350,31 +427,73 @@ export const StudyPlannerPage: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: TODAY'S FOCUS */}
+      {/* TAB 2: TODAY'S FOCUS (ACCESSIBLE SURFACE-BASED CARD) */}
       {activeTab === 'TODAY' && (
-        <div className="space-y-6 max-w-3xl">
-          {plan?.nextActivity && (
-            <div className="p-6 rounded-2xl bg-signal text-white space-y-3 shadow-md">
-              <span className="text-xs font-bold uppercase tracking-wider opacity-90 block">
-                Next Recommended Step
-              </span>
-              <h2 className="text-xl font-bold font-display">{plan.nextActivity.title}</h2>
-              <p className="text-xs opacity-90">{plan.nextActivity.rationale}</p>
-              <div className="pt-2">
+        <div className="space-y-6 max-w-4xl">
+          {plan?.nextActivity ? (
+            <div className="p-6 rounded-2xl border border-border bg-surface shadow-xs space-y-4">
+              <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-signal" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-signal">
+                    Next Recommended Activity
+                  </span>
+                </div>
+                <span className="text-xs text-text-tertiary">
+                  Est. Duration: <strong>{plan.nextActivity.estimatedDurationMinutes} mins</strong>
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-signal bg-signal-soft px-2 py-0.5 rounded uppercase">
+                    {plan.nextActivity.activityType}
+                  </span>
+                  <span className="text-xs text-text-tertiary">
+                    {plan.nextActivity.courseTitle}
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold font-display text-text-primary">
+                  {plan.nextActivity.title}
+                </h3>
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  {plan.nextActivity.rationale}
+                </p>
+              </div>
+
+              <div className="pt-2 flex flex-wrap items-center gap-3">
                 <Link
                   to={plan.nextActivity.actionUrl}
-                  className="px-5 py-2.5 rounded-xl bg-white text-signal font-bold text-xs inline-flex items-center gap-2 hover:bg-neutral-100 transition-colors shadow-xs"
+                  className="px-5 py-2.5 rounded-xl bg-signal text-white font-bold text-xs inline-flex items-center gap-2 hover:opacity-95 transition-opacity shadow-xs cursor-pointer"
                 >
                   <PlayCircle className="w-4 h-4" />
                   <span>Begin Activity ({plan.nextActivity.estimatedDurationMinutes} mins)</span>
                 </Link>
+                <button
+                  onClick={() => {
+                    setActiveTab('ASSISTANT');
+                    sendMessage(`Why was "${plan.nextActivity?.title}" scheduled for me today?`, plan.nextActivity?.activityId);
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-border bg-surface-elevated text-text-secondary hover:text-text-primary text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-signal" />
+                  <span>Ask Assistant About This</span>
+                </button>
               </div>
+            </div>
+          ) : (
+            <div className="p-8 rounded-2xl border border-border bg-surface text-center space-y-2">
+              <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+              <h3 className="text-base font-bold text-text-primary">All Caught Up for Today!</h3>
+              <p className="text-xs text-text-secondary">
+                You have completed all scheduled study activities for today. Feel free to explore new courses or review previous lessons.
+              </p>
             </div>
           )}
 
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">
-              All Activities for Today ({plan?.todayActivities.length || 0})
+              All Scheduled Activities for Today ({plan?.todayActivities.length || 0})
             </h3>
             {(!plan?.todayActivities || plan.todayActivities.length === 0) ? (
               <div className="p-8 text-center text-xs text-text-tertiary bg-surface rounded-2xl border border-border">
@@ -477,9 +596,16 @@ export const StudyPlannerPage: React.FC = () => {
                           : 'bg-surface-elevated border border-border text-text-primary rounded-bl-xs'
                       }`}
                     >
-                      <span className="font-bold text-[10px] block opacity-70">
-                        {isUser ? 'You' : 'AI Learning Assistant'}
-                      </span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-[10px] block opacity-70">
+                          {isUser ? 'You' : 'AI Learning Assistant'}
+                        </span>
+                        {!isUser && m.metadata?.fallbackUsed && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface border border-border text-text-tertiary">
+                            Pedagogical Guide
+                          </span>
+                        )}
+                      </div>
                       <p className="leading-relaxed whitespace-pre-wrap">{m.content}</p>
                     </div>
                   </div>

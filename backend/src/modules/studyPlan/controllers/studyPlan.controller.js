@@ -9,6 +9,7 @@ import {
     getAssistantConversationService,
     updateLearnerStudyPreferencesService,
     getLearnerStudyPreferences,
+    getStudyPlanQuotaService,
 } from "../services/studyPlan.service.js";
 
 export async function getStudyPreferences(req, res) {
@@ -40,6 +41,12 @@ export async function getPlanHistory(req, res) {
     const learnerId = req.user._id;
     const data = await getStudyPlanHistoryService(learnerId);
     return res.status(200).json(new ApiResponse(data, "Study plan history fetched successfully"));
+}
+
+export async function getPlanQuota(req, res) {
+    const learnerId = req.user._id;
+    const data = await getStudyPlanQuotaService(learnerId);
+    return res.status(200).json(new ApiResponse(data, "Study plan generation quota fetched successfully"));
 }
 
 export async function proposePlanRevision(req, res) {

@@ -692,13 +692,23 @@ export const LearnerRecommendationsPage: React.FC = () => {
                       <span className="text-[11px] text-text-tertiary truncate max-w-[200px]">
                         {cr.reason}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/learner/courses/${cr.courseId}`)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-signal text-white text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shrink-0"
-                      >
-                        Explore Course <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                      {enrolledCourses.some((c) => c.courseId === cr.courseId) ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/learner/courses/${cr.courseId}`)}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-elevated border border-border text-text-primary text-xs font-semibold hover:border-signal transition-colors cursor-pointer shrink-0"
+                        >
+                          Continue Learning <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/learner/courses/${cr.courseId}`)}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-signal text-white text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shrink-0"
+                        >
+                          Explore Course <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

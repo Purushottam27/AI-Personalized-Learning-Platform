@@ -5,6 +5,7 @@ import type {
   PlanHistoryItem,
   ProposedPlanRevision,
   ChatMessage,
+  StudyPlanQuota,
 } from '../types/studyPlan.types';
 import * as api from '../api/studyPlan.api';
 import { isApiError } from '../../../lib/axios';
@@ -12,6 +13,7 @@ import { isApiError } from '../../../lib/axios';
 export const useStudyPlan = () => {
   const [plan, setPlan] = useState<StudyPlan | null>(null);
   const [preferences, setPreferences] = useState<StudyPreferences | null>(null);
+  const [quota, setQuota] = useState<StudyPlanQuota | null>(null);
   const [history, setHistory] = useState<PlanHistoryItem[]>([]);
   const [proposedRevision, setProposedRevision] = useState<ProposedPlanRevision | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -24,15 +26,17 @@ export const useStudyPlan = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [planData, prefData, historyData, messagesData] = await Promise.all([
+      const [planData, prefData, quotaData, historyData, messagesData] = await Promise.all([
         api.getActiveStudyPlan(),
         api.getStudyPreferences(),
+        api.getStudyPlanQuota().catch(() => null),
         api.getStudyPlanHistory(),
         api.getAssistantMessages(),
       ]);
 
       setPlan(planData);
       setPreferences(prefData);
+      setQuota(quotaData);
       setHistory(historyData);
       setMessages(messagesData);
     } catch (err: unknown) {
@@ -66,8 +70,12 @@ export const useStudyPlan = () => {
     try {
       const newPlan = await api.generateStudyPlan(reason);
       setPlan(newPlan);
-      const updatedHistory = await api.getStudyPlanHistory();
+      const [updatedHistory, updatedQuota] = await Promise.all([
+        api.getStudyPlanHistory(),
+        api.getStudyPlanQuota().catch(() => null),
+      ]);
       setHistory(updatedHistory);
+      if (updatedQuota) setQuota(updatedQuota);
       return newPlan;
     } catch (err: unknown) {
       if (isApiError(err)) throw new Error(err.message);
@@ -124,6 +132,7 @@ export const useStudyPlan = () => {
         content: res.reply,
         metadata: {
           referencedActivityId: res.referencedActivity?.activityId || null,
+          fallbackUsed: res.fallbackUsed,
         },
         timestamp: res.timestamp,
       };
@@ -143,6 +152,7 @@ export const useStudyPlan = () => {
   return {
     plan,
     preferences,
+    quota,
     history,
     proposedRevision,
     setProposedRevision,

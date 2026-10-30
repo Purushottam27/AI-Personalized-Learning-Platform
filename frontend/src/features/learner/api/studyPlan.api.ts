@@ -6,6 +6,7 @@ import type {
   ProposedPlanRevision,
   ChatMessage,
   ChatReplyResponse,
+  StudyPlanQuota,
 } from '../types/studyPlan.types';
 
 export const getStudyPreferences = async (): Promise<StudyPreferences> => {
@@ -26,6 +27,11 @@ export const getActiveStudyPlan = async (): Promise<StudyPlan> => {
 export const generateStudyPlan = async (revisionReason?: string): Promise<StudyPlan> => {
   const res = await api.post<{ data: { plan: StudyPlan } }>('/learning/me/study-plan/generate', { revisionReason });
   return res.data.data.plan;
+};
+
+export const getStudyPlanQuota = async (): Promise<StudyPlanQuota> => {
+  const res = await api.get<{ data: StudyPlanQuota }>('/learning/me/study-plan/quota');
+  return res.data.data;
 };
 
 export const getStudyPlanHistory = async (): Promise<PlanHistoryItem[]> => {

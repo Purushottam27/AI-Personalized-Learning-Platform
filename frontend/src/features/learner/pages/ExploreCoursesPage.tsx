@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useExploreCourses } from '../hooks/useExploreCourses';
+import { useMyEnrollments } from '../hooks/useMyEnrollments';
 import { enrollInCourse } from '../api/enrollment.api';
 import {
   Search,
@@ -20,9 +21,21 @@ import type { CourseDifficulty } from '../types/course.types';
 export const ExploreCoursesPage: React.FC = () => {
   const navigate = useNavigate();
   const { courses, pagination, query, loading, error, updateFilters, refresh } = useExploreCourses();
+  const { enrollments, refresh: refreshEnrollments } = useMyEnrollments();
   const [searchTerm, setSearchTerm] = useState(query.search || '');
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ id: string; type: 'success' | 'error'; text: string } | null>(null);
+
+  // Map enrolled courses by courseId
+  const enrollmentMap = React.useMemo(() => {
+    const map = new Map<string, string>(); // courseId -> status
+    (enrollments || []).forEach((e) => {
+      if (e.courseId) {
+        map.set(e.courseId.toString(), e.status);
+      }
+    });
+    return map;
+  }, [enrollments]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,6 +185,7 @@ export const ExploreCoursesPage: React.FC = () => {
             {courses.map((course) => {
               const isEnrolling = enrollingId === course._id;
               const msg = actionMessage?.id === course._id ? actionMessage : null;
+              const enrollmentStatus = enrollmentMap.get(course._id.toString());
 
               return (
                 <div
@@ -181,13 +195,24 @@ export const ExploreCoursesPage: React.FC = () => {
                   <div className="p-6 space-y-4">
                     {/* Badges */}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface border border-border text-text-secondary">
-                        {course.domain || course.category || 'General'}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface border border-border text-text-secondary">
+                          {course.domain || course.category || 'General'}
+                        </span>
+                        {enrollmentStatus === 'ACTIVE' && (
+                          <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-signal-soft text-signal border border-signal/30">
+                            Enrolled
+                          </span>
+                        )}
+                        {enrollmentStatus === 'COMPLETED' && (
+                          <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                            Completed
+                          </span>
+                        )}
+                      </div>
                       <span
-                        className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${
-                          difficultyColors[course.difficulty] || 'bg-surface text-text-secondary border-border'
-                        }`}
+                        className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${difficultyColors[course.difficulty] || 'bg-surface text-text-secondary border-border'
+                          }`}
                       >
                         {course.difficulty}
                       </span>
@@ -225,11 +250,10 @@ export const ExploreCoursesPage: React.FC = () => {
                     {/* Action Message feedback */}
                     {msg && (
                       <div
-                        className={`p-3 rounded-xl text-xs flex items-start gap-2 ${
-                          msg.type === 'success'
+                        className={`p-3 rounded-xl text-xs flex items-start gap-2 ${msg.type === 'success'
                             ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                             : 'bg-error-soft text-error border border-error/20'
-                        }`}
+                          }`}
                       >
                         {msg.type === 'success' ? (
                           <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -249,13 +273,29 @@ export const ExploreCoursesPage: React.FC = () => {
                     >
                       View Details
                     </button>
-                    <button
-                      onClick={() => handleEnroll(course._id)}
-                      disabled={isEnrolling}
-                      className="flex-1 py-2 px-3 rounded-xl bg-signal text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-1.5"
-                    >
-                      {isEnrolling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Enroll Now'}
-                    </button>
+                    {enrollmentStatus === 'ACTIVE' ? (
+                      <button
+                        onClick={() => navigate(`/learner/courses/${course._id}`)}
+                        className="flex-1 py-2 px-3 rounded-xl bg-signal text-white text-xs font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        Continue Learning &rarr;
+                      </button>
+                    ) : enrollmentStatus === 'COMPLETED' ? (
+                      <button
+                        onClick={() => navigate(`/learner/courses/${course._id}`)}
+                        className="flex-1 py-2 px-3 rounded-xl bg-surface-elevated border border-border text-text-primary text-xs font-semibold hover:border-signal transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        Review Course
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleEnroll(course._id)}
+                        disabled={isEnrolling}
+                        className="flex-1 py-2 px-3 rounded-xl bg-signal text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        {isEnrolling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Enroll Now'}
+                      </button>
+                    )}
                   </div>
                 </div>
               );

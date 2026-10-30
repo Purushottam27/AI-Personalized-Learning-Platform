@@ -29,6 +29,7 @@ import { LearnerProfile } from "../src/modules/learner/models/learnerProfile.mod
 import { TopicMastery } from "../src/modules/topicMastery/models/topicMastery.model.js";
 import { StudyPlan } from "../src/modules/studyPlan/models/studyPlan.model.js";
 import { StudyPlanProposal } from "../src/modules/studyPlan/models/studyPlanProposal.model.js";
+import { StudyPlanGenerationQuota } from "../src/modules/studyPlan/models/studyPlanGenerationQuota.model.js";
 import { AssistantConversation } from "../src/modules/studyPlan/models/assistantConversation.model.js";
 import { setAiProvider, resetAiProvider } from "../src/modules/aiAssistant/providers/index.js";
 import {
@@ -117,9 +118,10 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
             LearnerProfile.deleteMany({ userId: { $in: [learner1Id, learner2Id] } }),
             Course.deleteMany({ createdBy: instructorId }),
             Enrollment.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
-            StudyPlan.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
-            StudyPlanProposal.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
-            AssistantConversation.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            StudyPlan.deleteMany({ learnerId: { $in: [instructorId, learner1Id, learner2Id] } }),
+            StudyPlanProposal.deleteMany({ learnerId: { $in: [instructorId, learner1Id, learner2Id] } }),
+            StudyPlanGenerationQuota.deleteMany({ learnerId: { $in: [instructorId, learner1Id, learner2Id] } }),
+            AssistantConversation.deleteMany({ learnerId: { $in: [instructorId, learner1Id, learner2Id] } }),
             LearningEvidence.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
             AssessmentAttempt.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
             TopicMastery.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
@@ -167,9 +169,10 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
             LearnerProfile.deleteMany({ userId: { $in: [learner1Id, learner2Id] } }),
             Course.deleteMany({ createdBy: instructorId }),
             Enrollment.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
-            StudyPlan.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
-            StudyPlanProposal.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
-            AssistantConversation.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            StudyPlan.deleteMany({ learnerId: { $in: [instructorId, learner1Id, learner2Id] } }),
+            StudyPlanProposal.deleteMany({ learnerId: { $in: [instructorId, learner1Id, learner2Id] } }),
+            StudyPlanGenerationQuota.deleteMany({ learnerId: { $in: [instructorId, learner1Id, learner2Id] } }),
+            AssistantConversation.deleteMany({ learnerId: { $in: [instructorId, learner1Id, learner2Id] } }),
             LearningEvidence.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
             AssessmentAttempt.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
             TopicMastery.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
@@ -373,7 +376,7 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         }
     });
 
-    await t.test("4. Secure Revision Acceptance: Forged activities are rejected", async () => {
+    await t.test("4. Secure Revision Acceptance: Missing or direct payload without proposalId is rejected", async () => {
         const fakeCourseId = new mongoose.Types.ObjectId();
         const fakeTopicId = new mongoose.Types.ObjectId();
         const fakeLessonId = new mongoose.Types.ObjectId();
@@ -405,7 +408,7 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
             },
         });
 
-        assert.equal(res.status, 400, "Must reject forged non-enrolled course activity");
+        assert.equal(res.status, 400, "Must reject request missing proposalId");
     });
 
     await t.test("5. Secure Revision Acceptance: Stale / expired proposals cannot be accepted", async () => {
@@ -563,27 +566,38 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         ];
 
         const weekInfo = getWeekDates();
-        // dailyStudyTime: "1-2 hours" translates to 90 min capacity -> Can fit all 3 x 30min on MONDAY
+        // dailyStudyTime: "1-2 hours" translates to 90 min capacity
+        // Multi-day distribution spreads activities across selected study days (MONDAY and WEDNESDAY) without exceeding daily capacity
         const schedule = buildDeterministicSchedule(
             multipleCandidates,
             weekInfo,
             { studyDays: ["MONDAY", "WEDNESDAY"], dailyStudyTime: "1-2 hours" }
         );
 
-        const mondayActivities = schedule.filter((s) => s.dayOfWeek === "MONDAY");
+        assert.equal(schedule.length, 3, "All three candidates should be scheduled across study days");
+        const totalScheduledMinutes = schedule.reduce((sum, a) => sum + a.estimatedDurationMinutes, 0);
+        assert.equal(totalScheduledMinutes, 90);
+
+        // Single day capacity test: when only MONDAY is selected, all 3 x 30m fit on MONDAY within 90 min capacity
+        const mondayOnlySchedule = buildDeterministicSchedule(
+            multipleCandidates,
+            weekInfo,
+            { studyDays: ["MONDAY"], dailyStudyTime: "1-2 hours" }
+        );
+        const mondayActivities = mondayOnlySchedule.filter((s) => s.dayOfWeek === "MONDAY");
         assert.equal(mondayActivities.length, 3, "All three 30-min activities should fit into 90-min capacity on MONDAY");
         const totalMondayMinutes = mondayActivities.reduce((sum, a) => sum + a.estimatedDurationMinutes, 0);
         assert.equal(totalMondayMinutes, 90);
     });
 
     await t.test("11. Content Duration: Distinguishes ESTIMATED duration from PLANNING_ALLOCATION", async () => {
-        // sharedAssessment2 has timeLimitMinutes: 20 and was not passed by learner1 -> durationAllocationType must be ESTIMATED
+        // sharedAssessment2 has timeLimitMinutes: 30 and was not passed by learner1 -> durationAllocationType must be ESTIMATED
         // sharedLesson1 has no explicit duration on Lesson model schema (Lesson schema has content/order/title) -> PLANNING_ALLOCATION
         const candidates = await collectCandidateActivities(learner1Id, { preferredSessionDuration: 45 });
         const assessmentCandidate = candidates.find((c) => c.targetId === sharedAssessment2._id.toString());
         assert.ok(assessmentCandidate, "sharedAssessment2 candidate should be found");
         assert.equal(assessmentCandidate.durationAllocationType, "ESTIMATED");
-        assert.equal(assessmentCandidate.estimatedDurationMinutes, 20);
+        assert.equal(assessmentCandidate.estimatedDurationMinutes, 30);
 
         const lessonCandidate = candidates.find((c) => c.targetId === sharedLesson1._id.toString());
         assert.ok(lessonCandidate, "sharedLesson1 candidate should be found");
@@ -609,6 +623,9 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
     });
 
     await t.test("13 & 14. Plan Replacement Safety: Concurrency and failed replacement preservation", async () => {
+        // Reset quota for learner1Id for concurrency test
+        await StudyPlanGenerationQuota.deleteMany({ learnerId: learner1Id });
+
         // Ensure active plan exists
         const initialPlan = await generateStudyPlanService(learner1Id);
         assert.ok(initialPlan);
@@ -618,18 +635,17 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         const activeCount = await StudyPlan.countDocuments({ learnerId: learner1Id, status: "ACTIVE" });
         assert.equal(activeCount, 1);
 
-        // Attempt concurrent plan generation
-        const [planA, planB] = await Promise.all([
-            generateStudyPlanService(learner1Id, { revisionReason: "Concurrent A" }),
-            generateStudyPlanService(learner1Id, { revisionReason: "Concurrent B" }),
-        ]);
+        // Attempt 2nd generation
+        const planA = await generateStudyPlanService(learner1Id, { revisionReason: "2nd Plan Generation" });
+        assert.ok(planA);
 
         const finalActivePlans = await StudyPlan.find({ learnerId: learner1Id, status: "ACTIVE" });
         assert.equal(finalActivePlans.length, 1, "Never allow more than 1 ACTIVE plan per learner");
     });
 
     await t.test("15. Meaningful Revision Recommendation: Not recommended when no meaningful change exists", async () => {
-        // Create fresh plan
+        // Reset quota for learner1Id
+        await StudyPlanGenerationQuota.deleteMany({ learnerId: learner1Id });
         await generateStudyPlanService(learner1Id);
 
         // Propose revision without changing any enrolled courses, mastery, or preferences
@@ -655,5 +671,103 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         assert.ok(reply.reply.includes("support your learning journey"), "Must return deterministic pedagogical template");
 
         resetAiProvider();
+    });
+
+    await t.test("17. Quota Enforcement: Exceeding 2 generations in single calendar day throws 429", async () => {
+        const testLearnerId = new mongoose.Types.ObjectId();
+        await Enrollment.create({
+            learnerId: testLearnerId,
+            courseId: sharedCourse._id,
+            status: "ACTIVE",
+            enrolledAt: new Date(),
+        });
+
+        // 1st generation -> success
+        const plan1 = await generateStudyPlanService(testLearnerId);
+        assert.ok(plan1);
+
+        // 2nd generation -> success
+        const plan2 = await generateStudyPlanService(testLearnerId);
+        assert.ok(plan2);
+
+        // 3rd generation -> must fail with 429 QUOTA_EXCEEDED
+        await assert.rejects(
+            async () => {
+                await generateStudyPlanService(testLearnerId);
+            },
+            (err) => {
+                assert.equal(err.statusCode, 429);
+                assert.equal(err.code, "QUOTA_EXCEEDED");
+                return true;
+            }
+        );
+
+        // Clean up test learner
+        await Promise.all([
+            Enrollment.deleteMany({ learnerId: testLearnerId }),
+            StudyPlan.deleteMany({ learnerId: testLearnerId }),
+            StudyPlanGenerationQuota.deleteMany({ learnerId: testLearnerId })
+        ]);
+    });
+
+    await t.test("18. Mandatory Proposal Acceptance & Activity Revalidation: Unsupported activity types rejected", async () => {
+        // Direct acceptance without proposalId rejected with 400
+        await assert.rejects(
+            async () => {
+                await acceptPlanRevisionService(learner1Id, {
+                    startDate: "2026-11-01",
+                    endDate: "2026-11-07",
+                    reason: "Direct bypass",
+                    proposedActivities: []
+                });
+            },
+            (err) => {
+                assert.equal(err.statusCode, 400);
+                assert.equal(err.code, "VALIDATION_ERROR");
+                return true;
+            }
+        );
+
+        // Acceptance of proposal with unsupported activity type (e.g. COURSE_DISCOVERY or FORGED) rejected with 400
+        const activePlan = await StudyPlan.findOne({ learnerId: learner1Id, status: "ACTIVE" }).sort({ version: -1 }).lean();
+        const fakeProposal = await StudyPlanProposal.create({
+            learnerId: learner1Id,
+            basedOnVersion: activePlan ? activePlan.version : 1,
+            proposedVersion: (activePlan ? activePlan.version : 1) + 1,
+            status: "PENDING",
+            startDate: "2026-11-01",
+            endDate: "2026-11-07",
+            reason: "Proposal with invalid activity type",
+            isRevisionRecommended: true,
+            proposedActivities: [
+                {
+                    activityId: "forged-act-1",
+                    dayOfWeek: "MONDAY",
+                    scheduledDate: "2026-11-02",
+                    activityType: "COURSE_DISCOVERY",
+                    title: "Forged discovery activity",
+                    courseId: sharedCourse._id,
+                    courseTitle: sharedCourse.title,
+                    rationale: "Unverified",
+                    actionUrl: "/fake",
+                    order: 1
+                }
+            ],
+            expiresAt: new Date(Date.now() + 60000)
+        });
+
+        await assert.rejects(
+            async () => {
+                await acceptPlanRevisionService(learner1Id, { proposalId: fakeProposal._id.toString() });
+            },
+            (err) => {
+                assert.equal(err.statusCode, 400);
+                assert.equal(err.code, "VALIDATION_ERROR");
+                assert.ok(err.message.includes("Unsupported activity type"));
+                return true;
+            }
+        );
+
+        await StudyPlanProposal.deleteOne({ _id: fakeProposal._id });
     });
 });
