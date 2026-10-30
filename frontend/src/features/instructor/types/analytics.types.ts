@@ -102,3 +102,94 @@ export interface InstructorAnalyticsQuery {
   search?: string;
 }
 
+export interface ScoreDistribution {
+  range0To49: number;
+  range50To69: number;
+  range70To84: number;
+  range85To100: number;
+}
+
+export interface AssessmentPerformanceSummary {
+  assessmentId: string;
+  title: string;
+  type: 'TOPIC' | 'DIAGNOSTIC' | 'FINAL';
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  topicId: string | null;
+  topicTitle: string | null;
+  topicOrder: number | null;
+  passingScore: number;
+  questionsPerAttempt: number;
+  totalPoolQuestions: number;
+  totalAttempts: number;
+  uniqueLearnersCount: number;
+  inProgressAttemptsCount: number;
+  passedCount: number;
+  failedCount: number;
+  passPercentage: number | null;
+  failPercentage: number | null;
+  averageScore: number | null;
+  participationRate: number | null;
+  completionRate: number | null;
+  scoreDistribution: ScoreDistribution;
+  hasSufficientData: boolean;
+}
+
+export interface ActionableInsight {
+  id: string;
+  category: 'PERFORMANCE' | 'COMPLETION' | 'CURRICULUM_ALIGNMENT' | 'DATA_LIMITATION' | 'QUESTION_PERFORMANCE';
+  title: string;
+  observation: string;
+  supportingEvidence: string;
+  reference: {
+    type: 'ASSESSMENT' | 'QUESTION' | 'TOPIC';
+    id: string;
+    title?: string;
+    assessmentType?: string;
+    topicId?: string | null;
+    questionText?: string;
+    assessmentId?: string;
+  };
+  suggestedAction: string;
+  dataLimitationNotice?: string;
+}
+
+export interface InstructorAssessmentAnalyticsResponse {
+  courseId: string;
+  courseTitle: string;
+  totalEnrolledLearners: number;
+  totalAssessmentsCount: number;
+  totalSubmittedAttempts: number;
+  assessments: AssessmentPerformanceSummary[];
+  insights: ActionableInsight[];
+}
+
+export interface QuestionPerformanceItem {
+  questionId: string;
+  questionText: string;
+  type: 'MCQ_SINGLE' | 'MCQ_MULTIPLE' | 'TRUE_FALSE';
+  configuredDifficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  marks: number;
+  totalExposures: number;
+  eligibleResponsesCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  unansweredCount: number;
+  correctPercentage: number | null;
+  incorrectPercentage: number | null;
+  unansweredPercentage: number | null;
+  responsePatternSignal: 'NORMAL' | 'HIGH_ACCURACY' | 'HIGH_INCORRECT_RATE' | 'HIGH_UNANSWERED_RATE' | 'INSUFFICIENT_DATA';
+  hasSufficientData: boolean;
+}
+
+export interface InstructorQuestionAnalyticsResponse {
+  assessmentId: string;
+  assessmentTitle: string;
+  assessmentType: string;
+  passingScore: number;
+  totalPoolQuestions: number;
+  totalCompletedAttempts: number;
+  questions: QuestionPerformanceItem[];
+  questionInsights: ActionableInsight[];
+}
+
+

@@ -3,6 +3,7 @@ import {
     courseIdParamSchema,
     analyticsOverviewQuerySchema,
     instructorAnalyticsQuerySchema,
+    assessmentIdParamSchema,
 } from "./analytics.validation.js";
 
 export function validateCourseIdParam(req, res, next) {
@@ -11,6 +12,15 @@ export function validateCourseIdParam(req, res, next) {
         throw new ApiError(400, "VALIDATION_ERROR", "Invalid path parameters", result.error.format());
     }
     req.params = result.data;
+    next();
+}
+
+export function validateAssessmentIdParam(req, res, next) {
+    const result = assessmentIdParamSchema.safeParse(req.params);
+    if (!result.success) {
+        throw new ApiError(400, "VALIDATION_ERROR", "Invalid path parameters", result.error.format());
+    }
+    req.params = { ...req.params, ...result.data };
     next();
 }
 

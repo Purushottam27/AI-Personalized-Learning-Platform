@@ -17,3 +17,7 @@ export const instructorAnalyticsQuerySchema = z.object({
     search: z.string().trim().max(100).optional(),
 });
 
+export const assessmentIdParamSchema = z.object({
+    assessmentId: z.string().regex(objectIdRegex, "assessmentId must be a valid 24-character hex ObjectId"),
+});
+

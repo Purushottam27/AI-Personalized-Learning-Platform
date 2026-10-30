@@ -12,9 +12,16 @@ import {
   RefreshCw,
   Clock,
   Layers,
+  FileCheck2,
+  Sparkles,
+  ChevronRight,
+  Info,
 } from 'lucide-react';
 import { useInstructorCourses } from '../hooks/useInstructorCourses';
 import { useInstructorCourseAnalytics } from '../hooks/useInstructorCourseAnalytics';
+import { useInstructorAssessmentAnalytics } from '../hooks/useInstructorAssessmentAnalytics';
+import { getInstructorQuestionAnalytics } from '../api/analytics.api';
+import type { InstructorQuestionAnalyticsResponse } from '../types/analytics.types';
 
 export const InstructorAnalyticsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -28,7 +35,13 @@ export const InstructorAnalyticsPage: React.FC = () => {
   const [searchLearner, setSearchLearner] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED' | 'WITHDRAWN'>('ALL');
   const [learnerPage, setLearnerPage] = useState(1);
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'TOPICS' | 'LEARNERS'>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'TOPICS' | 'ASSESSMENTS' | 'INSIGHTS' | 'LEARNERS'>('OVERVIEW');
+
+  // Selected assessment for question-level modal/deep-dive
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState<string | null>(null);
+  const [questionAnalytics, setQuestionAnalytics] = useState<InstructorQuestionAnalyticsResponse | null>(null);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState<boolean>(false);
+  const [questionError, setQuestionError] = useState<string | null>(null);
 
   const {
     analytics,
@@ -42,9 +55,32 @@ export const InstructorAnalyticsPage: React.FC = () => {
     search: searchLearner,
   });
 
+  const {
+    assessmentAnalytics,
+    isLoading: isLoadingAssessments,
+    error: assessmentError,
+    refetch: refetchAssessments,
+  } = useInstructorAssessmentAnalytics(selectedCourseId);
+
   const handleSelectCourse = (newCourseId: string) => {
     setSearchParams({ courseId: newCourseId });
     setLearnerPage(1);
+    setSelectedAssessmentId(null);
+    setQuestionAnalytics(null);
+  };
+
+  const handleOpenQuestions = async (assessmentId: string) => {
+    setSelectedAssessmentId(assessmentId);
+    setIsLoadingQuestions(true);
+    setQuestionError(null);
+    try {
+      const data = await getInstructorQuestionAnalytics(assessmentId);
+      setQuestionAnalytics(data);
+    } catch (err: any) {
+      setQuestionError(err.message || 'Failed to load question analytics');
+    } finally {
+      setIsLoadingQuestions(false);
+    }
   };
 
   // Loading courses
@@ -170,6 +206,28 @@ export const InstructorAnalyticsPage: React.FC = () => {
               Topic Distributions ({analytics.topicsPerformance.length})
             </button>
             <button
+              onClick={() => setActiveTab('ASSESSMENTS')}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'ASSESSMENTS'
+                  ? 'bg-signal text-white shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+              }`}
+            >
+              <FileCheck2 className="w-3.5 h-3.5" />
+              <span>Assessments ({assessmentAnalytics?.assessments.length ?? 0})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('INSIGHTS')}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'INSIGHTS'
+                  ? 'bg-signal text-white shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Insights ({assessmentAnalytics?.insights.length ?? 0})</span>
+            </button>
+            <button
               onClick={() => setActiveTab('LEARNERS')}
               className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                 activeTab === 'LEARNERS'
@@ -233,6 +291,7 @@ export const InstructorAnalyticsPage: React.FC = () => {
                     </span>
                   </div>
                 </div>
+                
 
                 <div className="p-5 rounded-2xl border border-border bg-surface flex flex-col justify-between">
                   <div className="flex items-center justify-between text-text-tertiary mb-3">
@@ -446,7 +505,326 @@ export const InstructorAnalyticsPage: React.FC = () => {
             </div>
           )}
 
-          {/* TAB 3: LEARNERS BREAKDOWN */}
+          {/* TAB 3: ASSESSMENTS PERFORMANCE */}
+          {activeTab === 'ASSESSMENTS' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-base font-bold text-text-primary">Assessment-Level Performance</h2>
+                  <p className="text-xs text-text-secondary">
+                    Completion statistics, pass/fail ratios, and score distribution per assessment.
+                  </p>
+                </div>
+                {selectedAssessmentId && (
+                  <button
+                    onClick={() => {
+                      setSelectedAssessmentId(null);
+                      setQuestionAnalytics(null);
+                    }}
+                    className="text-xs font-semibold text-signal hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    &larr; Back to all assessments
+                  </button>
+                )}
+              </div>
+
+              {isLoadingAssessments ? (
+                <div className="flex flex-col items-center justify-center p-12 space-y-3">
+                  <RefreshCw className="w-6 h-6 text-signal animate-spin" />
+                  <p className="text-xs text-text-tertiary">Loading assessment performance data...</p>
+                </div>
+              ) : assessmentError ? (
+                <div className="p-6 rounded-2xl bg-surface border border-error/30 text-center space-y-2">
+                  <p className="text-xs text-error">{assessmentError}</p>
+                  <button onClick={() => refetchAssessments()} className="text-xs text-signal font-semibold">
+                    Retry
+                  </button>
+                </div>
+              ) : isLoadingQuestions ? (
+                <div className="flex flex-col items-center justify-center p-12 space-y-3">
+                  <RefreshCw className="w-6 h-6 text-signal animate-spin" />
+                  <p className="text-xs text-text-tertiary">Loading question-level response statistics...</p>
+                </div>
+              ) : questionError ? (
+                <div className="p-6 rounded-2xl bg-surface border border-error/30 text-center space-y-2">
+                  <p className="text-xs text-error">{questionError}</p>
+                  <button
+                    onClick={() => selectedAssessmentId && handleOpenQuestions(selectedAssessmentId)}
+                    className="text-xs text-signal font-semibold"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : selectedAssessmentId && questionAnalytics ? (
+                /* Question Deep Dive for Selected Assessment */
+                <div className="space-y-5">
+                  <div className="p-5 rounded-2xl border border-border bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-signal-soft text-signal uppercase">
+                          {questionAnalytics.assessmentType}
+                        </span>
+                        <h3 className="text-base font-bold text-text-primary">{questionAnalytics.assessmentTitle}</h3>
+                      </div>
+                      <p className="text-xs text-text-tertiary mt-1">
+                        Passing Score: {questionAnalytics.passingScore}% • {questionAnalytics.totalPoolQuestions} questions in pool • {questionAnalytics.totalCompletedAttempts} submitted attempts
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Question Insights Banner if any */}
+                  {questionAnalytics.questionInsights.length > 0 && (
+                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+                      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold text-xs">
+                        <Info className="w-4 h-4 shrink-0" />
+                        <span>Question Performance Signals</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+                        {questionAnalytics.questionInsights.map((qi) => (
+                          <div key={qi.id} className="p-3 rounded-xl bg-surface border border-amber-500/30 text-xs space-y-1">
+                            <span className="font-bold text-text-primary block">{qi.title}</span>
+                            <p className="text-[11px] text-text-secondary">{qi.observation}</p>
+                            <span className="text-[10px] text-text-tertiary block font-medium">
+                              Suggestion: {qi.suggestedAction}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Question Items Table / Cards */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
+                      Question Pool Responses ({questionAnalytics.questions.length})
+                    </h4>
+                    {questionAnalytics.questions.map((q, idx) => (
+                      <div key={q.questionId} className="p-4 rounded-xl border border-border bg-surface space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                          <div className="space-y-1 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-bold text-text-tertiary bg-surface-elevated px-2 py-0.5 rounded">
+                                Q{idx + 1} • {q.type}
+                              </span>
+                              <span className="text-[10px] font-semibold text-text-tertiary border border-border px-1.5 py-0.5 rounded">
+                                {q.configuredDifficulty}
+                              </span>
+                              {q.responsePatternSignal === 'HIGH_INCORRECT_RATE' && (
+                                <span className="text-[10px] font-bold text-rose-600 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded">
+                                  High Incorrect Rate
+                                </span>
+                              )}
+                              {q.responsePatternSignal === 'HIGH_UNANSWERED_RATE' && (
+                                <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                                  High Unanswered
+                                </span>
+                              )}
+                              {q.responsePatternSignal === 'INSUFFICIENT_DATA' && (
+                                <span className="text-[10px] font-medium text-text-tertiary bg-neutral-500/10 px-1.5 py-0.5 rounded">
+                                  Awaiting Responses
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-medium text-text-primary pt-1">{q.questionText}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-xs font-bold text-text-primary block">
+                              {q.correctPercentage !== null ? `${q.correctPercentage}% Correct` : 'N/A'}
+                            </span>
+                            <span className="text-[11px] text-text-tertiary">
+                              {q.totalExposures} total exposures
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Breakdown bar */}
+                        <div className="space-y-1 pt-1">
+                          <div className="h-2 rounded-full overflow-hidden flex bg-surface-elevated border border-border">
+                            <div
+                              style={{ width: `${q.correctPercentage || 0}%` }}
+                              className="bg-emerald-500"
+                              title={`Correct: ${q.correctCount}`}
+                            />
+                            <div
+                              style={{ width: `${q.incorrectPercentage || 0}%` }}
+                              className="bg-rose-500"
+                              title={`Incorrect: ${q.incorrectCount}`}
+                            />
+                            <div
+                              style={{ width: `${q.unansweredPercentage || 0}%` }}
+                              className="bg-neutral-400"
+                              title={`Unanswered: ${q.unansweredCount}`}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-text-tertiary">
+                            <span>Correct: <strong className="text-emerald-600 dark:text-emerald-400">{q.correctCount}</strong> ({q.correctPercentage ?? 0}%)</span>
+                            <span>Incorrect: <strong className="text-rose-600 dark:text-rose-400">{q.incorrectCount}</strong> ({q.incorrectPercentage ?? 0}%)</span>
+                            <span>Unanswered: <strong>{q.unansweredCount}</strong> ({q.unansweredPercentage ?? 0}%)</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : !assessmentAnalytics || assessmentAnalytics.assessments.length === 0 ? (
+                <div className="p-12 text-center text-xs text-text-tertiary bg-surface rounded-2xl border border-border">
+                  No assessments configured for this course yet.
+                </div>
+              ) : (
+                /* Assessment Cards List */
+                <div className="grid grid-cols-1 gap-4">
+                  {assessmentAnalytics.assessments.map((a) => (
+                    <div
+                      key={a.assessmentId}
+                      className="p-5 rounded-2xl border border-border bg-surface hover:border-border-muted transition-all space-y-4"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-signal-soft text-signal uppercase">
+                              {a.type}
+                            </span>
+                            {a.topicTitle && (
+                              <span className="text-[11px] font-medium text-text-tertiary bg-surface-elevated px-2 py-0.5 rounded">
+                                Topic {a.topicOrder}: {a.topicTitle}
+                              </span>
+                            )}
+                            <span className="text-[10px] font-semibold text-text-secondary border border-border px-1.5 py-0.5 rounded">
+                              Passing: {a.passingScore}%
+                            </span>
+                          </div>
+                          <h3 className="text-sm font-bold text-text-primary pt-0.5">{a.title}</h3>
+                          <span className="text-xs text-text-tertiary block">
+                            {a.totalAttempts} submitted attempts • {a.uniqueLearnersCount} unique learners
+                            {a.inProgressAttemptsCount > 0 && ` • ${a.inProgressAttemptsCount} in-progress`}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <span className="text-xs font-bold text-text-primary block">
+                              Avg Score: {a.averageScore !== null ? `${a.averageScore}%` : 'N/A'}
+                            </span>
+                            <span className="text-[11px] text-text-tertiary">
+                              Pass Rate: {a.passPercentage !== null ? `${a.passPercentage}%` : 'Awaiting data'}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleOpenQuestions(a.assessmentId)}
+                            className="px-3 py-2 rounded-xl bg-surface-elevated border border-border hover:border-signal text-text-primary text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                          >
+                            <span>Questions</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Score distribution / completion info */}
+                      <div className="p-3.5 rounded-xl bg-surface-elevated border border-border/70 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-text-tertiary block">Participation</span>
+                          <span className="font-bold text-text-primary">
+                            {a.participationRate !== null ? `${a.participationRate}%` : 'N/A'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-text-tertiary block">Completion Rate</span>
+                          <span className="font-bold text-text-primary">
+                            {a.completionRate !== null ? `${a.completionRate}%` : 'N/A'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-text-tertiary block">Passed</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                            {a.passedCount} ({a.passPercentage ?? 0}%)
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-text-tertiary block">Failed</span>
+                          <span className="font-bold text-rose-600 dark:text-rose-400">
+                            {a.failedCount} ({a.failPercentage ?? 0}%)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: ACTIONABLE INSIGHTS */}
+          {activeTab === 'INSIGHTS' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-base font-bold text-text-primary">Actionable Instructor Insights</h2>
+                <p className="text-xs text-text-secondary">
+                  Evidence-backed observations and recommended pedagogical actions derived from student activity and assessment responses.
+                </p>
+              </div>
+
+              {!assessmentAnalytics || assessmentAnalytics.insights.length === 0 ? (
+                <div className="p-12 text-center text-xs text-text-tertiary bg-surface rounded-2xl border border-border space-y-2">
+                  <Sparkles className="w-8 h-8 text-signal mx-auto opacity-60" />
+                  <p className="font-semibold text-text-primary">No Performance Issues or Outliers Detected</p>
+                  <p className="max-w-md mx-auto">
+                    As learners submit attempts and complete curriculum topics, evidence-based recommendations will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {assessmentAnalytics.insights.map((insight) => {
+                    let borderClass = 'border-border';
+                    let badgeClass = 'bg-surface-elevated text-text-secondary';
+                    if (insight.category === 'PERFORMANCE' || insight.category === 'CURRICULUM_ALIGNMENT') {
+                      borderClass = 'border-rose-500/30';
+                      badgeClass = 'bg-rose-500/10 text-rose-600 dark:text-rose-400';
+                    } else if (insight.category === 'COMPLETION') {
+                      borderClass = 'border-amber-500/30';
+                      badgeClass = 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
+                    }
+
+                    return (
+                      <div
+                        key={insight.id}
+                        className={`p-5 rounded-2xl border ${borderClass} bg-surface space-y-3 shadow-xs`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${badgeClass}`}>
+                            {insight.category.replace('_', ' ')}
+                          </span>
+                          <span className="text-[11px] text-text-tertiary">
+                            Ref: {insight.reference.type}
+                          </span>
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-text-primary">{insight.title}</h3>
+                          <p className="text-xs text-text-secondary mt-1">{insight.observation}</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-surface-elevated border border-border/60 text-xs space-y-1">
+                          <span className="text-[11px] font-semibold text-text-tertiary block uppercase tracking-wider">
+                            Supporting Metric
+                          </span>
+                          <p className="text-text-primary font-medium">{insight.supportingEvidence}</p>
+                        </div>
+                        <div className="text-xs space-y-1 pt-1">
+                          <span className="font-bold text-signal block">Recommended Action:</span>
+                          <p className="text-text-secondary">{insight.suggestedAction}</p>
+                        </div>
+                        {insight.dataLimitationNotice && (
+                          <span className="text-[10px] text-text-tertiary block border-t border-border/50 pt-2">
+                            Notice: {insight.dataLimitationNotice}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: LEARNERS BREAKDOWN */}
           {activeTab === 'LEARNERS' && (
             <div className="space-y-6">
               {/* Search & Filter Header */}
