@@ -375,11 +375,27 @@ export const LearnerRecommendationsPage: React.FC = () => {
                         <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-surface-disabled text-text-secondary border border-border">
                           Mastery: {nextBestAction.score}% ({nextBestAction.status.replace(/_/g, ' ')})
                         </span>
+                      ) : nextBestAction.status === 'INSUFFICIENT_EVIDENCE' ? (
+                        <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-surface-disabled text-text-secondary border border-border">
+                          Status: New Topic (Awaiting Evidence)
+                        </span>
                       ) : nextBestAction.status ? (
                         <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-surface-disabled text-text-secondary border border-border">
                           Status: {nextBestAction.status.replace(/_/g, ' ')}
                         </span>
                       ) : null}
+
+                      {typeof nextBestAction.confidence === 'number' && nextBestAction.confidence > 0 && (
+                        <span className="px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-surface-disabled text-text-tertiary border border-border">
+                          Confidence: {Math.round(nextBestAction.confidence * 100)}%
+                        </span>
+                      )}
+
+                      {typeof nextBestAction.evidenceCount === 'number' && nextBestAction.evidenceCount > 0 && (
+                        <span className="px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-surface-disabled text-text-tertiary border border-border">
+                          {nextBestAction.evidenceCount} {nextBestAction.evidenceCount === 1 ? 'attempt' : 'attempts'} evaluated
+                        </span>
+                      )}
                     </div>
 
                     <h3 className="text-xl sm:text-2xl font-bold text-text-primary font-display">
@@ -402,13 +418,30 @@ export const LearnerRecommendationsPage: React.FC = () => {
                   </div>
 
                   <div className="shrink-0 flex items-center">
-                    <button
-                      onClick={() => handleNavigateToAction(nextBestAction)}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-signal text-white font-semibold text-sm hover:opacity-95 transition-all shadow-md hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus cursor-pointer"
-                    >
-                      <span>{getActionLabel(nextBestAction)}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                    {nextBestAction.isActionable ? (
+                      <button
+                        onClick={() => handleNavigateToAction(nextBestAction)}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-signal text-white font-semibold text-sm hover:opacity-95 transition-all shadow-md hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus cursor-pointer"
+                      >
+                        <span>{getActionLabel(nextBestAction)}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <div className="flex flex-col items-start sm:items-end gap-1.5">
+                        <span className="text-xs font-semibold text-text-tertiary italic">
+                          {nextBestAction.reasonCode === 'TOPIC_LOCKED'
+                            ? 'Locked (Complete Prior Assessments)'
+                            : 'Content in preparation'}
+                        </span>
+                        <button
+                          onClick={() => handleNavigateToAction(nextBestAction)}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-text-secondary hover:text-text-primary text-xs font-medium hover:bg-surface-elevated transition-colors cursor-pointer"
+                        >
+                          <span>View Course</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
