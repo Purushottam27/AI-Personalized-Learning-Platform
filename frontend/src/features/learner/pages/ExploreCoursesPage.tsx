@@ -21,7 +21,7 @@ import type { CourseDifficulty } from '../types/course.types';
 export const ExploreCoursesPage: React.FC = () => {
   const navigate = useNavigate();
   const { courses, pagination, query, loading, error, updateFilters, refresh } = useExploreCourses();
-  const { enrollments, refresh: refreshEnrollments } = useMyEnrollments();
+  const { enrollments } = useMyEnrollments();
   const [searchTerm, setSearchTerm] = useState(query.search || '');
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ id: string; type: 'success' | 'error'; text: string } | null>(null);

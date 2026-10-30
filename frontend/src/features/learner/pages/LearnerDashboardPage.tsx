@@ -3,7 +3,6 @@ import { useLearnerDashboard } from '../hooks/useLearnerDashboard';
 import { WelcomeHeader } from '../components/WelcomeHeader';
 import { ContinueLearningCard } from '../components/ContinueLearningCard';
 import { NextBestAction } from '../components/NextBestAction';
-import { CourseProgressCard } from '../components/CourseProgressCard';
 import { StrengthsWeaknesses } from '../components/StrengthsWeaknesses';
 import { LearningSummary } from '../components/LearningSummary';
 import { StudyPlannerWidget } from '../components/StudyPlannerWidget';
@@ -52,7 +51,7 @@ export const LearnerDashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-5xl space-y-8 pb-12">
+    <div className="w-full min-w-0 space-y-8 pb-12">
       <WelcomeHeader />
 
       <div className="space-y-6">
@@ -72,7 +71,6 @@ export const LearnerDashboardPage: React.FC = () => {
           />
         </div>
         <div className="space-y-6">
-          <CourseProgressCard progress={data.progress} />
           <LearningSummary summary={data.summary} />
         </div>
       </div>

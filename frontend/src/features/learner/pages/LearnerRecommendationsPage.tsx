@@ -20,6 +20,20 @@ import type {
   RecommendationTier,
 } from '../types/recommendation.types';
 
+const formatMasteryStatus = (status: string): string => {
+  const labels: Record<string, string> = {
+    MASTERED: 'Mastered',
+    STRONG: 'Strong',
+    FUNCTIONAL: 'Functional',
+    DEVELOPING: 'Developing',
+    DEVELOPING_MASTERY: 'Developing',
+    NEEDS_IMPROVEMENT: 'Needs Attention',
+    INSUFFICIENT_EVIDENCE: 'New Topic',
+  };
+
+  return labels[status] || status.toLowerCase().replace(/_/g, ' ').replace(/\\b\\w/g, (letter) => letter.toUpperCase());
+};
+
 export const LearnerRecommendationsPage: React.FC = () => {
   const navigate = useNavigate();
   const {
@@ -373,7 +387,7 @@ export const LearnerRecommendationsPage: React.FC = () => {
                       </span>
                       {nextBestAction.status && typeof nextBestAction.score === 'number' && nextBestAction.score !== null ? (
                         <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-surface-disabled text-text-secondary border border-border">
-                          Mastery: {nextBestAction.score}% ({nextBestAction.status.replace(/_/g, ' ')})
+                          Mastery: {nextBestAction.score}% ({formatMasteryStatus(nextBestAction.status)})
                         </span>
                       ) : nextBestAction.status === 'INSUFFICIENT_EVIDENCE' ? (
                         <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-surface-disabled text-text-secondary border border-border">
@@ -381,7 +395,7 @@ export const LearnerRecommendationsPage: React.FC = () => {
                         </span>
                       ) : nextBestAction.status ? (
                         <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-surface-disabled text-text-secondary border border-border">
-                          Status: {nextBestAction.status.replace(/_/g, ' ')}
+                          Status: {formatMasteryStatus(nextBestAction.status)}
                         </span>
                       ) : null}
 

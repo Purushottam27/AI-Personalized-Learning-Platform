@@ -31,9 +31,26 @@ export const ContinueLearningCard: React.FC<ContinueLearningCardProps> = ({ prog
         <p className="text-xs font-bold uppercase tracking-wider text-text-tertiary mb-2">Continue Learning</p>
         <h2 className="text-2xl font-semibold text-text-primary mb-1">{progress.courseTitle}</h2>
         <p className="text-text-secondary mb-4 flex items-center gap-2"><PlayCircle className="w-4 h-4 text-signal" /><span className="font-medium text-text-primary">{progress.currentTopicTitle}</span></p>
-        <div className="flex items-center gap-4 mt-6 max-w-md">
-          <div className="flex-1 h-2 bg-surface-disabled rounded-full overflow-hidden"><div className="h-full bg-signal transition-all duration-500 ease-out" style={{ width: `${progress.progressPercentage}%` }} /></div>
-          <span className="text-sm font-semibold text-text-secondary">{progress.progressPercentage}% complete</span>
+        <div className="mt-6 max-w-lg">
+          <div className="flex items-center justify-between gap-4 mb-2">
+            <span className="text-sm font-semibold text-text-primary">{progress.progressPercentage}% complete</span>
+            <span className="text-xs font-medium text-text-secondary">
+              {progress.completedTopics} of {progress.totalTopics} topics completed
+            </span>
+          </div>
+          <div
+            className="h-2.5 w-full bg-surface-disabled rounded-full overflow-hidden"
+            role="progressbar"
+            aria-label="Course progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.min(100, Math.max(0, progress.progressPercentage))}
+          >
+            <div
+              className="h-full bg-signal transition-all duration-500 ease-out"
+              style={{ width: `${Math.min(100, Math.max(0, progress.progressPercentage))}%` }}
+            />
+          </div>
         </div>
       </div>
       <div className="z-10 md:w-auto w-full">
