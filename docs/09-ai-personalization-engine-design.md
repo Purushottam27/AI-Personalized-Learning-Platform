@@ -406,43 +406,39 @@ The approved database design separates historical evidence from derived/current 
 
 Topic mastery is an estimate, not an absolute claim of knowledge.
 
-Initial interpretation categories:
+The approved MVP specification replaces legacy multi-tier ranges with a 3-tier performance category model plus a distinct baseline for insufficient evidence (see Section 12).
+
+Approved MVP categories:
 
 ```text
-0–39    Weak
-40–59   Developing
-60–74   Functional
-75–89   Strong
-90–100  Mastered
+0.0 – 59.9    Needs Improvement (NEEDS_IMPROVEMENT)
+60.0 – 79.9   Developing (DEVELOPING)
+80.0 – 100.0  Strong (STRONG)
 ```
 
-These are initial design values and can be tuned using evaluation data.
+- **Insufficient Evidence (`INSUFFICIENT_EVIDENCE`):** Distinct baseline state representing the absence of eligible submitted evidence (`masteryScore: null`, `confidence: 0`). It is never classified as a performance weakness.
 
 ## 11.1 Mastery Categories vs Intervention Thresholds
 
 The mastery categories above describe estimated mastery.
 
-Intervention thresholds serve a different purpose:
+Intervention thresholds serve an actionable recommendation purpose:
 
 ```text
-Mastery below 60%
+Status: NEEDS_IMPROVEMENT (Mastery 0.0–59.9%)
     ↓
-Weakness candidate
+Weakness candidate: prioritize review / remediation
 
-Mastery below 50%
+Status: DEVELOPING (Mastery 60.0–79.9%)
     ↓
-Prioritize review / remediation
+Developing understanding: prioritize targeted practice
 
-Mastery 50–70%
+Status: STRONG (Mastery 80.0–100.0%)
     ↓
-Prioritize targeted practice
-
-Mastery above 70%
-    ↓
-Generally continue unless other evidence indicates a weakness
+Progression to next topic or optional mastery reinforcement
 ```
 
-These intervention thresholds must not be interpreted as additional mastery categories.
+These intervention thresholds align directly with the 3-tier MVP performance categories and must not be interpreted as separate conflicting mastery ranges.
 
 ---
 
@@ -467,7 +463,7 @@ masteryScore = sum(evidenceWeight * attemptScore) / sum(evidenceWeight)
 - **Equal Source Weighting:** Practice attempts and topic assessments use equal weight (`sourceWeight = 1.0`).
 - **No Recency Multiplier:** Attempts are weighted strictly by valid question volume capped at 20 (`MAX_ATTEMPT_QUESTION_WEIGHT = 20`); no chronological recency multiplier is applied.
 - **Bounding:** Bounded between 0 and 100 and rounded to one decimal place.
-- **Insufficient Evidence Representation:** If no eligible submitted evidence exists or total evidence weight is zero, `masteryScore = 0` and status is assigned `INSUFFICIENT_EVIDENCE`.
+- **Insufficient Evidence Representation:** If no eligible submitted evidence exists or total evidence weight is zero, `masteryScore = null` (or omitted) and status is assigned `INSUFFICIENT_EVIDENCE` with `confidence = 0`. This is a provisional baseline state, not a zero or low score.
 
 ## 12.3 Confidence Formula
 Confidence evaluates evidence depth and breadth independently of mastery score:

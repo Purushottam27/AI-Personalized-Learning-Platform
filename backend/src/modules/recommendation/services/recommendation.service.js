@@ -151,8 +151,10 @@ function compareRecommendations(a, b) {
     // 2. Intra-tier priority
     // For weaknesses & developing topics: lower mastery score is more urgent
     if (a.tierKey === "DEMONSTRATED_WEAKNESS" || a.tierKey === "DEVELOPING_MASTERY") {
-        if (a.masteryScore !== b.masteryScore) {
-            return a.masteryScore - b.masteryScore;
+        const scoreA = typeof a.masteryScore === "number" ? a.masteryScore : Infinity;
+        const scoreB = typeof b.masteryScore === "number" ? b.masteryScore : Infinity;
+        if (scoreA !== scoreB) {
+            return scoreA - scoreB;
         }
     }
 
@@ -376,7 +378,7 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
         const course = courseMap.get(topic.courseId.toString());
         const masteryKey = `${topic.courseId}_${topic._id}`;
         const mastery = masteryMap.get(masteryKey) || {
-            masteryScore: 0,
+            masteryScore: null,
             status: MASTERY_STATUS.INSUFFICIENT_EVIDENCE,
             confidence: 0,
             evidenceCount: 0,
@@ -590,7 +592,7 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
             candidate.topicId = topic._id;
             candidate.topicTitle = topic.title;
             candidate.topicOrder = topic.order;
-            candidate.masteryScore = mastery.masteryScore;
+            candidate.masteryScore = mastery.masteryScore ?? null;
             candidate.masteryStatus = mastery.status;
             candidate.confidence = mastery.confidence;
             candidate.evidenceCount = mastery.evidenceCount;
@@ -646,7 +648,7 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
             targetId: topActionable.targetId,
             targetType: topActionable.targetType,
             priority: 1,
-            score: topActionable.masteryScore,
+            score: topActionable.masteryScore ?? null,
             status: topActionable.masteryStatus,
             reasonCode: topActionable.reasonCode,
             explanation: topActionable.explanation,
@@ -670,7 +672,7 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
         targetType: c.targetType,
         priority: index + 1,
         tier: c.tierKey,
-        masteryScore: c.masteryScore,
+        masteryScore: c.masteryScore ?? null,
         masteryStatus: c.masteryStatus,
         confidence: c.confidence,
         reasonCode: c.reasonCode,

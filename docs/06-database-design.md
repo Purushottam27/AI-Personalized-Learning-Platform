@@ -1477,7 +1477,7 @@ Possible statuses:
 
 \`\`\`text
 
-INSUFFICIENT_EVIDENCE (provisional / baseline state; separate from low mastery)
+INSUFFICIENT_EVIDENCE (provisional / baseline state; masteryScore: null, confidence: 0; separate from low mastery)
 
 NEEDS_IMPROVEMENT (0.0 – 59.9)
 

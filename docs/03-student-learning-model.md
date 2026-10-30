@@ -914,7 +914,7 @@ The approved MVP performance categories:
 80.0 – 100.0  Strong (STRONG)
 ```
 
-- **Insufficient Evidence (`INSUFFICIENT_EVIDENCE`):** A distinct provisional baseline state representing the absence of eligible submitted evidence. It is never classified as a performance weakness.
+- **Insufficient Evidence (`INSUFFICIENT_EVIDENCE`):** A distinct provisional baseline state representing the absence of eligible submitted evidence (`masteryScore: null`, `confidence: 0`). It is never classified as a performance weakness or a zero mastery score.
 - At least one eligible submitted evidence event is required before assigning a performance category.
 - **Progression Boundary:** Mastery estimates do not independently unlock topics or override formal assessment passing requirements; formal passing thresholds defined by instructors remain deterministic and authoritative.
 

@@ -497,7 +497,7 @@ export async function getLearnerCourseProgressService(learnerId, courseId) {
             topicId: topic._id.toString(),
             title: topic.title,
             order: topic.order,
-            masteryScore: m ? m.masteryScore : 0,
+            masteryScore: m ? (m.masteryScore ?? null) : null,
             status: m ? m.status : MASTERY_STATUS.INSUFFICIENT_EVIDENCE,
             confidence: m ? m.confidence : 0,
             evidenceCount: m ? m.evidenceCount : 0,

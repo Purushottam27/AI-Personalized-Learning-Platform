@@ -61,7 +61,7 @@ export interface TopicProgressItem {
   topicId: string;
   title: string;
   order: number;
-  masteryScore: number;
+  masteryScore: number | null;
   status: string;
   confidence: number;
   evidenceCount: number;

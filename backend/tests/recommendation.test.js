@@ -452,7 +452,7 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
             for (const rec of res.recommendations) {
                 assert.equal(rec.tier, RECOMMENDATION_TIERS.INSUFFICIENT_EVIDENCE.key);
                 assert.equal(rec.masteryStatus, MASTERY_STATUS.INSUFFICIENT_EVIDENCE);
-                assert.equal(rec.masteryScore, 0);
+                assert.equal(rec.masteryScore, null);
             }
         });
 

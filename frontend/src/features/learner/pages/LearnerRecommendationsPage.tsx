@@ -552,7 +552,7 @@ export const LearnerRecommendationsPage: React.FC = () => {
                             </div>
                           )}
 
-                          {rec.masteryScore !== undefined && rec.masteryScore > 0 && (
+                          {typeof rec.masteryScore === 'number' && rec.masteryScore > 0 && (
                             <span className="text-xs font-medium text-text-tertiary">
                               Mastery: <span className="font-semibold text-text-primary">{rec.masteryScore}%</span>
                             </span>

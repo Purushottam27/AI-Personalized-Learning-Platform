@@ -47,7 +47,7 @@ export interface LearnerRecommendationItem {
   targetType: RecommendationTargetType;
   priority: number;
   tier: RecommendationTier;
-  masteryScore: number;
+  masteryScore: number | null;
   masteryStatus: string;
   confidence: number;
   reasonCode: string;
@@ -65,7 +65,7 @@ export interface LearnerNextBestAction {
   targetId: string;
   targetType: RecommendationTargetType;
   priority: number;
-  score?: number;
+  score?: number | null;
   status?: string;
   reasonCode: string;
   explanation: string;

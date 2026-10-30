@@ -35,7 +35,7 @@ function clamp(val, min, max) {
 export function computeTopicMastery(evidenceList = []) {
     if (!Array.isArray(evidenceList) || evidenceList.length === 0) {
         return {
-            masteryScore: 0,
+            masteryScore: null,
             status: MASTERY_STATUS.INSUFFICIENT_EVIDENCE,
             confidence: 0,
             evidenceCount: 0,
@@ -103,7 +103,7 @@ export function computeTopicMastery(evidenceList = []) {
     // If no eligible evidence or no positive total weight exists, represent as insufficient evidence
     if (totalWeightSum <= 0) {
         return {
-            masteryScore: 0,
+            masteryScore: null,
             status: MASTERY_STATUS.INSUFFICIENT_EVIDENCE,
             confidence: 0,
             evidenceCount: n,

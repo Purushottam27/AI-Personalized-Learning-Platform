@@ -23,10 +23,10 @@ const topicMasterySchema = new mongoose.Schema(
         },
         masteryScore: {
             type: Number,
-            required: true,
+            required: false,
             min: 0,
             max: 100,
-            default: 0,
+            default: null,
         },
         status: {
             type: String,

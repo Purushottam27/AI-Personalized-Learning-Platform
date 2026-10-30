@@ -30,6 +30,7 @@ import {
     getLearnerCourseMasteryService,
     getLearnerWeaknessesService,
     getInstructorTopicMasteryService,
+    serializeTopicMastery,
 } from "../src/modules/topicMastery/services/topicMastery.service.js";
 import { computeTopicMastery } from "../src/modules/topicMastery/services/masteryCalculation.service.js";
 import {
@@ -172,7 +173,7 @@ test("Stage 5 — Topic Mastery & Weakness Detection Test Suite", async (t) => {
     // ==========================================
     await t.test("1.1 computeTopicMastery handles empty evidence list with INSUFFICIENT_EVIDENCE", () => {
         const result = computeTopicMastery([]);
-        assert.equal(result.masteryScore, 0);
+        assert.equal(result.masteryScore, null);
         assert.equal(result.status, MASTERY_STATUS.INSUFFICIENT_EVIDENCE);
         assert.equal(result.confidence, 0);
         assert.equal(result.evidenceCount, 0);
@@ -193,7 +194,7 @@ test("Stage 5 — Topic Mastery & Weakness Detection Test Suite", async (t) => {
             },
         ];
         const result = computeTopicMastery(evidence);
-        assert.equal(result.masteryScore, 0);
+        assert.equal(result.masteryScore, null);
         assert.equal(result.status, MASTERY_STATUS.INSUFFICIENT_EVIDENCE);
         assert.equal(result.confidence, 0);
     });
@@ -316,10 +317,10 @@ test("Stage 5 — Topic Mastery & Weakness Detection Test Suite", async (t) => {
     });
 
     await t.test("1.9 computeTopicMastery keeps INSUFFICIENT_EVIDENCE distinct from a low mastery score", () => {
-        // Zero evidence -> INSUFFICIENT_EVIDENCE, score 0, confidence 0
+        // Zero evidence -> INSUFFICIENT_EVIDENCE, score null, confidence 0
         const zeroResult = computeTopicMastery([]);
         assert.equal(zeroResult.status, MASTERY_STATUS.INSUFFICIENT_EVIDENCE);
-        assert.equal(zeroResult.masteryScore, 0);
+        assert.equal(zeroResult.masteryScore, null);
         assert.equal(zeroResult.confidence, 0);
 
         // Evidence with 0% score -> NEEDS_IMPROVEMENT with calculated confidence
@@ -571,7 +572,7 @@ test("Stage 5 — Topic Mastery & Weakness Detection Test Suite", async (t) => {
         assert.equal(res.status, 200);
         const body = await res.json();
         assert.equal(body.data.topicId.toString(), topic1Id.toString());
-        assert.equal(body.data.masteryScore, 0);
+        assert.equal(body.data.masteryScore, null);
         assert.equal(body.data.status, MASTERY_STATUS.INSUFFICIENT_EVIDENCE);
         assert.equal(body.data.confidence, 0);
         assert.equal(body.data.evidenceCount, 0);
@@ -658,5 +659,24 @@ test("Stage 5 — Topic Mastery & Weakness Detection Test Suite", async (t) => {
         assert.equal(res.status, 400);
         const body = await res.json();
         assert.equal(body.error?.code, "VALIDATION_ERROR");
+    });
+
+    await t.test("3.11 Recalculating topic with zero evidence persists and serializes masteryScore: null", async () => {
+        const zeroEvidenceLearnerId = new mongoose.Types.ObjectId();
+        const doc = await recalculateTopicMasteryService(zeroEvidenceLearnerId, courseId, topic2Id);
+        assert.equal(doc.status, MASTERY_STATUS.INSUFFICIENT_EVIDENCE);
+        assert.equal(doc.masteryScore, null);
+        assert.equal(doc.confidence, 0);
+
+        const serialized = serializeTopicMastery(doc);
+        assert.equal(serialized.status, MASTERY_STATUS.INSUFFICIENT_EVIDENCE);
+        assert.equal(serialized.masteryScore, null);
+        assert.equal(serialized.confidence, 0);
+
+        // Fetch from database directly to verify persistence
+        const found = await TopicMastery.findOne({ learnerId: zeroEvidenceLearnerId, courseId, topicId: topic2Id });
+        assert.ok(found);
+        assert.equal(found.status, MASTERY_STATUS.INSUFFICIENT_EVIDENCE);
+        assert.equal(found.masteryScore, null);
     });
 });
