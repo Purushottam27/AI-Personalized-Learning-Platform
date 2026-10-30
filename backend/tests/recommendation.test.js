@@ -27,6 +27,8 @@ import { Enrollment } from "../src/modules/enrollment/models/enrollment.model.js
 import { LearningEvidence } from "../src/modules/learningEvidence/models/learningEvidence.model.js";
 import { LearnerProfile } from "../src/modules/learner/models/learnerProfile.model.js";
 import { TopicMastery } from "../src/modules/topicMastery/models/topicMastery.model.js";
+import { recordPracticeEvidenceService } from "../src/modules/learningEvidence/services/learningEvidence.service.js";
+import { PracticeAttempt } from "../src/modules/practice/models/practiceAttempt.model.js";
 import { Assessment } from "../src/modules/assessment/models/assessment.model.js";
 import { AssessmentAttempt } from "../src/modules/assessmentAttempt/models/assessmentAttempt.model.js";
 import { MASTERY_STATUS } from "../src/modules/topicMastery/constants/mastery.constants.js";
@@ -800,6 +802,7 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
                 options: [{ key: "A", text: "Opt A" }, { key: "B", text: "Opt B" }],
                 correctAnswer: "A",
                 marks: 1,
+                difficulty: "MEDIUM",
             }));
         }
 
@@ -1185,6 +1188,151 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
                 "When prerequisite is completed, active-course practice remains highest priority"
             );
             assert.equal(resWithCompletedPrereq.nextBestAction.targetId.toString(), activePracticeId.toString());
+        });
+
+        await t.test("5.7 Explainability & Follow-through: Evidence accuracy and recommendation refresh after activity", async () => {
+            const flowLearnerId = new mongoose.Types.ObjectId();
+            const flowCourseId = new mongoose.Types.ObjectId();
+            const flowTopic1Id = new mongoose.Types.ObjectId();
+            const flowTopic2Id = new mongoose.Types.ObjectId();
+            const flowPractice1Id = new mongoose.Types.ObjectId();
+            const flowLesson1Id = new mongoose.Types.ObjectId();
+
+            createdUserIds.push(flowLearnerId);
+            createdCourseIds.push(flowCourseId);
+            createdTopicIds.push(flowTopic1Id, flowTopic2Id);
+            createdPracticeIds.push(flowPractice1Id);
+
+            await User.create({
+                _id: flowLearnerId,
+                name: "Flow Learner",
+                email: "flow_learner@test.com",
+                passwordHash: "hash123",
+                role: "LEARNER",
+            });
+
+            await Course.create({
+                _id: flowCourseId,
+                title: "Flow Course",
+                description: "End to end flow verification course",
+                createdBy: instructorId,
+                domain: "Science",
+                category: "Chemistry",
+                difficulty: "BEGINNER",
+                status: "PUBLISHED",
+                progressionPolicy: { lockingEnabled: false },
+            });
+
+            await Topic.create([
+                { _id: flowTopic1Id, courseId: flowCourseId, title: "Organic Fundamentals", order: 1 },
+                { _id: flowTopic2Id, courseId: flowCourseId, title: "Reaction Kinetics", order: 2 },
+            ]);
+
+            await Lesson.create([
+                { _id: flowLesson1Id, topicId: flowTopic1Id, title: "Intro to Organic Compounds", order: 1, content: [{ type: "TEXT", value: "Intro" }] },
+            ]);
+
+            await Practice.create({
+                _id: flowPractice1Id,
+                courseId: flowCourseId,
+                topicId: flowTopic1Id,
+                questionBankId: qBankId,
+                createdBy: instructorId,
+                title: "Practice: Organic Nomenclature",
+                status: "PUBLISHED",
+                contributeToLearningEvidence: true,
+            });
+
+            await Enrollment.create({
+                learnerId: flowLearnerId,
+                courseId: flowCourseId,
+                status: "ACTIVE",
+            });
+
+            // Step 1: Initial state (Insufficient Evidence)
+            // Verify: masteryScore is null (NEVER numeric 0 or fabricated score)
+            const initialRecs = await getLearnerRecommendationsService(flowLearnerId, { courseId: flowCourseId.toString() });
+            const initialTopic1Rec = initialRecs.recommendations.find((r) => r.topicId.toString() === flowTopic1Id.toString());
+            assert.ok(initialTopic1Rec, "Topic 1 recommendation must exist");
+            assert.equal(initialTopic1Rec.masteryScore, null, "Insufficient evidence topic must have null masteryScore");
+            assert.equal(initialTopic1Rec.masteryStatus, MASTERY_STATUS.INSUFFICIENT_EVIDENCE);
+            assert.equal(initialTopic1Rec.confidence, 0);
+            assert.equal(initialTopic1Rec.evidenceCount, 0);
+            assert.equal(initialTopic1Rec.isActionable, true);
+            assert.match(initialTopic1Rec.explanation, /insufficient evidence/i);
+            assert.doesNotMatch(initialTopic1Rec.explanation, /weak/i);
+
+            // Step 2: Learner completes practice with low score (demonstrated weakness)
+            // Persist valid LearningEvidence and recalculate mastery
+            const lowScoreAttempt = await PracticeAttempt.create({
+                learnerId: flowLearnerId,
+                practiceId: flowPractice1Id,
+                courseId: flowCourseId,
+                topicId: flowTopic1Id,
+                status: "SUBMITTED",
+                attemptNumber: 1,
+                totalMarks: 5,
+                marksAwarded: 2,
+                scorePercent: 40,
+                totalQuestions: 5,
+                correctCount: 2,
+                incorrectCount: 3,
+                timeSpentSeconds: 120,
+                submittedAt: new Date(),
+                completedAt: new Date(),
+                contributeToLearningEvidence: true,
+                questions: createDummyAttemptSnapshots(),
+            });
+
+            await recordPracticeEvidenceService(lowScoreAttempt);
+
+            // Step 3: Refreshed recommendations immediately reflect updated mastery
+            const refreshedWeak = await getLearnerRecommendationsService(flowLearnerId, { courseId: flowCourseId.toString() });
+            const weakRec = refreshedWeak.recommendations.find((r) => r.topicId.toString() === flowTopic1Id.toString());
+            assert.ok(weakRec);
+            assert.equal(weakRec.tier, RECOMMENDATION_TIERS.DEMONSTRATED_WEAKNESS.key);
+            assert.equal(weakRec.masteryStatus, MASTERY_STATUS.NEEDS_IMPROVEMENT);
+            assert.equal(typeof weakRec.masteryScore, "number");
+            assert.ok(weakRec.masteryScore <= 59);
+            assert.ok(weakRec.evidenceCount >= 1, "evidenceCount must accurately reflect submitted evidence");
+            assert.ok(weakRec.confidence > 0, "confidence must be non-zero after recorded evidence");
+            assert.match(weakRec.explanation, /NEEDS_IMPROVEMENT/);
+            assert.equal(refreshedWeak.nextBestAction.actionType, RECOMMENDATION_ACTION_TYPES.ATTEMPT_PRACTICE);
+            assert.equal(refreshedWeak.nextBestAction.targetId.toString(), flowPractice1Id.toString());
+
+            // Step 4: Learner completes additional high-scoring practices -> mastery updates to STRONG
+            // We record 5 consecutive 100% attempts
+            for (let i = 0; i < 5; i++) {
+                const highAttempt = await PracticeAttempt.create({
+                    learnerId: flowLearnerId,
+                    practiceId: flowPractice1Id,
+                    courseId: flowCourseId,
+                    topicId: flowTopic1Id,
+                    status: "SUBMITTED",
+                    attemptNumber: i + 2,
+                    totalMarks: 5,
+                    marksAwarded: 5,
+                    scorePercent: 100,
+                    totalQuestions: 5,
+                    correctCount: 5,
+                    incorrectCount: 0,
+                    timeSpentSeconds: 90,
+                    submittedAt: new Date(),
+                    completedAt: new Date(),
+                    contributeToLearningEvidence: true,
+                    questions: createDummyAttemptSnapshots(),
+                });
+                await recordPracticeEvidenceService(highAttempt);
+            }
+
+            // Step 5: Refreshed recommendations: weak remedial recommendation is replaced!
+            // Now Topic 1 is strong, and Topic 2 is unlocked -> natural follow-through recommends progressing to Topic 2!
+            const refreshedStrong = await getLearnerRecommendationsService(flowLearnerId, { courseId: flowCourseId.toString() });
+            const progRec = refreshedStrong.recommendations.find((r) => r.actionType === RECOMMENDATION_ACTION_TYPES.PROGRESS_TO_TOPIC);
+            assert.ok(progRec, "Completed weak state must be replaced by progression action");
+            assert.equal(progRec.targetId.toString(), flowTopic2Id.toString());
+            assert.equal(progRec.isActionable, true);
+            assert.match(progRec.explanation, /solid mastery|mastered/i);
         });
     });
 

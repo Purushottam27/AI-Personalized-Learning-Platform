@@ -371,11 +371,15 @@ export const LearnerRecommendationsPage: React.FC = () => {
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-signal text-white">
                         <Sparkles className="w-3.5 h-3.5" /> Next Best Action
                       </span>
-                      {nextBestAction.status && (
+                      {nextBestAction.status && typeof nextBestAction.score === 'number' && nextBestAction.score !== null ? (
                         <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-surface-disabled text-text-secondary border border-border">
-                          Mastery: {nextBestAction.score}% ({nextBestAction.status})
+                          Mastery: {nextBestAction.score}% ({nextBestAction.status.replace(/_/g, ' ')})
                         </span>
-                      )}
+                      ) : nextBestAction.status ? (
+                        <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-surface-disabled text-text-secondary border border-border">
+                          Status: {nextBestAction.status.replace(/_/g, ' ')}
+                        </span>
+                      ) : null}
                     </div>
 
                     <h3 className="text-xl sm:text-2xl font-bold text-text-primary font-display">
@@ -552,11 +556,21 @@ export const LearnerRecommendationsPage: React.FC = () => {
                             </div>
                           )}
 
-                          {typeof rec.masteryScore === 'number' && rec.masteryScore > 0 && (
+                          {typeof rec.masteryScore === 'number' && rec.masteryScore !== null ? (
                             <span className="text-xs font-medium text-text-tertiary">
                               Mastery: <span className="font-semibold text-text-primary">{rec.masteryScore}%</span>
+                              {typeof rec.confidence === 'number' && rec.confidence > 0 && (
+                                <span className="ml-1 text-[11px] text-text-tertiary">
+                                  ({Math.round(rec.confidence * 100)}% conf
+                                  {typeof rec.evidenceCount === 'number' && rec.evidenceCount > 0 ? `, ${rec.evidenceCount} evidence` : ''})
+                                </span>
+                              )}
                             </span>
-                          )}
+                          ) : rec.masteryStatus === 'INSUFFICIENT_EVIDENCE' ? (
+                            <span className="text-xs font-medium text-text-tertiary">
+                              Status: <span className="font-semibold text-text-primary">New Topic (Awaiting Evidence)</span>
+                            </span>
+                          ) : null}
                         </div>
                       </div>
 
@@ -573,7 +587,7 @@ export const LearnerRecommendationsPage: React.FC = () => {
                         ) : (
                           <div className="flex flex-col items-end gap-1.5">
                             <span className="text-[11px] font-medium text-text-tertiary italic">
-                              Content in preparation
+                              {rec.reasonCode === 'TOPIC_LOCKED' ? 'Locked (Complete Prior Assessments)' : 'Content in preparation'}
                             </span>
                             <button
                               onClick={() => handleNavigateToAction(rec)}

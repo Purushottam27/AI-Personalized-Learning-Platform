@@ -50,6 +50,7 @@ export interface LearnerRecommendationItem {
   masteryScore: number | null;
   masteryStatus: string;
   confidence: number;
+  evidenceCount?: number;
   reasonCode: string;
   explanation: string;
   isActionable: boolean;
@@ -67,6 +68,8 @@ export interface LearnerNextBestAction {
   priority: number;
   score?: number | null;
   status?: string;
+  confidence?: number;
+  evidenceCount?: number;
   reasonCode: string;
   explanation: string;
   isActionable: boolean;
