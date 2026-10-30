@@ -3,16 +3,38 @@ import { Course } from "../../course/models/course.model.js";
 import { AssessmentAttempt } from "../../assessmentAttempt/models/assessmentAttempt.model.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
-async function assertPrerequisitesSatisfied(learnerId, prerequisiteCourseIds) {
-    if (prerequisiteCourseIds.length === 0) return;
+export async function evaluatePrerequisites(learnerId, prerequisiteCourseIds = []) {
+    const rawIds = Array.isArray(prerequisiteCourseIds) ? prerequisiteCourseIds : [];
+    const validIds = rawIds.filter((id) => id && /^[0-9a-fA-F]{24}$/.test(String(id)));
 
-    const completedCount = await Enrollment.countDocuments({
+    if (validIds.length === 0) {
+        return { isSatisfied: true, completedCourseIds: [], unmetCourseIds: [] };
+    }
+
+    const completedEnrollments = await Enrollment.find({
         learnerId,
-        courseId: { $in: prerequisiteCourseIds },
-        status: "COMPLETED"
-    });
+        courseId: { $in: validIds },
+        status: "COMPLETED",
+    }).select("courseId").lean();
 
-    if (completedCount !== prerequisiteCourseIds.length) {
+    const completedSet = new Set(completedEnrollments.map((e) => e.courseId.toString()));
+    const unmetCourseIds = validIds
+        .map((id) => id.toString())
+        .filter((idStr) => !completedSet.has(idStr));
+
+    return {
+        isSatisfied: unmetCourseIds.length === 0,
+        completedCourseIds: Array.from(completedSet),
+        unmetCourseIds,
+    };
+}
+
+async function assertPrerequisitesSatisfied(learnerId, prerequisiteCourseIds) {
+    if (!prerequisiteCourseIds || prerequisiteCourseIds.length === 0) return;
+
+    const evaluation = await evaluatePrerequisites(learnerId, prerequisiteCourseIds);
+
+    if (!evaluation.isSatisfied) {
         throw new ApiError(
             409,
             "PREREQUISITE_NOT_SATISFIED",

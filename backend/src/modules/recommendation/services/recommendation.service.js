@@ -4,6 +4,7 @@ import { Topic } from "../../topic/models/topic.model.js";
 import { Lesson } from "../../lesson/models/lesson.model.js";
 import { Practice } from "../../practice/models/practice.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
+import { evaluatePrerequisites } from "../../enrollment/services/enrollment.service.js";
 import { LearnerProfile } from "../../learner/models/learnerProfile.model.js";
 import { TopicMastery } from "../../topicMastery/models/topicMastery.model.js";
 import { MASTERY_STATUS } from "../../topicMastery/constants/mastery.constants.js";
@@ -111,14 +112,68 @@ export async function findCourseDiscoveryRecommendations(learnerId, excludedCour
         return (a.course.title || "").localeCompare(b.course.title || "");
     });
 
-    return scoredCourses.slice(0, limit).map((item, index) => {
+    const topScored = scoredCourses.slice(0, limit);
+
+    // Collect all prerequisite course IDs referenced by top scored courses
+    const allPrereqCourseIds = new Set();
+    for (const item of topScored) {
+        const prereqList = item.course.prerequisites?.courses || [];
+        for (const pId of prereqList) {
+            if (pId) allPrereqCourseIds.add(pId.toString());
+        }
+    }
+
+    // Resolve prerequisite course metadata for published prerequisite courses
+    const prereqDocs = allPrereqCourseIds.size > 0
+        ? await Course.find({ _id: { $in: Array.from(allPrereqCourseIds) } }).select("_id title status domain difficulty").lean()
+        : [];
+    const prereqDocMap = new Map(prereqDocs.map((doc) => [doc._id.toString(), doc]));
+
+    // Evaluate prerequisites for each recommended discovery course using existing evaluatePrerequisites
+    const discoveryItems = [];
+    for (let index = 0; index < topScored.length; index++) {
+        const item = topScored[index];
         const c = item.course;
         const topTerm = item.matchedTerms[0] || null;
-        const reason = topTerm
+        let reason = topTerm
             ? `Matches your interest in "${topTerm}"`
             : "Recommended based on your learning goals and profile";
 
-        return {
+        const prereqCourseIds = c.prerequisites?.courses || [];
+        const prereqEvaluation = await evaluatePrerequisites(learnerId, prereqCourseIds);
+
+        // Identify unmet prerequisites and whether any are published/enrollable
+        const unmetPrereqTitles = [];
+        const unmetPrereqDetails = [];
+        for (const unmetId of prereqEvaluation.unmetCourseIds) {
+            const pDoc = prereqDocMap.get(unmetId);
+            if (pDoc) {
+                unmetPrereqTitles.push(pDoc.title);
+                unmetPrereqDetails.push({
+                    courseId: pDoc._id,
+                    title: pDoc.title,
+                    status: pDoc.status,
+                    domain: pDoc.domain,
+                    difficulty: pDoc.difficulty,
+                    isPublished: pDoc.status === "PUBLISHED",
+                });
+            } else {
+                unmetPrereqTitles.push("Prerequisite Course");
+                unmetPrereqDetails.push({
+                    courseId: unmetId,
+                    title: "Prerequisite Course",
+                    status: "UNKNOWN",
+                    isPublished: false,
+                });
+            }
+        }
+
+        let explanation = reason;
+        if (!prereqEvaluation.isSatisfied && unmetPrereqTitles.length > 0) {
+            explanation = `${reason}. Note: Requires completion of prerequisite course(s): ${unmetPrereqTitles.join(", ")}.`;
+        }
+
+        discoveryItems.push({
             id: `rec_course_${c._id}`,
             actionType: "EXPLORE_COURSE",
             courseId: c._id,
@@ -133,10 +188,62 @@ export async function findCourseDiscoveryRecommendations(learnerId, excludedCour
             priority: index + 1,
             matchedInterest: topTerm,
             reason,
-            explanation: reason,
+            explanation,
             isActionable: true,
-        };
-    });
+            prerequisitesSatisfied: prereqEvaluation.isSatisfied,
+            unmetPrerequisites: unmetPrereqDetails,
+        });
+    }
+
+    return discoveryItems;
+}
+
+/**
+ * Helper to determine the top next best action when course discovery is active
+ * and there are no higher-priority active-course candidates.
+ * Prioritizes required published prerequisite courses over regular course exploration.
+ */
+function resolveCourseDiscoveryNextBestAction(courseDiscoveryRecommendations = []) {
+    if (!courseDiscoveryRecommendations || courseDiscoveryRecommendations.length === 0) {
+        return null;
+    }
+
+    // Check if any discovery recommendation has unmet prerequisites that are published courses
+    for (const rec of courseDiscoveryRecommendations) {
+        if (!rec.prerequisitesSatisfied && Array.isArray(rec.unmetPrerequisites)) {
+            const firstPublishedPrereq = rec.unmetPrerequisites.find((p) => p.isPublished);
+            if (firstPublishedPrereq) {
+                return {
+                    type: "EXPLORE_COURSE",
+                    title: `Complete Prerequisite: ${firstPublishedPrereq.title}`,
+                    description: `Course "${rec.courseTitle}" requires "${firstPublishedPrereq.title}" as a prerequisite before you can enroll. Start this prerequisite course first.`,
+                    actionType: "EXPLORE_COURSE",
+                    courseId: firstPublishedPrereq.courseId,
+                    targetId: firstPublishedPrereq.courseId,
+                    targetType: "COURSE",
+                    priority: 1,
+                    reasonCode: "PREREQUISITE_COURSE_REQUIRED",
+                    explanation: `Prerequisite for "${rec.courseTitle}". Completing this course satisfies prerequisite requirements for enrollment.`,
+                    isActionable: true,
+                };
+            }
+        }
+    }
+
+    const topCourse = courseDiscoveryRecommendations[0];
+    return {
+        type: "EXPLORE_COURSE",
+        title: topCourse.title,
+        description: topCourse.description,
+        actionType: "EXPLORE_COURSE",
+        courseId: topCourse.courseId,
+        targetId: topCourse.targetId,
+        targetType: "COURSE",
+        priority: 1,
+        reasonCode: "INTEREST_DISCOVERY",
+        explanation: topCourse.reason,
+        isActionable: true,
+    };
 }
 
 /**
@@ -229,21 +336,8 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
                 };
             }
 
-            const topCourse = courseDiscoveryRecommendations[0];
             return {
-                nextBestAction: {
-                    type: "EXPLORE_COURSE",
-                    title: topCourse.title,
-                    description: topCourse.description,
-                    actionType: "EXPLORE_COURSE",
-                    courseId: topCourse.courseId,
-                    targetId: topCourse.targetId,
-                    targetType: "COURSE",
-                    priority: 1,
-                    reasonCode: "INTEREST_DISCOVERY",
-                    explanation: topCourse.reason,
-                    isActionable: true,
-                },
+                nextBestAction: resolveCourseDiscoveryNextBestAction(courseDiscoveryRecommendations),
                 recommendations: [],
                 courseRecommendations: courseDiscoveryRecommendations,
                 totalCount: courseDiscoveryRecommendations.length,
@@ -265,21 +359,8 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
                 };
             }
 
-            const topCourse = courseDiscoveryRecommendations[0];
             return {
-                nextBestAction: {
-                    type: "EXPLORE_COURSE",
-                    title: topCourse.title,
-                    description: topCourse.description,
-                    actionType: "EXPLORE_COURSE",
-                    courseId: topCourse.courseId,
-                    targetId: topCourse.targetId,
-                    targetType: "COURSE",
-                    priority: 1,
-                    reasonCode: "INTEREST_DISCOVERY",
-                    explanation: topCourse.reason,
-                    isActionable: true,
-                },
+                nextBestAction: resolveCourseDiscoveryNextBestAction(courseDiscoveryRecommendations),
                 recommendations: [],
                 courseRecommendations: courseDiscoveryRecommendations,
                 totalCount: courseDiscoveryRecommendations.length,
@@ -296,21 +377,8 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
 
     if (topics.length === 0) {
         if (courseDiscoveryRecommendations.length > 0) {
-            const topCourse = courseDiscoveryRecommendations[0];
             return {
-                nextBestAction: {
-                    type: "EXPLORE_COURSE",
-                    title: topCourse.title,
-                    description: topCourse.description,
-                    actionType: "EXPLORE_COURSE",
-                    courseId: topCourse.courseId,
-                    targetId: topCourse.targetId,
-                    targetType: "COURSE",
-                    priority: 1,
-                    reasonCode: "INTEREST_DISCOVERY",
-                    explanation: topCourse.reason,
-                    isActionable: true,
-                },
+                nextBestAction: resolveCourseDiscoveryNextBestAction(courseDiscoveryRecommendations),
                 recommendations: [],
                 courseRecommendations: courseDiscoveryRecommendations,
                 totalCount: courseDiscoveryRecommendations.length,
@@ -602,21 +670,8 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
 
     if (candidates.length === 0) {
         if (courseDiscoveryRecommendations.length > 0) {
-            const topCourse = courseDiscoveryRecommendations[0];
             return {
-                nextBestAction: {
-                    type: "EXPLORE_COURSE",
-                    title: topCourse.title,
-                    description: topCourse.description,
-                    actionType: "EXPLORE_COURSE",
-                    courseId: topCourse.courseId,
-                    targetId: topCourse.targetId,
-                    targetType: "COURSE",
-                    priority: 1,
-                    reasonCode: "INTEREST_DISCOVERY",
-                    explanation: topCourse.reason,
-                    isActionable: true,
-                },
+                nextBestAction: resolveCourseDiscoveryNextBestAction(courseDiscoveryRecommendations),
                 recommendations: [],
                 courseRecommendations: courseDiscoveryRecommendations,
                 totalCount: courseDiscoveryRecommendations.length,

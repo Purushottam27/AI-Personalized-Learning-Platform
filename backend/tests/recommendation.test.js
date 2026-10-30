@@ -482,6 +482,134 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
             // Cleanup profile for this test
             await LearnerProfile.deleteOne({ userId: unenrolledLearnerId });
         });
+
+        await t.test("2.5 Course discovery evaluates prerequisites and indicates completed status", async () => {
+            // Setup: Prerequisite Course (published) & Advanced Course (published, requires Prerequisite Course)
+            const prereqCourseId = new mongoose.Types.ObjectId();
+            const advancedCourseId = new mongoose.Types.ObjectId();
+
+            await Course.create([
+                {
+                    _id: prereqCourseId,
+                    title: "Foundations of AI",
+                    description: "Learn machine learning basics and algebra",
+                    domain: "Technology",
+                    category: "Artificial Intelligence",
+                    difficulty: "BEGINNER",
+                    status: "PUBLISHED",
+                    createdBy: instructorId,
+                },
+                {
+                    _id: advancedCourseId,
+                    title: "Advanced Deep Learning",
+                    description: "Deep neural networks and LLMs for AI specialists",
+                    domain: "Technology",
+                    category: "Artificial Intelligence",
+                    difficulty: "ADVANCED",
+                    status: "PUBLISHED",
+                    createdBy: instructorId,
+                    prerequisites: {
+                        courses: [prereqCourseId],
+                        knowledge: ["Linear Algebra", "Python Programming"],
+                    },
+                },
+            ]);
+
+            // Learner with interest in "Artificial Intelligence"
+            await LearnerProfile.create({
+                userId: unenrolledLearnerId,
+                interests: ["Artificial Intelligence"],
+                goals: ["Master Deep Learning"],
+                experienceLevel: "I have substantial experience",
+                onboardingState: "COMPLETED",
+            });
+
+            // Case A: Learner has completed the prerequisite course enrollment
+            await Enrollment.create({
+                learnerId: unenrolledLearnerId,
+                courseId: prereqCourseId,
+                status: "COMPLETED",
+            });
+
+            const resCompleted = await getLearnerRecommendationsService(unenrolledLearnerId);
+            const advRecCompleted = resCompleted.courseRecommendations.find(
+                (c) => c.courseId.toString() === advancedCourseId.toString()
+            );
+            assert.ok(advRecCompleted, "Advanced course must be recommended in discovery");
+            assert.equal(advRecCompleted.prerequisitesSatisfied, true, "Prerequisites must be marked satisfied");
+            assert.equal(advRecCompleted.unmetPrerequisites.length, 0);
+
+            // Cleanup Case A enrollment
+            await Enrollment.deleteOne({ learnerId: unenrolledLearnerId, courseId: prereqCourseId });
+
+            // Case B: Prerequisite is NOT completed -> remains discoverable, has explanation, and NBA recommends the published prerequisite
+            const resIncomplete = await getLearnerRecommendationsService(unenrolledLearnerId);
+            const advRecIncomplete = resIncomplete.courseRecommendations.find(
+                (c) => c.courseId.toString() === advancedCourseId.toString()
+            );
+            assert.ok(advRecIncomplete, "Advanced course must remain discoverable even when prerequisites are incomplete");
+            assert.equal(advRecIncomplete.prerequisitesSatisfied, false, "Prerequisites must be marked not satisfied");
+            assert.equal(advRecIncomplete.unmetPrerequisites.length, 1);
+            assert.equal(advRecIncomplete.unmetPrerequisites[0].courseId.toString(), prereqCourseId.toString());
+            assert.equal(advRecIncomplete.unmetPrerequisites[0].title, "Foundations of AI");
+            assert.ok(advRecIncomplete.explanation.includes("Foundations of AI"), "Explanation must explain the unmet prerequisite");
+
+            // Verify NBA prioritizes the published prerequisite course over the target course
+            assert.ok(resIncomplete.nextBestAction);
+            assert.equal(resIncomplete.nextBestAction.actionType, "EXPLORE_COURSE");
+            assert.equal(resIncomplete.nextBestAction.courseId.toString(), prereqCourseId.toString(), "NBA must recommend the prerequisite course first");
+            assert.equal(resIncomplete.nextBestAction.reasonCode, "PREREQUISITE_COURSE_REQUIRED");
+            assert.ok(resIncomplete.nextBestAction.title.includes("Complete Prerequisite"));
+
+            // Case C: Multiple unmet prerequisites
+            const secondPrereqCourseId = new mongoose.Types.ObjectId();
+            await Course.create({
+                _id: secondPrereqCourseId,
+                title: "Probability and Statistics",
+                description: "Statistical modeling for Artificial Intelligence",
+                domain: "Technology",
+                category: "Artificial Intelligence",
+                difficulty: "BEGINNER",
+                status: "PUBLISHED",
+                createdBy: instructorId,
+            });
+            await Course.updateOne(
+                { _id: advancedCourseId },
+                { $set: { "prerequisites.courses": [prereqCourseId, secondPrereqCourseId] } }
+            );
+
+            const resMultiple = await getLearnerRecommendationsService(unenrolledLearnerId);
+            const advRecMultiple = resMultiple.courseRecommendations.find(
+                (c) => c.courseId.toString() === advancedCourseId.toString()
+            );
+            assert.ok(advRecMultiple);
+            assert.equal(advRecMultiple.prerequisitesSatisfied, false);
+            assert.equal(advRecMultiple.unmetPrerequisites.length, 2);
+            assert.ok(advRecMultiple.explanation.includes("Foundations of AI"));
+            assert.ok(advRecMultiple.explanation.includes("Probability and Statistics"));
+
+            // Case D: Prerequisite course is unpublished / archived -> do NOT recommend it as learner NBA action
+            await Course.updateMany(
+                { _id: { $in: [prereqCourseId, secondPrereqCourseId] } },
+                { $set: { status: "ARCHIVED" } }
+            );
+
+            const resArchivedPrereq = await getLearnerRecommendationsService(unenrolledLearnerId);
+            const advRecArchived = resArchivedPrereq.courseRecommendations.find(
+                (c) => c.courseId.toString() === advancedCourseId.toString()
+            );
+            assert.ok(advRecArchived, "Course remains discoverable even with archived prerequisite reference");
+            assert.equal(advRecArchived.prerequisitesSatisfied, false);
+            // Neither prerequisite is published, so NBA should NOT recommend an archived course
+            assert.ok(resArchivedPrereq.nextBestAction);
+            assert.notEqual(resArchivedPrereq.nextBestAction.courseId.toString(), prereqCourseId.toString());
+            assert.notEqual(resArchivedPrereq.nextBestAction.courseId.toString(), secondPrereqCourseId.toString());
+            assert.notEqual(resArchivedPrereq.nextBestAction.reasonCode, "PREREQUISITE_COURSE_REQUIRED");
+
+            // Cleanup created fixtures
+            await Course.deleteMany({ _id: { $in: [prereqCourseId, secondPrereqCourseId, advancedCourseId] } });
+            await LearnerProfile.deleteOne({ userId: unenrolledLearnerId });
+        });
     });
 
     // Test Group 3: Data Immutability & No Competing State
