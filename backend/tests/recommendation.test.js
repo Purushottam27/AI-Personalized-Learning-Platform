@@ -27,6 +27,8 @@ import { Enrollment } from "../src/modules/enrollment/models/enrollment.model.js
 import { LearningEvidence } from "../src/modules/learningEvidence/models/learningEvidence.model.js";
 import { LearnerProfile } from "../src/modules/learner/models/learnerProfile.model.js";
 import { TopicMastery } from "../src/modules/topicMastery/models/topicMastery.model.js";
+import { Assessment } from "../src/modules/assessment/models/assessment.model.js";
+import { AssessmentAttempt } from "../src/modules/assessmentAttempt/models/assessmentAttempt.model.js";
 import { MASTERY_STATUS } from "../src/modules/topicMastery/constants/mastery.constants.js";
 import { getLearnerRecommendationsService } from "../src/modules/recommendation/services/recommendation.service.js";
 import {
@@ -706,6 +708,327 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
         });
     });
 
+
+    // Test Group 5: Topic progression awareness and Unified Next Best Action
+    await t.test("5. Topic progression awareness and Unified Next Best Action", async (t) => {
+        const progCourseId = new mongoose.Types.ObjectId();
+        const progTopic1Id = new mongoose.Types.ObjectId();
+        const progTopic2Id = new mongoose.Types.ObjectId();
+        const progAssessment1Id = new mongoose.Types.ObjectId();
+        const progLesson1Id = new mongoose.Types.ObjectId();
+        const progLesson2Id = new mongoose.Types.ObjectId();
+        const progPractice1Id = new mongoose.Types.ObjectId();
+        const progPractice2Id = new mongoose.Types.ObjectId();
+
+        createdCourseIds.push(progCourseId);
+        createdTopicIds.push(progTopic1Id, progTopic2Id);
+        createdLessonIds.push(progLesson1Id, progLesson2Id);
+        createdPracticeIds.push(progPractice1Id, progPractice2Id);
+
+        // Setup Course with lockingEnabled: true
+        await Course.create({
+            _id: progCourseId,
+            title: "Topic Progression Course",
+            description: "Course to test topic progression locking in recommendations",
+            createdBy: instructorId,
+            domain: "Computer Science",
+            category: "Progression",
+            difficulty: "INTERMEDIATE",
+            status: "PUBLISHED",
+            progressionPolicy: {
+                lockingEnabled: true,
+            },
+            publicationSnapshot: {
+                requiredAssessments: [
+                    {
+                        assessmentId: progAssessment1Id,
+                        topicId: progTopic1Id,
+                        type: "TOPIC",
+                        passingScore: 70,
+                    },
+                ],
+            },
+        });
+
+        await Topic.create([
+            { _id: progTopic1Id, courseId: progCourseId, title: "Progression Topic 1", order: 1 },
+            { _id: progTopic2Id, courseId: progCourseId, title: "Progression Topic 2", order: 2 },
+        ]);
+
+        await Lesson.create([
+            { _id: progLesson1Id, topicId: progTopic1Id, title: "Lesson 1", order: 1, content: [{ type: "TEXT", value: "L1" }] },
+            { _id: progLesson2Id, topicId: progTopic2Id, title: "Lesson 2", order: 1, content: [{ type: "TEXT", value: "L2" }] },
+        ]);
+
+        await Practice.create([
+            { _id: progPractice1Id, courseId: progCourseId, topicId: progTopic1Id, questionBankId: qBankId, createdBy: instructorId, title: "Practice 1", status: "PUBLISHED" },
+            { _id: progPractice2Id, courseId: progCourseId, topicId: progTopic2Id, questionBankId: qBankId, createdBy: instructorId, title: "Practice 2", status: "PUBLISHED" },
+        ]);
+
+        await Assessment.create({
+            _id: progAssessment1Id,
+            courseId: progCourseId,
+            topicId: progTopic1Id,
+            title: "Topic 1 Required Test",
+            type: "TOPIC",
+            passingScore: 70,
+            status: "PUBLISHED",
+            createdBy: instructorId,
+        });
+
+        const testLearnerId = new mongoose.Types.ObjectId();
+        createdUserIds.push(testLearnerId);
+        await User.create({
+            _id: testLearnerId,
+            name: "Progression Test Learner",
+            email: "prog_learner@test.com",
+            passwordHash: "hash123",
+            role: "LEARNER",
+        });
+
+        await Enrollment.create({
+            learnerId: testLearnerId,
+            courseId: progCourseId,
+            status: "ACTIVE",
+        });
+
+        function createDummyAttemptSnapshots() {
+            return [1, 2, 3, 4, 5].map((_, idx) => ({
+                questionId: new mongoose.Types.ObjectId(),
+                questionText: `Snapshot question ${idx + 1}`,
+                type: "MCQ_SINGLE",
+                options: [{ key: "A", text: "Opt A" }, { key: "B", text: "Opt B" }],
+                correctAnswer: "A",
+                marks: 1,
+            }));
+        }
+
+        await t.test("5.1 Locking enabled: Topic 1 is accessible; Topic 2 direct actions are non-actionable (locked)", async () => {
+            const res = await getLearnerRecommendationsService(testLearnerId, { courseId: progCourseId.toString() });
+            
+            const topic1Rec = res.recommendations.find((r) => r.topicId.toString() === progTopic1Id.toString());
+            const topic2Rec = res.recommendations.find((r) => r.topicId.toString() === progTopic2Id.toString());
+
+            assert.ok(topic1Rec, "Topic 1 recommendation must exist");
+            assert.equal(topic1Rec.isActionable, true, "Topic 1 (first topic) must be unlocked and actionable");
+
+            assert.ok(topic2Rec, "Topic 2 recommendation must exist");
+            assert.equal(topic2Rec.isActionable, false, "Topic 2 must be marked non-actionable because prior topic assessment is incomplete");
+            assert.equal(topic2Rec.reasonCode, RECOMMENDATION_REASON_CODES.TOPIC_LOCKED);
+            assert.match(topic2Rec.explanation, /locked/i);
+        });
+
+        await t.test("5.2 Strong mastery on Topic 1 does NOT bypass locked Topic 2", async () => {
+            // Set Topic 1 mastery to STRONG, but DO NOT submit/pass the required assessment
+            await TopicMastery.create({
+                learnerId: testLearnerId,
+                courseId: progCourseId,
+                topicId: progTopic1Id,
+                masteryScore: 85,
+                status: MASTERY_STATUS.STRONG,
+                confidence: 0.9,
+                evidenceCount: 5,
+            });
+
+            const res = await getLearnerRecommendationsService(testLearnerId, { courseId: progCourseId.toString() });
+
+            // Next topic is locked; recommendation should NOT provide an actionable PROGRESS_TO_TOPIC
+            const progressRec = res.recommendations.find((r) => r.actionType === RECOMMENDATION_ACTION_TYPES.PROGRESS_TO_TOPIC);
+            if (progressRec) {
+                assert.equal(progressRec.isActionable, false, "PROGRESS_TO_TOPIC must not be actionable when target topic is locked");
+                assert.equal(progressRec.reasonCode, RECOMMENDATION_REASON_CODES.TOPIC_LOCKED);
+            } else {
+                // If practice reinforcement was chosen instead because next topic is locked, verify it reinforces current topic
+                const reinforceRec = res.recommendations.find((r) => r.actionType === RECOMMENDATION_ACTION_TYPES.ATTEMPT_PRACTICE);
+                assert.ok(reinforceRec, "Should reinforce current topic or mark progress non-actionable");
+                assert.equal(reinforceRec.topicId.toString(), progTopic1Id.toString());
+            }
+
+            // NextBestAction must not be a locked action for Topic 2
+            if (res.nextBestAction?.topicId) {
+                assert.notEqual(res.nextBestAction.topicId.toString(), progTopic2Id.toString());
+            }
+        });
+
+        await t.test("5.3 Passing required assessment unlocks Topic 2 for progression and direct action", async () => {
+            // Record passing attempt for Topic 1 required assessment
+            await AssessmentAttempt.create({
+                learnerId: testLearnerId,
+                courseId: progCourseId,
+                assessmentId: progAssessment1Id,
+                assessmentType: "TOPIC",
+                attemptNumber: 1,
+                status: "SUBMITTED",
+                passed: true,
+                passingScore: 70,
+                scorePercent: 85,
+                totalMarks: 5,
+                marksAwarded: 4.25,
+                questions: createDummyAttemptSnapshots(),
+            });
+
+            const res = await getLearnerRecommendationsService(testLearnerId, { courseId: progCourseId.toString() });
+
+            // Topic 1 is strong, now Topic 2 is unlocked!
+            const progressRec = res.recommendations.find((r) => r.actionType === RECOMMENDATION_ACTION_TYPES.PROGRESS_TO_TOPIC);
+            assert.ok(progressRec, "Progression recommendation to Topic 2 must exist");
+            assert.equal(progressRec.isActionable, true, "Progress to Topic 2 must now be actionable");
+            assert.equal(progressRec.targetId.toString(), progTopic2Id.toString());
+            assert.equal(progressRec.reasonCode, RECOMMENDATION_REASON_CODES.PROGRESSION_NEXT_TOPIC);
+
+            // And Topic 2 itself is now actionable
+            const topic2Rec = res.recommendations.find((r) => r.topicId.toString() === progTopic2Id.toString() && r.actionType !== RECOMMENDATION_ACTION_TYPES.PROGRESS_TO_TOPIC);
+            if (topic2Rec) {
+                assert.equal(topic2Rec.isActionable, true, "Direct actions on Topic 2 must be actionable once unlocked");
+            }
+        });
+
+        await t.test("5.4 Locking disabled: topics remain unlocked without passing prior assessments", async () => {
+            const noLockCourseId = new mongoose.Types.ObjectId();
+            const nlTopic1Id = new mongoose.Types.ObjectId();
+            const nlTopic2Id = new mongoose.Types.ObjectId();
+            createdCourseIds.push(noLockCourseId);
+            createdTopicIds.push(nlTopic1Id, nlTopic2Id);
+
+            await Course.create({
+                _id: noLockCourseId,
+                title: "Unlocked Course",
+                description: "Locking disabled course",
+                createdBy: instructorId,
+                domain: "Computer Science",
+                category: "Open",
+                difficulty: "BEGINNER",
+                status: "PUBLISHED",
+                progressionPolicy: {
+                    lockingEnabled: false,
+                },
+            });
+
+            await Topic.create([
+                { _id: nlTopic1Id, courseId: noLockCourseId, title: "NL Topic 1", order: 1 },
+                { _id: nlTopic2Id, courseId: noLockCourseId, title: "NL Topic 2", order: 2 },
+            ]);
+
+            await Lesson.create([
+                { topicId: nlTopic1Id, title: "NL Lesson 1", order: 1, content: [{ type: "TEXT", value: "NL1" }] },
+                { topicId: nlTopic2Id, title: "NL Lesson 2", order: 1, content: [{ type: "TEXT", value: "NL2" }] },
+            ]);
+
+            const nlLearnerId = new mongoose.Types.ObjectId();
+            createdUserIds.push(nlLearnerId);
+            await User.create({
+                _id: nlLearnerId,
+                name: "NL Learner",
+                email: "nl_learner@test.com",
+                passwordHash: "hash123",
+                role: "LEARNER",
+            });
+
+            await Enrollment.create({
+                learnerId: nlLearnerId,
+                courseId: noLockCourseId,
+                status: "ACTIVE",
+            });
+
+            const res = await getLearnerRecommendationsService(nlLearnerId, { courseId: noLockCourseId.toString() });
+            const topic2Rec = res.recommendations.find((r) => r.topicId.toString() === nlTopic2Id.toString());
+            assert.ok(topic2Rec, "Topic 2 recommendation must exist");
+            assert.equal(topic2Rec.isActionable, true, "Topic 2 must remain actionable when lockingEnabled is false");
+        });
+
+        await t.test("5.5 Unified Next Best Action: falls back to discovery prerequisite / exploration when all active topics locked", async () => {
+            const lockedOnlyLearnerId = new mongoose.Types.ObjectId();
+            const lockedCourseId = new mongoose.Types.ObjectId();
+            const lTopic1Id = new mongoose.Types.ObjectId();
+            const lTopic2Id = new mongoose.Types.ObjectId();
+            const lAssessment1Id = new mongoose.Types.ObjectId();
+
+            createdUserIds.push(lockedOnlyLearnerId);
+            createdCourseIds.push(lockedCourseId);
+            createdTopicIds.push(lTopic1Id, lTopic2Id);
+
+            await User.create({
+                _id: lockedOnlyLearnerId,
+                name: "Locked Learner",
+                email: "locked_learner@test.com",
+                passwordHash: "hash123",
+                role: "LEARNER",
+            });
+
+            // Learner has interest in Computer Science so courseDiscovery finds Course 2
+            await LearnerProfile.create({
+                userId: lockedOnlyLearnerId,
+                interests: ["Computer Science"],
+                onboardingState: "COMPLETED",
+            });
+
+            await Course.create({
+                _id: lockedCourseId,
+                title: "Locked Enrolled Course",
+                description: "Course where learner has completed Topic 1 and Topic 2 is locked",
+                createdBy: instructorId,
+                domain: "Mathematics",
+                category: "Geometry",
+                difficulty: "BEGINNER",
+                status: "PUBLISHED",
+                progressionPolicy: {
+                    lockingEnabled: true,
+                },
+                publicationSnapshot: {
+                    requiredAssessments: [
+                        { assessmentId: lAssessment1Id, topicId: lTopic1Id, type: "TOPIC", passingScore: 70 },
+                    ],
+                },
+            });
+
+            await Assessment.create({
+                _id: lAssessment1Id,
+                courseId: lockedCourseId,
+                topicId: lTopic1Id,
+                title: "Topic 1 Required Test",
+                type: "TOPIC",
+                passingScore: 70,
+                status: "PUBLISHED",
+                createdBy: instructorId,
+            });
+
+            await Topic.create([
+                { _id: lTopic1Id, courseId: lockedCourseId, title: "L Topic 1", order: 1 },
+                { _id: lTopic2Id, courseId: lockedCourseId, title: "L Topic 2", order: 2 },
+            ]);
+
+            // Topic 2 has a lesson, Topic 1 has NO lessons or practices left (mastered without practice)
+            await Lesson.create([
+                { topicId: lTopic2Id, title: "L Lesson 2", order: 1, content: [{ type: "TEXT", value: "L2" }] },
+            ]);
+
+            await Enrollment.create({
+                learnerId: lockedOnlyLearnerId,
+                courseId: lockedCourseId,
+                status: "ACTIVE",
+            });
+
+            // Topic 1 is mastered, next topic is locked, and no practices are available
+            await TopicMastery.create({
+                learnerId: lockedOnlyLearnerId,
+                courseId: lockedCourseId,
+                topicId: lTopic1Id,
+                masteryScore: 95,
+                status: MASTERY_STATUS.MASTERED,
+                confidence: 0.95,
+                evidenceCount: 6,
+            });
+
+            // Active course recommendations will only have non-actionable items (Topic 2 locked, Progress locked)
+            const res = await getLearnerRecommendationsService(lockedOnlyLearnerId);
+
+            // Since active course has no actionable items, Next Best Action unifies with course discovery!
+            assert.ok(res.nextBestAction, "Next best action must exist");
+            assert.equal(res.nextBestAction.actionType, "EXPLORE_COURSE", "Unified NBA should select course discovery when active course items are locked");
+            assert.equal(res.nextBestAction.isActionable, true, "Discovery NBA must be actionable");
+        });
+    });
+
     // Cleanup
     t.after(async () => {
         await LearnerProfile.deleteMany({ userId: { $in: createdUserIds } });
@@ -715,6 +1038,8 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
         await Lesson.deleteMany({ _id: { $in: createdLessonIds } });
         await Practice.deleteMany({ _id: { $in: createdPracticeIds } });
         await QuestionBank.deleteMany({ _id: { $in: createdBankIds } });
+        await Assessment.deleteMany({ courseId: { $in: createdCourseIds } });
+        await AssessmentAttempt.deleteMany({ learnerId: { $in: createdUserIds } });
         await Enrollment.deleteMany({ learnerId: { $in: createdUserIds } });
         await TopicMastery.deleteMany({ learnerId: { $in: createdUserIds } });
         await LearningEvidence.deleteMany({ learnerId: { $in: createdUserIds } });

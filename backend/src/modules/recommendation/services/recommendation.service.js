@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { Course } from "../../course/models/course.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
+import { isTopicUnlockedForLearner } from "../../topic/services/topicProgression.service.js";
 import { Lesson } from "../../lesson/models/lesson.model.js";
 import { Practice } from "../../practice/models/practice.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
@@ -444,6 +445,8 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
     // Evaluate rules for each topic
     for (const topic of topics) {
         const course = courseMap.get(topic.courseId.toString());
+        const unlockStatus = await isTopicUnlockedForLearner(learnerId, course, topic);
+        const isTopicUnlocked = Boolean(unlockStatus?.isUnlocked);
         const masteryKey = `${topic.courseId}_${topic._id}`;
         const mastery = masteryMap.get(masteryKey) || {
             masteryScore: null,
@@ -602,18 +605,49 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
             case MASTERY_STATUS.STRONG: {
                 const tier = RECOMMENDATION_TIERS.MASTERY_PROGRESSION;
                 if (nextTopic) {
-                    candidate = {
-                        actionType: RECOMMENDATION_ACTION_TYPES.PROGRESS_TO_TOPIC,
-                        title: `Progress to: ${nextTopic.title}`,
-                        description: `You have demonstrated ${mastery.status.toLowerCase()} mastery in "${topic.title}" (${mastery.masteryScore}%). Advance to the next topic "${nextTopic.title}".`,
-                        targetId: nextTopic._id,
-                        targetType: RECOMMENDATION_TARGET_TYPES.TOPIC,
-                        tierKey: tier.key,
-                        tierPriority: tier.priority,
-                        reasonCode: RECOMMENDATION_REASON_CODES.PROGRESSION_NEXT_TOPIC,
-                        explanation: `Topic "${topic.title}" has demonstrated solid mastery (${mastery.masteryScore}%). Proceeding to "${nextTopic.title}" is recommended.`,
-                        isActionable: true,
-                    };
+                    const nextUnlockStatus = await isTopicUnlockedForLearner(learnerId, course, nextTopic);
+                    const isNextUnlocked = Boolean(nextUnlockStatus?.isUnlocked);
+
+                    if (isNextUnlocked) {
+                        candidate = {
+                            actionType: RECOMMENDATION_ACTION_TYPES.PROGRESS_TO_TOPIC,
+                            title: `Progress to: ${nextTopic.title}`,
+                            description: `You have demonstrated ${mastery.status.toLowerCase()} mastery in "${topic.title}" (${mastery.masteryScore}%). Advance to the next topic "${nextTopic.title}".`,
+                            targetId: nextTopic._id,
+                            targetType: RECOMMENDATION_TARGET_TYPES.TOPIC,
+                            tierKey: tier.key,
+                            tierPriority: tier.priority,
+                            reasonCode: RECOMMENDATION_REASON_CODES.PROGRESSION_NEXT_TOPIC,
+                            explanation: `Topic "${topic.title}" has demonstrated solid mastery (${mastery.masteryScore}%). Proceeding to "${nextTopic.title}" is recommended.`,
+                            isActionable: true,
+                        };
+                    } else if (availablePractice) {
+                        candidate = {
+                            actionType: RECOMMENDATION_ACTION_TYPES.ATTEMPT_PRACTICE,
+                            title: `Reinforce: ${availablePractice.title}`,
+                            description: `Reinforce your strong understanding of "${topic.title}" with additional practice while next topic is locked.`,
+                            targetId: availablePractice._id,
+                            targetType: RECOMMENDATION_TARGET_TYPES.PRACTICE,
+                            tierKey: tier.key,
+                            tierPriority: tier.priority,
+                            reasonCode: RECOMMENDATION_REASON_CODES.MASTERY_REINFORCEMENT,
+                            explanation: `Topic "${topic.title}" is strong (${mastery.masteryScore}%). Next topic "${nextTopic.title}" is currently locked pending prerequisite assessments.`,
+                            isActionable: true,
+                        };
+                    } else {
+                        candidate = {
+                            actionType: RECOMMENDATION_ACTION_TYPES.PROGRESS_TO_TOPIC,
+                            title: `Progress to: ${nextTopic.title}`,
+                            description: `You have demonstrated ${mastery.status.toLowerCase()} mastery in "${topic.title}" (${mastery.masteryScore}%). However, "${nextTopic.title}" is locked.`,
+                            targetId: nextTopic._id,
+                            targetType: RECOMMENDATION_TARGET_TYPES.TOPIC,
+                            tierKey: tier.key,
+                            tierPriority: tier.priority,
+                            reasonCode: RECOMMENDATION_REASON_CODES.TOPIC_LOCKED,
+                            explanation: `Topic "${nextTopic.title}" is currently locked. Complete all required assessments in previous topics to unlock progression.`,
+                            isActionable: false,
+                        };
+                    }
                 } else if (availablePractice) {
                     candidate = {
                         actionType: RECOMMENDATION_ACTION_TYPES.ATTEMPT_PRACTICE,
@@ -634,18 +668,49 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
             case MASTERY_STATUS.MASTERED: {
                 const tier = RECOMMENDATION_TIERS.MASTERED;
                 if (nextTopic) {
-                    candidate = {
-                        actionType: RECOMMENDATION_ACTION_TYPES.PROGRESS_TO_TOPIC,
-                        title: `Progress to: ${nextTopic.title}`,
-                        description: `Topic "${topic.title}" is mastered (${mastery.masteryScore}%). Continue your journey with "${nextTopic.title}".`,
-                        targetId: nextTopic._id,
-                        targetType: RECOMMENDATION_TARGET_TYPES.TOPIC,
-                        tierKey: tier.key,
-                        tierPriority: tier.priority,
-                        reasonCode: RECOMMENDATION_REASON_CODES.COURSE_PROGRESSION,
-                        explanation: `Topic "${topic.title}" is mastered. Progress to the next topic in the curriculum.`,
-                        isActionable: true,
-                    };
+                    const nextUnlockStatus = await isTopicUnlockedForLearner(learnerId, course, nextTopic);
+                    const isNextUnlocked = Boolean(nextUnlockStatus?.isUnlocked);
+
+                    if (isNextUnlocked) {
+                        candidate = {
+                            actionType: RECOMMENDATION_ACTION_TYPES.PROGRESS_TO_TOPIC,
+                            title: `Progress to: ${nextTopic.title}`,
+                            description: `Topic "${topic.title}" is mastered (${mastery.masteryScore}%). Continue your journey with "${nextTopic.title}".`,
+                            targetId: nextTopic._id,
+                            targetType: RECOMMENDATION_TARGET_TYPES.TOPIC,
+                            tierKey: tier.key,
+                            tierPriority: tier.priority,
+                            reasonCode: RECOMMENDATION_REASON_CODES.COURSE_PROGRESSION,
+                            explanation: `Topic "${topic.title}" is mastered. Progress to the next topic in the curriculum.`,
+                            isActionable: true,
+                        };
+                    } else if (availablePractice) {
+                        candidate = {
+                            actionType: RECOMMENDATION_ACTION_TYPES.ATTEMPT_PRACTICE,
+                            title: `Reinforce: ${availablePractice.title}`,
+                            description: `Reinforce your mastery in "${topic.title}" with additional practice while next topic is locked.`,
+                            targetId: availablePractice._id,
+                            targetType: RECOMMENDATION_TARGET_TYPES.PRACTICE,
+                            tierKey: tier.key,
+                            tierPriority: tier.priority,
+                            reasonCode: RECOMMENDATION_REASON_CODES.MASTERY_REINFORCEMENT,
+                            explanation: `Topic "${topic.title}" is mastered (${mastery.masteryScore}%). Next topic "${nextTopic.title}" is currently locked pending prerequisite assessments.`,
+                            isActionable: true,
+                        };
+                    } else {
+                        candidate = {
+                            actionType: RECOMMENDATION_ACTION_TYPES.PROGRESS_TO_TOPIC,
+                            title: `Progress to: ${nextTopic.title}`,
+                            description: `Topic "${topic.title}" is mastered (${mastery.masteryScore}%). However, "${nextTopic.title}" is locked.`,
+                            targetId: nextTopic._id,
+                            targetType: RECOMMENDATION_TARGET_TYPES.TOPIC,
+                            tierKey: tier.key,
+                            tierPriority: tier.priority,
+                            reasonCode: RECOMMENDATION_REASON_CODES.TOPIC_LOCKED,
+                            explanation: `Topic "${nextTopic.title}" is currently locked. Complete all required assessments in previous topics to unlock progression.`,
+                            isActionable: false,
+                        };
+                    }
                 }
                 break;
             }
@@ -655,6 +720,13 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
         }
 
         if (candidate) {
+            // If the current topic itself is locked, its direct actions (lessons/practices) cannot be accessed
+            if (!isTopicUnlocked && candidate.actionType !== RECOMMENDATION_ACTION_TYPES.PROGRESS_TO_TOPIC) {
+                candidate.isActionable = false;
+                candidate.reasonCode = RECOMMENDATION_REASON_CODES.TOPIC_LOCKED;
+                candidate.explanation = `Topic "${topic.title}" is currently locked. Complete all required assessments in previous topics to unlock it.`;
+            }
+
             candidate.courseId = topic.courseId;
             candidate.courseTitle = course?.title || "Unknown Course";
             candidate.topicId = topic._id;
@@ -688,26 +760,51 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
     // Deterministically rank all candidates
     candidates.sort(compareRecommendations);
 
-    // Identify Next Best Action: highest-ranked actionable item (or first item as fallback)
-    const topActionable = candidates.find((c) => c.isActionable) || candidates[0] || null;
+    // Identify Next Best Action:
+    // Unified priority:
+    // 1. Highest-ranked actionable active-course candidate
+    // 2. If no actionable active-course candidates exist: course discovery Next Best Action (prerequisite before plain exploration)
+    // 3. Fallback to first active candidate (even if non-actionable) or null
+    const topActionableActive = candidates.find((c) => c.isActionable) || null;
+    const discoveryNBA = resolveCourseDiscoveryNextBestAction(courseDiscoveryRecommendations);
 
     let nextBestAction = null;
-    if (topActionable) {
+    if (topActionableActive) {
         nextBestAction = {
-            type: topActionable.actionType,
-            title: topActionable.title,
-            description: topActionable.description,
-            actionType: topActionable.actionType,
-            courseId: topActionable.courseId,
-            topicId: topActionable.topicId,
-            targetId: topActionable.targetId,
-            targetType: topActionable.targetType,
+            type: topActionableActive.actionType,
+            title: topActionableActive.title,
+            description: topActionableActive.description,
+            actionType: topActionableActive.actionType,
+            courseId: topActionableActive.courseId,
+            topicId: topActionableActive.topicId,
+            targetId: topActionableActive.targetId,
+            targetType: topActionableActive.targetType,
             priority: 1,
-            score: topActionable.masteryScore ?? null,
-            status: topActionable.masteryStatus,
-            reasonCode: topActionable.reasonCode,
-            explanation: topActionable.explanation,
-            isActionable: topActionable.isActionable,
+            score: topActionableActive.masteryScore ?? null,
+            status: topActionableActive.masteryStatus,
+            reasonCode: topActionableActive.reasonCode,
+            explanation: topActionableActive.explanation,
+            isActionable: topActionableActive.isActionable,
+        };
+    } else if (discoveryNBA) {
+        nextBestAction = discoveryNBA;
+    } else if (candidates.length > 0) {
+        const fallback = candidates[0];
+        nextBestAction = {
+            type: fallback.actionType,
+            title: fallback.title,
+            description: fallback.description,
+            actionType: fallback.actionType,
+            courseId: fallback.courseId,
+            topicId: fallback.topicId,
+            targetId: fallback.targetId,
+            targetType: fallback.targetType,
+            priority: 1,
+            score: fallback.masteryScore ?? null,
+            status: fallback.masteryStatus,
+            reasonCode: fallback.reasonCode,
+            explanation: fallback.explanation,
+            isActionable: fallback.isActionable,
         };
     }
 
