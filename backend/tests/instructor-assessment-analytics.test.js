@@ -750,6 +750,142 @@ test("Instructor Assessment and Question Analytics Test Suite", async (t) => {
         assert.match(corrInsight2.observation, /1 learner\(s\) exhibit both Needs Improvement/);
     });
 
+    await t.test("Regression: Unevaluated attempts do not affect question response statistics and duplicate answers follow first-match lookup", async () => {
+        const qCheckCourseId = new mongoose.Types.ObjectId();
+        const qCheckTopicId = new mongoose.Types.ObjectId();
+        const qCheckAssmId = new mongoose.Types.ObjectId();
+        const qLearner1Id = new mongoose.Types.ObjectId();
+        const qLearner2Id = new mongoose.Types.ObjectId();
+
+        createdCourseIds.push(qCheckCourseId);
+        createdTopicIds.push(qCheckTopicId);
+        createdAssessmentIds.push(qCheckAssmId);
+        createdUserIds.push(qLearner1Id, qLearner2Id);
+
+        await User.create([
+            { _id: qLearner1Id, name: "Q Learner Evaluated", email: "qeval@test.com", password: "p", role: "LEARNER", status: "ACTIVE" },
+            { _id: qLearner2Id, name: "Q Learner Unevaluated", email: "quneval@test.com", password: "p", role: "LEARNER", status: "ACTIVE" },
+        ]);
+
+        await Course.create({
+            _id: qCheckCourseId,
+            title: "Course for Question Analytics Regression",
+            description: "Testing unevaluated attempt exclusion and first-match answer lookup.",
+            domain: "Computer Science",
+            category: "Databases",
+            difficulty: "BEGINNER",
+            createdBy: instructor1Id,
+            status: "PUBLISHED",
+        });
+
+        await Topic.create({
+            _id: qCheckTopicId,
+            courseId: qCheckCourseId,
+            title: "QCheck Topic",
+            order: 1,
+        });
+
+        await Assessment.create({
+            _id: qCheckAssmId,
+            courseId: qCheckCourseId,
+            topicId: qCheckTopicId,
+            createdBy: instructor1Id,
+            type: "TOPIC",
+            title: "QCheck Assessment",
+            questionIds: createdQuestionIds,
+            questionsPerAttempt: 5,
+            passingScore: 60,
+            status: "PUBLISHED",
+        });
+
+        // Attempt A (Evaluated): Learner 1 submitted, scored 100%, passed.
+        // It contains a duplicate answer record for question 1:
+        // First entry: { questionId: snapshots[0].questionId, answer: "A" } (CORRECT)
+        // Second duplicate entry: { questionId: snapshots[0].questionId, answer: "B" } (INCORRECT)
+        // First-match rule must pick "A", resulting in correctCount = 1!
+        const evalAttemptWithDuplicates = await AssessmentAttempt.create({
+            assessmentId: qCheckAssmId,
+            learnerId: qLearner1Id,
+            courseId: qCheckCourseId,
+            assessmentType: "TOPIC",
+            attemptNumber: 1,
+            status: "SUBMITTED",
+            startedAt: new Date(Date.now() - 3600000),
+            submittedAt: new Date(),
+            passingScore: 60,
+            questions: snapshots,
+            answers: [
+                { questionId: snapshots[0].questionId, answer: "A" }, // First match: CORRECT
+                { questionId: snapshots[0].questionId, answer: "B" }, // Duplicate: must be ignored by first-match lookup
+                { questionId: snapshots[1].questionId, answer: "B" }, // INCORRECT
+                { questionId: snapshots[2].questionId, answer: null }, // UNANSWERED
+            ],
+            totalMarks: 10,
+            marksAwarded: 2,
+            scorePercent: 20,
+            passed: false,
+        });
+
+        // Attempt B (Unevaluated): Learner 2 submitted, scorePercent: null, passed: null
+        // Must NOT contribute to exposures or counts
+        const unevalAttempt = await AssessmentAttempt.create({
+            assessmentId: qCheckAssmId,
+            learnerId: qLearner2Id,
+            courseId: qCheckCourseId,
+            assessmentType: "TOPIC",
+            attemptNumber: 1,
+            status: "SUBMITTED",
+            startedAt: new Date(Date.now() - 1800000),
+            submittedAt: new Date(),
+            passingScore: 60,
+            questions: snapshots,
+            answers: [
+                { questionId: snapshots[0].questionId, answer: "A" },
+            ],
+            totalMarks: 10,
+            marksAwarded: null,
+            scorePercent: null,
+            passed: null,
+        });
+
+        createdAttemptIds.push(evalAttemptWithDuplicates._id, unevalAttempt._id);
+
+        const data = await getInstructorQuestionAnalyticsService(instructor1Id, qCheckAssmId);
+
+        // Verification of attempt separation
+        assert.equal(data.totalCompletedAttempts, 2);
+        assert.equal(data.totalEvaluatedAttempts, 1);
+        assert.equal(data.totalUnevaluatedAttempts, 1);
+
+        // Question 1: Evaluated attempt had duplicate answers; first match was "A" (CORRECT)
+        // Unevaluated attempt must NOT add an extra exposure
+        const q1 = data.questions.find((q) => q.questionId === snapshots[0].questionId.toString());
+        assert.ok(q1);
+        assert.equal(q1.totalExposures, 1); // Strictly 1 from evaluated attempt, not 2!
+        assert.equal(q1.correctCount, 1); // First match "A" picked!
+        assert.equal(q1.incorrectCount, 0); // Duplicate "B" was not used to overwrite
+        assert.equal(q1.unansweredCount, 0);
+        assert.equal(q1.correctPercentage, 100);
+
+        // Question 2: Evaluated attempt answered "B" (INCORRECT)
+        const q2 = data.questions.find((q) => q.questionId === snapshots[1].questionId.toString());
+        assert.ok(q2);
+        assert.equal(q2.totalExposures, 1);
+        assert.equal(q2.correctCount, 0);
+        assert.equal(q2.incorrectCount, 1);
+        assert.equal(q2.unansweredCount, 0);
+        assert.equal(q2.incorrectPercentage, 100);
+
+        // Question 3: Evaluated attempt answered null (UNANSWERED)
+        const q3 = data.questions.find((q) => q.questionId === snapshots[2].questionId.toString());
+        assert.ok(q3);
+        assert.equal(q3.totalExposures, 1);
+        assert.equal(q3.correctCount, 0);
+        assert.equal(q3.incorrectCount, 0);
+        assert.equal(q3.unansweredCount, 1);
+        assert.equal(q3.unansweredPercentage, 100);
+    });
+
     // ==========================================
     // 3. Authorization & HTTP API Endpoints Tests
     // ==========================================

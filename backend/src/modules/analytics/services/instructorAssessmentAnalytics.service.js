@@ -422,6 +422,31 @@ export async function getInstructorQuestionAnalyticsService(instructorId, assess
         status: "SUBMITTED",
     }).lean();
 
+    // Filter to only valid evaluated attempts
+    // Definition matching getInstructorAssessmentAnalyticsService:
+    // - Valid numeric scorePercent exists
+    // - Valid boolean passed exists, or derived using attempt's historical passingScore
+    const evaluatedAttempts = [];
+    let unevaluatedAttemptsCount = 0;
+
+    for (const att of attempts) {
+        const hasScore = att.scorePercent !== null && att.scorePercent !== undefined && typeof att.scorePercent === "number";
+
+        let passed = null;
+        if (att.passed !== null && att.passed !== undefined && typeof att.passed === "boolean") {
+            passed = att.passed;
+        } else if (hasScore && att.passingScore !== null && att.passingScore !== undefined && typeof att.passingScore === "number") {
+            passed = att.scorePercent >= att.passingScore;
+        }
+
+        const isEvaluated = hasScore && passed !== null;
+        if (isEvaluated) {
+            evaluatedAttempts.push(att);
+        } else {
+            unevaluatedAttemptsCount += 1;
+        }
+    }
+
     // 4. Aggregate Question Responses
     const questionStatsMap = new Map();
 
@@ -441,13 +466,13 @@ export async function getInstructorQuestionAnalyticsService(instructorId, assess
         });
     }
 
-    // Aggregate from submitted attempts using attempt snapshots
-    for (const att of attempts) {
-        const answersMap = new Map();
-        for (const ansItem of (att.answers || [])) {
-            answersMap.set(ansItem.questionId.toString(), ansItem.answer);
-        }
+    // Helper matching assessmentAttempt.service.js answerFor: returns the FIRST matching answer
+    function answerForAttempt(attempt, questionId) {
+        return attempt.answers?.find((item) => sameId(item.questionId, questionId))?.answer ?? null;
+    }
 
+    // Aggregate strictly from evaluated attempts using attempt snapshots
+    for (const att of evaluatedAttempts) {
         for (const snap of (att.questions || [])) {
             const qid = snap.questionId.toString();
 
@@ -469,7 +494,8 @@ export async function getInstructorQuestionAnalyticsService(instructorId, assess
             const stat = questionStatsMap.get(qid);
             stat.totalExposures += 1;
 
-            const submittedAnswer = answersMap.has(qid) ? answersMap.get(qid) : null;
+            // Use first-matching answer lookup matching authoritative answerFor()
+            const submittedAnswer = answerForAttempt(att, snap.questionId);
 
             if (submittedAnswer === null || submittedAnswer === undefined || submittedAnswer === "") {
                 stat.unansweredCount += 1;
@@ -541,6 +567,8 @@ export async function getInstructorQuestionAnalyticsService(instructorId, assess
         passingScore: assessment.passingScore,
         totalPoolQuestions: questionAnalyticsList.length,
         totalCompletedAttempts: attempts.length,
+        totalEvaluatedAttempts: evaluatedAttempts.length,
+        totalUnevaluatedAttempts: unevaluatedAttemptsCount,
         questions: questionAnalyticsList,
         questionInsights,
     };

@@ -190,6 +190,8 @@ export interface InstructorQuestionAnalyticsResponse {
   passingScore: number;
   totalPoolQuestions: number;
   totalCompletedAttempts: number;
+  totalEvaluatedAttempts?: number;
+  totalUnevaluatedAttempts?: number;
   questions: QuestionPerformanceItem[];
   questionInsights: ActionableInsight[];
 }
