@@ -34,6 +34,7 @@ import { InstructorCoursesPage } from '../features/instructor/pages/InstructorCo
 import { CreateCoursePage } from '../features/instructor/pages/CreateCoursePage';
 import { CourseWorkspacePage } from '../features/instructor/pages/CourseWorkspacePage';
 import { TopicWorkspacePage } from '../features/instructor/pages/TopicWorkspacePage';
+import { InstructorAnalyticsPage } from '../features/instructor/pages/InstructorAnalyticsPage';
 
 // Profile & Settings
 import { LearnerProfilePage } from '../features/profile/pages/LearnerProfilePage';
@@ -91,7 +92,7 @@ function App() {
                   <Route path="courses/:courseId/topics/:topicId" element={<TopicWorkspacePage />} />
                   <Route path="courses/:courseId" element={<CourseWorkspacePage />} />
                   <Route path="learners" element={<PlaceholderPage title="Learners" description="Manage learners enrolled in your courses." />} />
-                  <Route path="analytics" element={<PlaceholderPage title="Analytics" description="Insights into learner performance and course metrics." />} />
+                  <Route path="analytics" element={<InstructorAnalyticsPage />} />
                   <Route path="profile" element={<InstructorProfilePage />} />
                 </Route>
 

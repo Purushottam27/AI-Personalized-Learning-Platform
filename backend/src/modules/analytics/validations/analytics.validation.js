@@ -9,3 +9,11 @@ export const courseIdParamSchema = z.object({
 export const analyticsOverviewQuerySchema = z.object({
     days: z.coerce.number().int().min(1).max(30).optional().default(7),
 });
+
+export const instructorAnalyticsQuerySchema = z.object({
+    page: z.coerce.number().int().min(1).optional().default(1),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+    status: z.enum(["ACTIVE", "COMPLETED", "WITHDRAWN", "ALL"]).optional().default("ALL"),
+    search: z.string().trim().max(100).optional(),
+});
+
