@@ -577,13 +577,13 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
     });
 
     await t.test("11. Content Duration: Distinguishes ESTIMATED duration from PLANNING_ALLOCATION", async () => {
-        // sharedAssessment2 has timeLimitMinutes: 30 and was not passed by learner1 -> durationAllocationType must be ESTIMATED
+        // sharedAssessment2 has timeLimitMinutes: 20 and was not passed by learner1 -> durationAllocationType must be ESTIMATED
         // sharedLesson1 has no explicit duration on Lesson model schema (Lesson schema has content/order/title) -> PLANNING_ALLOCATION
         const candidates = await collectCandidateActivities(learner1Id, { preferredSessionDuration: 45 });
         const assessmentCandidate = candidates.find((c) => c.targetId === sharedAssessment2._id.toString());
         assert.ok(assessmentCandidate, "sharedAssessment2 candidate should be found");
         assert.equal(assessmentCandidate.durationAllocationType, "ESTIMATED");
-        assert.equal(assessmentCandidate.estimatedDurationMinutes, 30);
+        assert.equal(assessmentCandidate.estimatedDurationMinutes, 20);
 
         const lessonCandidate = candidates.find((c) => c.targetId === sharedLesson1._id.toString());
         assert.ok(lessonCandidate, "sharedLesson1 candidate should be found");
