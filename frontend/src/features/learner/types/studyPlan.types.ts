@@ -26,6 +26,8 @@ export interface ScheduledActivity {
   actualStatus?: ActivityStatus;
   isCompleted?: boolean;
   isToday?: boolean;
+  isUntrackedCompletion?: boolean;
+  durationAllocationType?: 'ESTIMATED' | 'PLANNING_ALLOCATION';
 }
 
 export interface StudyPreferences {
@@ -75,6 +77,7 @@ export interface PlanHistoryItem {
 }
 
 export interface ProposedPlanRevision {
+  proposalId?: string;
   isRevisionRecommended: boolean;
   proposedVersion: number;
   startDate: string;
@@ -82,6 +85,7 @@ export interface ProposedPlanRevision {
   reason: string;
   proposedActivities: ScheduledActivity[];
   preferencesSnapshot: StudyPreferences;
+  expiresAt?: string;
 }
 
 export interface ChatMessage {

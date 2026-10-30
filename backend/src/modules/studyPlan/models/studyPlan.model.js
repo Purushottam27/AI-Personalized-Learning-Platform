@@ -58,6 +58,11 @@ const scheduledActivitySchema = new mongoose.Schema({
         type: Number,
         default: 30
     },
+    durationAllocationType: {
+        type: String,
+        enum: ["ESTIMATED", "PLANNING_ALLOCATION"],
+        default: "PLANNING_ALLOCATION"
+    },
     rationale: {
         type: String,
         required: true

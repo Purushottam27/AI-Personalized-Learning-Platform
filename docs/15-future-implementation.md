@@ -1,4 +1,10 @@
-# Future Implementation & Deferred Decisions
+\| preferredTime \| Implemented in Phase 4 (preferredTimeOfDay) \|
+
+\| preferredSessionDuration \| Implemented in Phase 4 \|
+
+\| studyDays \| Implemented in Phase 4 \|
+
+\| Weekly study scheduling \| Implemented in Phase 4 \|# Future Implementation & Deferred Decisions
 
 \> **\*\*Purpose:\*\*** Record features, architectural enhancements, and implementation decisions that have been intentionally deferred from the current MVP but may be required or valuable in future phases.
 

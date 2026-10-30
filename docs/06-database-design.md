@@ -3016,13 +3016,27 @@ Persists versioned, evidence-grounded study plans for learners.
   - `activityId`: Target ObjectId
   - `title`: Activity title snapshot
   - `estimatedMinutes`: Expected session duration
+  - `durationAllocationType`: Enum string (`ESTIMATED`, `PLANNING_ALLOCATION`) distinguishing actual assessment/item limits from schedule slot allocations
   - `dayOfWeek`: Planned weekday
   - `scheduledDate`: Date for the activity
   - `isCompleted`: Derived or snapshot completion flag
 - `revisionHistory`: Array of audit records for adaptation proposals and adjustments
 - Timestamps (`createdAt`, `updatedAt`)
 
-### 68.3 `AssistantConversation` Collection
+### 68.3 `StudyPlanProposal` Collection
+Persists server-generated, server-owned revision proposals that learners may review and accept without client-side tampering.
+- `learnerId`: Reference to `User` (`ObjectId`, indexed)
+- `activePlanId`: Reference to current `StudyPlan` (`ObjectId`)
+- `basedOnVersion`: Integer version of the active plan when proposal was generated
+- `proposedVersion`: Next sequential integer version (`basedOnVersion + 1`)
+- `status`: Enum string (`PENDING`, `ACCEPTED`, `EXPIRED`, `REJECTED`)
+- `proposedActivities`: Array of validated activity snapshots with re-verified metadata
+- `rationale`: Explanation for proposed schedule modifications
+- `meaningfulDifferences`: Array of detected difference summaries
+- `expiresAt`: Expiration timestamp (24-hour TTL)
+- Timestamps (`createdAt`, `updatedAt`)
+
+### 68.4 `AssistantConversation` Collection
 Persists conversational guidance between learner and contextual AI assistant.
 - `learnerId`: Reference to `User` (`ObjectId`, indexed)
 - `role`: Enum string (`user`, `assistant`, `system`)

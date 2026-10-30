@@ -19,13 +19,13 @@ export const updateStudyPreferences = async (updates: Partial<StudyPreferences>)
 };
 
 export const getActiveStudyPlan = async (): Promise<StudyPlan> => {
-  const res = await api.get<{ data: StudyPlan }>('/learning/me/study-plan');
-  return res.data.data;
+  const res = await api.get<{ data: { plan: StudyPlan } }>('/learning/me/study-plan');
+  return res.data.data.plan;
 };
 
 export const generateStudyPlan = async (revisionReason?: string): Promise<StudyPlan> => {
-  const res = await api.post<{ data: StudyPlan }>('/learning/me/study-plan/generate', { revisionReason });
-  return res.data.data;
+  const res = await api.post<{ data: { plan: StudyPlan } }>('/learning/me/study-plan/generate', { revisionReason });
+  return res.data.data.plan;
 };
 
 export const getStudyPlanHistory = async (): Promise<PlanHistoryItem[]> => {
@@ -39,8 +39,11 @@ export const proposePlanRevision = async (reason?: string): Promise<ProposedPlan
 };
 
 export const acceptPlanRevision = async (revisionData: ProposedPlanRevision): Promise<StudyPlan> => {
-  const res = await api.post<{ data: StudyPlan }>('/learning/me/study-plan/accept-revision', revisionData);
-  return res.data.data;
+  const payload = revisionData.proposalId
+    ? { proposalId: revisionData.proposalId }
+    : revisionData;
+  const res = await api.post<{ data: { plan: StudyPlan } }>('/learning/me/study-plan/accept-revision', payload);
+  return res.data.data.plan;
 };
 
 export const chatWithAssistant = async (message: string, activityId?: string): Promise<ChatReplyResponse> => {

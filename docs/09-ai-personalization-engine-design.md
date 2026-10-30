@@ -2591,5 +2591,12 @@ The AI Learning Assistant is purely **assistive, explanatory, and advisory**:
   3. Enrolled courses and currently unlocked topics.
   4. Identified strengths and topics needing attention.
 - When the external AI provider is unavailable, degraded, or rate-limited:
-  - The backend smoothly defaults to deterministic template-based guidance.
+  - The backend smoothly defaults to deterministic template-based guidance with `fallbackUsed: true`.
   - The assistant remains responsive and informative without throwing system exceptions.
+
+### 43.3 Study Plan Revision Protocol & Server Authority
+- Revisions are never accepted from unverified client activity payloads.
+- All proposals are generated as server-owned `StudyPlanProposal` records, tied to the learner, with explicit 24-hour expiration (`expiresAt`) and base plan version binding.
+- Revisions evaluate whether newly generated schedules meaningfully differ from the current active plan (`isRevisionRecommended`) before suggesting change.
+- Revision acceptance validates learner ownership, non-expiration, active version matching, and rigorously re-validates all activities against database models and `isTopicUnlockedForLearner`.
+- Plan activation and archiving are executed atomically inside a database transaction to prevent plan duplication or orphaned states.

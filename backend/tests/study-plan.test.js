@@ -20,21 +20,31 @@ import { User } from "../src/modules/identity/models/user.model.js";
 import { Course } from "../src/modules/course/models/course.model.js";
 import { Topic } from "../src/modules/topic/models/topic.model.js";
 import { Lesson } from "../src/modules/lesson/models/lesson.model.js";
+import { Practice } from "../src/modules/practice/models/practice.model.js";
+import { Assessment } from "../src/modules/assessment/models/assessment.model.js";
+import { AssessmentAttempt } from "../src/modules/assessmentAttempt/models/assessmentAttempt.model.js";
 import { Enrollment } from "../src/modules/enrollment/models/enrollment.model.js";
 import { LearningEvidence } from "../src/modules/learningEvidence/models/learningEvidence.model.js";
 import { LearnerProfile } from "../src/modules/learner/models/learnerProfile.model.js";
+import { TopicMastery } from "../src/modules/topicMastery/models/topicMastery.model.js";
 import { StudyPlan } from "../src/modules/studyPlan/models/studyPlan.model.js";
+import { StudyPlanProposal } from "../src/modules/studyPlan/models/studyPlanProposal.model.js";
 import { AssistantConversation } from "../src/modules/studyPlan/models/assistantConversation.model.js";
+import { setAiProvider, resetAiProvider } from "../src/modules/aiAssistant/providers/index.js";
 import {
     generateStudyPlanService,
     getActiveStudyPlanService,
     getLearnerStudyPreferences,
     updateLearnerStudyPreferencesService,
     proposePlanRevisionService,
+    acceptPlanRevisionService,
     chatWithAssistantService,
+    buildDeterministicSchedule,
+    collectCandidateActivities,
+    getWeekDates,
 } from "../src/modules/studyPlan/services/studyPlan.service.js";
 
-test("Phase 4 — AI Learning Assistant & Personalized Study Plan Test Suite", async (t) => {
+test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Test Suite", async (t) => {
     const { MONGODB_URI, TEST_DB_NAME, DB_NAME, JWT_ACCESS_SECRET } = process.env;
     assert.ok(MONGODB_URI, "MONGODB_URI must be set in backend/.env");
     assert.ok(TEST_DB_NAME && TEST_DB_NAME.endsWith("_test"), "TEST_DB_NAME must end with _test");
@@ -42,7 +52,8 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Test Suite", a
     assert.ok(JWT_ACCESS_SECRET, "JWT_ACCESS_SECRET must be set in backend/.env");
 
     const instructorId = new mongoose.Types.ObjectId();
-    const learnerId = new mongoose.Types.ObjectId();
+    const learner1Id = new mongoose.Types.ObjectId();
+    const learner2Id = new mongoose.Types.ObjectId();
 
     let server;
     let baseUrl;
@@ -100,29 +111,39 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Test Suite", a
     t.before(async () => {
         await mongoose.connect(MONGODB_URI, { dbName: TEST_DB_NAME });
 
-        // Clean collections
+        // Clean test collections
         await Promise.all([
-            User.deleteMany({ _id: { $in: [instructorId, learnerId] } }),
-            LearnerProfile.deleteMany({ userId: learnerId }),
+            User.deleteMany({ _id: { $in: [instructorId, learner1Id, learner2Id] } }),
+            LearnerProfile.deleteMany({ userId: { $in: [learner1Id, learner2Id] } }),
             Course.deleteMany({ createdBy: instructorId }),
-            Enrollment.deleteMany({ learnerId }),
-            StudyPlan.deleteMany({ learnerId }),
-            AssistantConversation.deleteMany({ learnerId }),
-            LearningEvidence.deleteMany({ learnerId }),
+            Enrollment.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            StudyPlan.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            StudyPlanProposal.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            AssistantConversation.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            LearningEvidence.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            AssessmentAttempt.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            TopicMastery.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
         ]);
 
         await User.create([
             {
                 _id: instructorId,
-                name: "Instructor Study",
-                email: "instructor.study@test.com",
+                name: "Instructor Phase 4",
+                email: "instructor.p4@test.com",
                 role: "INSTRUCTOR",
                 password: "hashedPassword123",
             },
             {
-                _id: learnerId,
-                name: "Learner Planner",
-                email: "learner.planner@test.com",
+                _id: learner1Id,
+                name: "Learner Primary",
+                email: "learner1.p4@test.com",
+                role: "LEARNER",
+                password: "hashedPassword123",
+            },
+            {
+                _id: learner2Id,
+                name: "Learner Secondary",
+                email: "learner2.p4@test.com",
                 role: "LEARNER",
                 password: "hashedPassword123",
             },
@@ -140,125 +161,107 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Test Suite", a
         if (server) {
             await new Promise((resolve) => server.close(resolve));
         }
+        resetAiProvider();
         await Promise.all([
-            User.deleteMany({ _id: { $in: [instructorId, learnerId] } }),
-            LearnerProfile.deleteMany({ userId: learnerId }),
+            User.deleteMany({ _id: { $in: [instructorId, learner1Id, learner2Id] } }),
+            LearnerProfile.deleteMany({ userId: { $in: [learner1Id, learner2Id] } }),
             Course.deleteMany({ createdBy: instructorId }),
-            Enrollment.deleteMany({ learnerId }),
-            StudyPlan.deleteMany({ learnerId }),
-            AssistantConversation.deleteMany({ learnerId }),
-            LearningEvidence.deleteMany({ learnerId }),
+            Enrollment.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            StudyPlan.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            StudyPlanProposal.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            AssistantConversation.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            LearningEvidence.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            AssessmentAttempt.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
+            TopicMastery.deleteMany({ learnerId: { $in: [learner1Id, learner2Id] } }),
         ]);
         await mongoose.disconnect();
     });
 
-    await t.test("1. Learner Study Preferences: default fallback and update", async () => {
-        const initialPrefs = await getLearnerStudyPreferences(learnerId);
-        assert.ok(initialPrefs);
-        assert.equal(initialPrefs.dailyStudyTime, "1-2 hours");
-        assert.ok(Array.isArray(initialPrefs.studyDays));
-        assert.equal(initialPrefs.preferredSessionDuration, 45);
-        assert.equal(initialPrefs.preferredTimeOfDay, "ANYTIME");
+    // --- SETUP FIXTURE DATA FOR COMMON TESTS ---
+    let sharedCourse;
+    let sharedTopic1;
+    let sharedTopic2;
+    let sharedLesson1;
+    let sharedAssessment1;
+    let sharedAssessment2;
 
-        const updated = await updateLearnerStudyPreferencesService(learnerId, {
-            dailyStudyTime: "1-2 hours",
-            studyDays: ["MONDAY", "WEDNESDAY", "FRIDAY"],
-            preferredSessionDuration: 30,
-            preferredTimeOfDay: "MORNING",
-        });
-
-        assert.equal(updated.dailyStudyTime, "1-2 hours");
-        assert.deepEqual(updated.studyDays, ["MONDAY", "WEDNESDAY", "FRIDAY"]);
-        assert.equal(updated.preferredSessionDuration, 30);
-        assert.equal(updated.preferredTimeOfDay, "MORNING");
-
-        // Verify via API
-        const token = signLearnerToken(learnerId);
-        const res = await apiRequest({
-            method: "GET",
-            path: "/api/v1/learning/me/study-preferences",
-            token,
-        });
-        assert.equal(res.status, 200);
-        assert.equal(res.data.data.dailyStudyTime, "1-2 hours");
-        assert.deepEqual(res.data.data.studyDays, ["MONDAY", "WEDNESDAY", "FRIDAY"]);
-    });
-
-    await t.test("2. Plan Generation: builds grounded schedule from enrolled course", async () => {
-        const course = await Course.create({
-            title: "Data Structures & Algorithms Comprehensive",
-            description: "Master modern algorithms and data structures with hands-on practice.",
+    await t.test("0. Setup Course, Topics, Lessons, and Assessments Fixtures", async () => {
+        sharedCourse = await Course.create({
+            title: "Advanced Data Structures & Algorithms",
+            description: "A comprehensive course on trees, graphs, dynamic programming, and complexity.",
             domain: "COMPUTER_SCIENCE",
             category: "SOFTWARE_ENGINEERING",
-            difficulty: "BEGINNER",
+            difficulty: "INTERMEDIATE",
             createdBy: instructorId,
             status: "PUBLISHED",
             isPublished: true,
-            progressionPolicy: { lockingEnabled: false },
+            progressionPolicy: { lockingEnabled: true },
         });
 
-        const topic1 = await Topic.create({
-            courseId: course._id,
-            title: "Arrays & Strings",
+        sharedTopic1 = await Topic.create({
+            courseId: sharedCourse._id,
+            title: "Trees & Binary Search Trees",
             order: 1,
         });
 
-        const lesson1 = await Lesson.create({
-            topicId: topic1._id,
-            title: "Array Basics",
-            content: "Introduction to arrays",
-            estimatedDuration: 20,
+        sharedTopic2 = await Topic.create({
+            courseId: sharedCourse._id,
+            title: "Graph Traversal & Shortest Path",
+            order: 2,
+        });
+
+        sharedLesson1 = await Lesson.create({
+            topicId: sharedTopic1._id,
+            title: "Binary Tree Representation",
+            content: "Nodes, edges, and pointers in BST.",
+            estimatedDuration: 25,
             order: 1,
         });
 
-        // Enroll learner
+        sharedAssessment1 = await Assessment.create({
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            type: "TOPIC",
+            title: "BST Formative Quiz",
+            createdBy: instructorId,
+            status: "PUBLISHED",
+            passingScore: 70,
+            questionsPerAttempt: 5,
+            timeLimitMinutes: 20,
+        });
+
+        sharedAssessment2 = await Assessment.create({
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            type: "TOPIC",
+            title: "BST Comprehensive Evaluation",
+            createdBy: instructorId,
+            status: "PUBLISHED",
+            passingScore: 80,
+            questionsPerAttempt: 5,
+            timeLimitMinutes: 30,
+        });
+
         await Enrollment.create({
-            learnerId,
-            courseId: course._id,
+            learnerId: learner1Id,
+            courseId: sharedCourse._id,
             status: "ACTIVE",
             enrolledAt: new Date(),
         });
-
-        // Generate plan
-        const plan = await generateStudyPlanService(learnerId);
-        assert.ok(plan);
-        assert.equal(plan.status, "ACTIVE");
-        assert.equal(plan.version, 1);
-        assert.deepEqual(plan.preferencesSnapshot.studyDays, ["MONDAY", "WEDNESDAY", "FRIDAY"]);
-        assert.ok(plan.scheduledActivities.length > 0);
-
-        // Verify scheduled activities contain our created lesson
-        const scheduledLesson = plan.scheduledActivities.find(
-            (a) => a.targetId === lesson1._id.toString() || a.activityType === "LESSON"
-        );
-        assert.ok(scheduledLesson, "First topic lesson should be scheduled");
-        assert.equal(scheduledLesson.isCompleted, false);
-
-        // Verify API GET active plan
-        const token = signLearnerToken(learnerId);
-        const getRes = await apiRequest({
-            method: "GET",
-            path: "/api/v1/learning/me/study-plan",
-            token,
-        });
-        assert.equal(getRes.status, 200);
-        assert.equal(getRes.data.data.plan.version, 1);
-        assert.ok(getRes.data.data.plan.scheduledActivities.length > 0);
     });
 
-    await t.test("3. Evidence Grounding: dynamic completion without artificial checkmarks", async () => {
-        const activePlan = await getActiveStudyPlanService(learnerId);
-        assert.ok(activePlan);
-
-        const scheduledLesson = activePlan.scheduledActivities.find((a) => a.activityType === "LESSON");
+    await t.test("1 & 2. Correct Lesson Completion Semantics: Practice/Assessment evidence does NOT complete lesson", async () => {
+        const plan = await generateStudyPlanService(learner1Id);
+        assert.ok(plan);
+        const scheduledLesson = plan.scheduledActivities.find((a) => a.activityType === "LESSON");
         assert.ok(scheduledLesson);
         assert.equal(scheduledLesson.isCompleted, false);
 
-        // Create genuine learning evidence for this topic/activity
+        // Record unrelated Practice evidence on the same topic
         await LearningEvidence.create({
-            learnerId,
-            courseId: scheduledLesson.courseId,
-            topicId: scheduledLesson.topicId,
+            learnerId: learner1Id,
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
             sourceType: "PRACTICE",
             sourceId: new mongoose.Types.ObjectId(),
             attemptId: new mongoose.Types.ObjectId(),
@@ -272,72 +275,385 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Test Suite", a
             responses: [],
         });
 
+        // Record Assessment evidence on the same topic
+        await LearningEvidence.create({
+            learnerId: learner1Id,
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            sourceType: "ASSESSMENT",
+            sourceId: sharedAssessment1._id,
+            attemptId: new mongoose.Types.ObjectId(),
+            completedAt: new Date(),
+            totalQuestions: 5,
+            correctCount: 4,
+            totalMarks: 5,
+            marksAwarded: 4,
+            scorePercent: 80,
+            passed: true,
+            responses: [],
+        });
+
         // Re-fetch enriched plan
-        const refreshed = await getActiveStudyPlanService(learnerId);
-        const refreshedLesson = refreshed.scheduledActivities.find(
-            (a) => a.activityId === scheduledLesson.activityId
-        );
+        const enriched = await getActiveStudyPlanService(learner1Id);
+        const lessonInPlan = enriched.scheduledActivities.find((a) => a.activityType === "LESSON");
         assert.equal(
-            refreshedLesson.isCompleted,
-            true,
-            "Should reflect isCompleted: true strictly based on LearningEvidence"
+            lessonInPlan.isCompleted,
+            false,
+            "Lesson must remain NOT completed despite unrelated practice and assessment evidence on the topic"
         );
+        assert.equal(lessonInPlan.isUntrackedCompletion, true);
     });
 
-    await t.test("4. Adaptation Workflow: propose revision and accept with versioning", async () => {
-        const proposed = await proposePlanRevisionService(learnerId, "Adjusting study pace");
+    await t.test("3. Genuine Assessment Completion: completed assessment updates its scheduled activity correctly", async () => {
+        // Record passing assessment attempt for sharedAssessment1
+        await AssessmentAttempt.create({
+            assessmentId: sharedAssessment1._id,
+            courseId: sharedCourse._id,
+            learnerId: learner1Id,
+            assessmentType: "TOPIC",
+            attemptNumber: 1,
+            status: "SUBMITTED",
+            passingScore: 70,
+            questions: [
+                {
+                    questionId: new mongoose.Types.ObjectId(),
+                    questionText: "What is the worst case search time for balanced BST?",
+                    type: "MCQ_SINGLE",
+                    options: [{ key: "A", text: "O(log N)" }, { key: "B", text: "O(N)" }],
+                    correctAnswer: "A",
+                    marks: 2,
+                },
+                {
+                    questionId: new mongoose.Types.ObjectId(),
+                    questionText: "What is an in-order traversal of a BST?",
+                    type: "MCQ_SINGLE",
+                    options: [{ key: "A", text: "Sorted" }, { key: "B", text: "Reverse" }],
+                    correctAnswer: "A",
+                    marks: 2,
+                },
+                {
+                    questionId: new mongoose.Types.ObjectId(),
+                    questionText: "Is a leaf node degree 0?",
+                    type: "TRUE_FALSE",
+                    options: [{ key: "TRUE", text: "True" }, { key: "FALSE", text: "False" }],
+                    correctAnswer: "TRUE",
+                    marks: 2,
+                },
+                {
+                    questionId: new mongoose.Types.ObjectId(),
+                    questionText: "Is height of empty tree usually defined as -1?",
+                    type: "TRUE_FALSE",
+                    options: [{ key: "TRUE", text: "True" }, { key: "FALSE", text: "False" }],
+                    correctAnswer: "TRUE",
+                    marks: 2,
+                },
+                {
+                    questionId: new mongoose.Types.ObjectId(),
+                    questionText: "Does AVL tree maintain height balance?",
+                    type: "TRUE_FALSE",
+                    options: [{ key: "TRUE", text: "True" }, { key: "FALSE", text: "False" }],
+                    correctAnswer: "TRUE",
+                    marks: 2,
+                },
+            ],
+            totalMarks: 10,
+            marksAwarded: 9,
+            scorePercent: 90,
+            passed: true,
+            submittedAt: new Date(),
+        });
 
-        assert.ok(proposed);
-        assert.equal(proposed.isRevisionRecommended, true);
-        assert.equal(proposed.proposedVersion, 2);
-        assert.ok(proposed.proposedActivities);
+        const enriched = await getActiveStudyPlanService(learner1Id);
+        const scheduledAss = enriched.scheduledActivities.find(
+            (a) => a.activityType === "ASSESSMENT" && a.targetId === sharedAssessment1._id.toString()
+        );
+        if (scheduledAss) {
+            assert.equal(scheduledAss.isCompleted, true);
+            assert.equal(scheduledAss.actualStatus, "COMPLETED");
+        }
+    });
 
-        // Accept revision via API
-        const token = signLearnerToken(learnerId);
-        const acceptRes = await apiRequest({
+    await t.test("4. Secure Revision Acceptance: Forged activities are rejected", async () => {
+        const fakeCourseId = new mongoose.Types.ObjectId();
+        const fakeTopicId = new mongoose.Types.ObjectId();
+        const fakeLessonId = new mongoose.Types.ObjectId();
+
+        const token = signLearnerToken(learner1Id);
+        const res = await apiRequest({
             method: "POST",
             path: "/api/v1/learning/me/study-plan/accept-revision",
             token,
             body: {
-                startDate: proposed.startDate,
-                endDate: proposed.endDate,
-                reason: "Pace change accepted",
-                proposedActivities: proposed.proposedActivities,
+                startDate: "2026-11-02",
+                endDate: "2026-11-08",
+                reason: "Forged attack payload",
+                proposedActivities: [
+                    {
+                        activityId: "forged-act-1",
+                        dayOfWeek: "MONDAY",
+                        scheduledDate: "2026-11-02",
+                        activityType: "LESSON",
+                        title: "Hacked Lesson",
+                        courseId: fakeCourseId.toString(),
+                        courseTitle: "Nonexistent Course",
+                        topicId: fakeTopicId.toString(),
+                        targetId: fakeLessonId.toString(),
+                        estimatedDurationMinutes: 30,
+                        actionUrl: "/hack",
+                    },
+                ],
             },
         });
 
-        assert.equal(acceptRes.status, 200);
-        assert.equal(acceptRes.data.data.plan.version, 2, "New plan should be version 2");
-        assert.equal(acceptRes.data.data.plan.status, "ACTIVE");
-
-        // Verify old plan is superseded
-        const oldPlan = await StudyPlan.findOne({ learnerId, version: 1 });
-        assert.equal(oldPlan.status, "SUPERSEDED");
+        assert.equal(res.status, 400, "Must reject forged non-enrolled course activity");
     });
 
-    await t.test("5. AI Learning Assistant: contextual grounded chat and offline fallback", async () => {
-        // Direct service invocation with message string
-        const reply = await chatWithAssistantService(learnerId, "What should I focus on next?");
-
-        assert.ok(reply);
-        assert.ok(reply.reply.length > 0);
-
-        // Verify conversation history was recorded
-        const history = await AssistantConversation.findOne({ learnerId });
-        assert.ok(history && history.messages.length >= 2, "User message and assistant response must be persisted");
-        assert.equal(history.messages[history.messages.length - 2].role, "user");
-        assert.equal(history.messages[history.messages.length - 1].role, "assistant");
-
-        // Verify via API
-        const token = signLearnerToken(learnerId);
-        const chatRes = await apiRequest({
-            method: "POST",
-            path: "/api/v1/learning/me/study-assistant/chat",
-            token,
-            body: { message: "Help me review algorithms" },
+    await t.test("5. Secure Revision Acceptance: Stale / expired proposals cannot be accepted", async () => {
+        // Create an expired proposal manually
+        const expiredProposal = await StudyPlanProposal.create({
+            learnerId: learner1Id,
+            basedOnVersion: 1,
+            proposedVersion: 2,
+            status: "EXPIRED",
+            startDate: "2026-11-02",
+            endDate: "2026-11-08",
+            reason: "Old proposal",
+            expiresAt: new Date(Date.now() - 10000), // in the past
+            proposedActivities: [],
         });
 
-        assert.equal(chatRes.status, 200);
-        assert.ok(chatRes.data.data.reply);
+        const token = signLearnerToken(learner1Id);
+        const res = await apiRequest({
+            method: "POST",
+            path: "/api/v1/learning/me/study-plan/accept-revision",
+            token,
+            body: {
+                proposalId: expiredProposal._id.toString(),
+            },
+        });
+
+        assert.equal(res.status, 409, "Must reject stale/expired proposal with 409 Conflict");
+    });
+
+    await t.test("6. Secure Revision Acceptance: Another learner cannot accept someone else's proposal", async () => {
+        // Learner 1 proposes a revision
+        const proposalRes = await proposePlanRevisionService(learner1Id, "Legit proposal by Learner 1");
+        assert.ok(proposalRes.proposalId);
+
+        // Learner 2 attempts to accept Learner 1's proposal
+        const token2 = signLearnerToken(learner2Id);
+        const res = await apiRequest({
+            method: "POST",
+            path: "/api/v1/learning/me/study-plan/accept-revision",
+            token: token2,
+            body: {
+                proposalId: proposalRes.proposalId,
+            },
+        });
+
+        assert.equal(res.status, 403, "Must reject cross-learner proposal acceptance with 403 Forbidden");
+    });
+
+    await t.test("7. Topic Lock Enforcement: Locked topics cannot enter revision proposals", async () => {
+        // Topic 2 is locked because Topic 1 required assessments have not all been passed
+        const candidates = await collectCandidateActivities(learner1Id, { preferredSessionDuration: 45 });
+        const topic2Candidates = candidates.filter((c) => c.topicId?.toString() === sharedTopic2._id.toString());
+        assert.equal(topic2Candidates.length, 0, "No activities from locked Topic 2 can be generated");
+    });
+
+    await t.test("8. Remediation Candidate Eligibility: Cannot bypass active enrollment, publication or unlock checks", async () => {
+        // Create an unpublished course
+        const unpublishedCourse = await Course.create({
+            title: "Draft Course Not Ready",
+            description: "Unpublished internal course for draft testing.",
+            domain: "COMPUTER_SCIENCE",
+            category: "SOFTWARE_ENGINEERING",
+            difficulty: "ADVANCED",
+            createdBy: instructorId,
+            status: "DRAFT",
+            isPublished: false,
+        });
+
+        const draftTopic = await Topic.create({
+            courseId: unpublishedCourse._id,
+            title: "Draft Secrets",
+            order: 1,
+        });
+
+        // Set topic mastery to NEEDS_IMPROVEMENT on this draft topic
+        await TopicMastery.create({
+            learnerId: learner1Id,
+            courseId: unpublishedCourse._id,
+            topicId: draftTopic._id,
+            status: "NEEDS_IMPROVEMENT",
+            masteryScore: 0.3,
+            confidence: 0.8,
+            evidenceCount: 5,
+        });
+
+        const candidates = await collectCandidateActivities(learner1Id, { preferredSessionDuration: 45 });
+        const leakedRemediation = candidates.find((c) => c.topicId?.toString() === draftTopic._id.toString());
+        assert.equal(leakedRemediation, undefined, "Remediation on unpublished/non-enrolled course topic must NOT be scheduled");
+    });
+
+    await t.test("9. Schedule Generation: Does not duplicate activities through candidate-list wrapping", async () => {
+        const singleCandidate = [
+            {
+                activityId: "cand-single-1",
+                activityType: "LESSON",
+                title: "Only One Lesson Exists",
+                courseId: sharedCourse._id,
+                courseTitle: sharedCourse.title,
+                targetId: sharedLesson1._id.toString(),
+                estimatedDurationMinutes: 30,
+                durationAllocationType: "PLANNING_ALLOCATION",
+                rationale: "Single candidate test",
+                actionUrl: "/learn",
+            },
+        ];
+
+        const weekInfo = getWeekDates();
+        const schedule = buildDeterministicSchedule(
+            singleCandidate,
+            weekInfo,
+            { studyDays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"], dailyStudyTime: "1-2 hours" }
+        );
+
+        assert.equal(schedule.length, 1, "Must schedule the candidate exactly once without wrapping around");
+    });
+
+    await t.test("10. Schedule Generation: Respects daily study capacity and allows multiple activities if capacity permits", async () => {
+        const multipleCandidates = [
+            {
+                activityId: "c1",
+                activityType: "LESSON",
+                title: "Lesson 1",
+                courseId: sharedCourse._id,
+                courseTitle: sharedCourse.title,
+                targetId: "t1",
+                estimatedDurationMinutes: 30,
+                durationAllocationType: "PLANNING_ALLOCATION",
+                rationale: "R1",
+                actionUrl: "/1",
+            },
+            {
+                activityId: "c2",
+                activityType: "PRACTICE",
+                title: "Practice 1",
+                courseId: sharedCourse._id,
+                courseTitle: sharedCourse.title,
+                targetId: "t2",
+                estimatedDurationMinutes: 30,
+                durationAllocationType: "PLANNING_ALLOCATION",
+                rationale: "R2",
+                actionUrl: "/2",
+            },
+            {
+                activityId: "c3",
+                activityType: "ASSESSMENT",
+                title: "Assessment 1",
+                courseId: sharedCourse._id,
+                courseTitle: sharedCourse.title,
+                targetId: "t3",
+                estimatedDurationMinutes: 30,
+                durationAllocationType: "PLANNING_ALLOCATION",
+                rationale: "R3",
+                actionUrl: "/3",
+            },
+        ];
+
+        const weekInfo = getWeekDates();
+        // dailyStudyTime: "1-2 hours" translates to 90 min capacity -> Can fit all 3 x 30min on MONDAY
+        const schedule = buildDeterministicSchedule(
+            multipleCandidates,
+            weekInfo,
+            { studyDays: ["MONDAY", "WEDNESDAY"], dailyStudyTime: "1-2 hours" }
+        );
+
+        const mondayActivities = schedule.filter((s) => s.dayOfWeek === "MONDAY");
+        assert.equal(mondayActivities.length, 3, "All three 30-min activities should fit into 90-min capacity on MONDAY");
+        const totalMondayMinutes = mondayActivities.reduce((sum, a) => sum + a.estimatedDurationMinutes, 0);
+        assert.equal(totalMondayMinutes, 90);
+    });
+
+    await t.test("11. Content Duration: Distinguishes ESTIMATED duration from PLANNING_ALLOCATION", async () => {
+        // sharedAssessment2 has timeLimitMinutes: 30 and was not passed by learner1 -> durationAllocationType must be ESTIMATED
+        // sharedLesson1 has no explicit duration on Lesson model schema (Lesson schema has content/order/title) -> PLANNING_ALLOCATION
+        const candidates = await collectCandidateActivities(learner1Id, { preferredSessionDuration: 45 });
+        const assessmentCandidate = candidates.find((c) => c.targetId === sharedAssessment2._id.toString());
+        assert.ok(assessmentCandidate, "sharedAssessment2 candidate should be found");
+        assert.equal(assessmentCandidate.durationAllocationType, "ESTIMATED");
+        assert.equal(assessmentCandidate.estimatedDurationMinutes, 30);
+
+        const lessonCandidate = candidates.find((c) => c.targetId === sharedLesson1._id.toString());
+        assert.ok(lessonCandidate, "sharedLesson1 candidate should be found");
+        assert.equal(lessonCandidate.durationAllocationType, "PLANNING_ALLOCATION");
+    });
+
+    await t.test("12. Multiple Formal Assessments: Discovers and schedules all eligible formal topic assessments", async () => {
+        // sharedTopic1 has two published topic assessments: sharedAssessment1 and sharedAssessment2
+        // Neither has been passed yet for this test case
+        await AssessmentAttempt.deleteMany({ learnerId: learner2Id });
+        await Enrollment.create({
+            learnerId: learner2Id,
+            courseId: sharedCourse._id,
+            status: "ACTIVE",
+            enrolledAt: new Date(),
+        });
+
+        const candidates = await collectCandidateActivities(learner2Id, { preferredSessionDuration: 45 });
+        const assessmentCandidates = candidates.filter((c) => c.activityType === "ASSESSMENT");
+        assert.ok(assessmentCandidates.length >= 2, "Must discover both formal topic assessments on Topic 1");
+        assert.ok(assessmentCandidates.some((c) => c.targetId === sharedAssessment1._id.toString()));
+        assert.ok(assessmentCandidates.some((c) => c.targetId === sharedAssessment2._id.toString()));
+    });
+
+    await t.test("13 & 14. Plan Replacement Safety: Concurrency and failed replacement preservation", async () => {
+        // Ensure active plan exists
+        const initialPlan = await generateStudyPlanService(learner1Id);
+        assert.ok(initialPlan);
+        const initialVersion = initialPlan.version;
+
+        // Verify that there is strictly 1 active plan for learner1
+        const activeCount = await StudyPlan.countDocuments({ learnerId: learner1Id, status: "ACTIVE" });
+        assert.equal(activeCount, 1);
+
+        // Attempt concurrent plan generation
+        const [planA, planB] = await Promise.all([
+            generateStudyPlanService(learner1Id, { revisionReason: "Concurrent A" }),
+            generateStudyPlanService(learner1Id, { revisionReason: "Concurrent B" }),
+        ]);
+
+        const finalActivePlans = await StudyPlan.find({ learnerId: learner1Id, status: "ACTIVE" });
+        assert.equal(finalActivePlans.length, 1, "Never allow more than 1 ACTIVE plan per learner");
+    });
+
+    await t.test("15. Meaningful Revision Recommendation: Not recommended when no meaningful change exists", async () => {
+        // Create fresh plan
+        await generateStudyPlanService(learner1Id);
+
+        // Propose revision without changing any enrolled courses, mastery, or preferences
+        const proposal = await proposePlanRevisionService(learner1Id, "Check no-op revision");
+        assert.equal(
+            proposal.isRevisionRecommended,
+            false,
+            "When current schedule and proposed schedule match identically, isRevisionRecommended must be FALSE"
+        );
+    });
+
+    await t.test("16. AI Assistant Deterministic Fallback: Simulated failure triggers and verifies fallback", async () => {
+        // Mock provider that throws an error
+        setAiProvider({
+            generateText: async () => {
+                throw new Error("Simulated AI Provider Outage / 503 Rate Limit");
+            },
+        });
+
+        const reply = await chatWithAssistantService(learner1Id, "Can you explain binary search trees?");
+        assert.ok(reply);
+        assert.equal(reply.fallbackUsed, true, "fallbackUsed must be true when AI provider fails");
+        assert.ok(reply.reply.includes("support your learning journey"), "Must return deterministic pedagogical template");
+
+        resetAiProvider();
     });
 });

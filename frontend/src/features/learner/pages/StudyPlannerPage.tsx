@@ -396,6 +396,11 @@ export const StudyPlannerPage: React.FC = () => {
                           <CheckCircle2 className="w-3 h-3" /> Completed
                         </span>
                       )}
+                      {act.isUntrackedCompletion && (
+                        <span className="text-[10px] font-medium text-text-tertiary bg-surface-elevated px-2 py-0.5 rounded">
+                          Self-paced lesson
+                        </span>
+                      )}
                     </div>
                     <h4 className="text-sm font-bold text-text-primary">{act.title}</h4>
                     <p className="text-xs text-text-secondary">{act.rationale}</p>

@@ -13,8 +13,10 @@ import { MASTERY_STATUS } from "../../topicMastery/constants/mastery.constants.j
 import { getLearnerRecommendationsService } from "../../recommendation/services/recommendation.service.js";
 import { isTopicUnlockedForLearner } from "../../topic/services/topicProgression.service.js";
 import { StudyPlan } from "../models/studyPlan.model.js";
+import { StudyPlanProposal } from "../models/studyPlanProposal.model.js";
 import { AssistantConversation } from "../models/assistantConversation.model.js";
 import { getAiProvider } from "../../aiAssistant/providers/index.js";
+import { withTransaction } from "../../../shared/utils/withTransaction.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 function requireObjectId(value, field = "id") {
@@ -53,6 +55,26 @@ export function getWeekDates(referenceDate = new Date()) {
         endDate: weekDays[6].date,
         weekDays
     };
+}
+
+/**
+ * Maps dailyStudyTime enum string to minutes capacity.
+ */
+export function parseDailyCapacityMinutes(dailyStudyTime) {
+    switch (dailyStudyTime) {
+        case "Less than 1 hour":
+            return 45;
+        case "1-2 hours":
+            return 90;
+        case "2-3 hours":
+            return 150;
+        case "3-4 hours":
+            return 210;
+        case "5 or more hours":
+            return 300;
+        default:
+            return 90; // Default 1-2 hours
+    }
 }
 
 /**
@@ -98,18 +120,16 @@ export async function updateLearnerStudyPreferencesService(learnerId, updates) {
 
 /**
  * Derives authoritative activity completion status from learning records.
+ * CRITICAL RULE: Never infer lesson completion from unrelated topic-level practice/assessment evidence.
+ * If no authoritative lesson completion record exists, retain PENDING/NOT_TRACKED.
  */
 export async function evaluateActivityActualState(activity, learnerId, allEvidence, allMastery, allAttempts) {
     const { activityType, targetId, topicId, courseId } = activity;
 
     if (activityType === "LESSON") {
-        // A lesson is completed if there is evidence on its topic or course
-        const hasTopicEvidence = allEvidence.some((ev) => 
-            ev.learnerId.toString() === learnerId.toString() &&
-            ev.courseId.toString() === courseId.toString() &&
-            (ev.topicId?.toString() === topicId?.toString() || ev.sourceId?.toString() === targetId)
-        );
-        return hasTopicEvidence ? "COMPLETED" : "PENDING";
+        // No authoritative lesson-completion model or evidence source exists in this architecture.
+        // Therefore, we do NOT synthesize completion from topic practice/assessment evidence.
+        return "PENDING";
     }
 
     if (activityType === "PRACTICE") {
@@ -155,6 +175,12 @@ export async function evaluateActivityActualState(activity, learnerId, allEviden
 
 /**
  * Deterministically constructs candidate learning activities grounded in real course content.
+ * Enforces rigorous eligibility on:
+ * - Active learner enrollment
+ * - Course publication (status: 'PUBLISHED')
+ * - Topic unlock via authoritative isTopicUnlockedForLearner()
+ * - Multiple formal topic assessments
+ * - Strict remediation candidate eligibility
  */
 export async function collectCandidateActivities(learnerId, preferences) {
     const activeEnrollments = await Enrollment.find({
@@ -163,51 +189,60 @@ export async function collectCandidateActivities(learnerId, preferences) {
     }).populate("courseId").lean();
 
     const candidates = [];
-    const now = new Date();
+    const courseIds = activeEnrollments
+        .map((e) => e.courseId)
+        .filter((c) => c && (c.status === "PUBLISHED" || c.isPublished))
+        .map((c) => c._id);
 
-    // 1. Fetch recommendations for Next Best Action alignment
-    let nba = null;
-    try {
-        const recs = await getLearnerRecommendationsService(learnerId, { limit: 5 });
-        nba = recs?.nextBestAction || null;
-    } catch {
-        nba = null;
-    }
-
-    // 2. Fetch TopicMastery for active courses
-    const courseIds = activeEnrollments.map((e) => e.courseId?._id).filter(Boolean);
+    // 1. Fetch TopicMastery for active published courses
     const masteryRecords = await TopicMastery.find({
         learnerId,
         courseId: { $in: courseIds }
     }).lean();
 
-    // Check for NEEDS_IMPROVEMENT topics (Remediation focus)
+    // Check for NEEDS_IMPROVEMENT topics (Remediation focus) with FULL eligibility checks
     for (const m of masteryRecords) {
         if (m.status === MASTERY_STATUS.NEEDS_IMPROVEMENT) {
             const topic = await Topic.findById(m.topicId).lean();
             if (topic) {
-                const practice = await Practice.findOne({ topicId: topic._id, status: "PUBLISHED" }).lean();
-                if (practice) {
-                    candidates.push({
-                        activityId: `cand-remed-prac-${practice._id}`,
-                        activityType: "PRACTICE",
-                        title: `Remediation Practice: ${practice.title}`,
-                        courseId: topic.courseId,
-                        courseTitle: "",
-                        topicId: topic._id,
-                        topicTitle: topic.title,
-                        targetId: practice._id.toString(),
-                        estimatedDurationMinutes: preferences.preferredSessionDuration || 30,
-                        rationale: `Needs improvement identified on ${topic.title}. Reinforce foundations through practice.`,
-                        actionUrl: `/learner/practices/${practice._id}`,
-                        priority: 1
-                    });
+                const enrollment = activeEnrollments.find(
+                    (e) => e.courseId?._id?.toString() === topic.courseId.toString()
+                );
+                const course = enrollment?.courseId;
+
+                // Enforce course existence, publication, active enrollment, topic ownership & unlock
+                if (course && (course.status === "PUBLISHED" || course.isPublished)) {
+                    const unlockStatus = await isTopicUnlockedForLearner(learnerId, course, topic);
+                    if (unlockStatus.isUnlocked) {
+                        const practices = await Practice.find({
+                            topicId: topic._id,
+                            status: "PUBLISHED"
+                        }).lean();
+
+                        for (const practice of practices) {
+                            candidates.push({
+                                activityId: `cand-remed-prac-${practice._id}`,
+                                activityType: "PRACTICE",
+                                title: `Remediation Practice: ${practice.title}`,
+                                courseId: topic.courseId,
+                                courseTitle: course.title,
+                                topicId: topic._id,
+                                topicTitle: topic.title,
+                                targetId: practice._id.toString(),
+                                estimatedDurationMinutes: preferences.preferredSessionDuration || 30,
+                                durationAllocationType: "PLANNING_ALLOCATION",
+                                rationale: `Needs improvement identified on ${topic.title}. Reinforce foundations through targeted practice.`,
+                                actionUrl: `/learner/practices/${practice._id}`,
+                                priority: 1
+                            });
+                        }
+                    }
                 }
             }
         }
     }
 
-    // Check next unlocked topics and lessons in enrolled courses
+    // 2. Discover unlocked topic lessons, practices, and formal assessments in enrolled courses
     for (const enr of activeEnrollments) {
         const course = enr.courseId;
         if (!course || (!course.isPublished && course.status !== "PUBLISHED")) continue;
@@ -218,27 +253,15 @@ export async function collectCandidateActivities(learnerId, preferences) {
             const unlockStatus = await isTopicUnlockedForLearner(learnerId, course, topic);
             if (!unlockStatus.isUnlocked) continue;
 
-            // Check if topic assessment passed
-            const topicAssessment = await Assessment.findOne({
-                courseId: course._id,
-                topicId: topic._id,
-                status: "PUBLISHED"
-            }).lean();
-
-            let assessmentPassed = false;
-            if (topicAssessment) {
-                const passedAttempt = await AssessmentAttempt.findOne({
-                    assessmentId: topicAssessment._id,
-                    learnerId,
-                    status: "SUBMITTED",
-                    passed: true
-                }).lean();
-                assessmentPassed = Boolean(passedAttempt);
-            }
-
             // Find lessons in this unlocked topic
             const lessons = await Lesson.find({ topicId: topic._id }).sort({ order: 1 }).lean();
             for (const l of lessons) {
+                // If lesson has a genuine estimated duration, mark ESTIMATED; otherwise PLANNING_ALLOCATION
+                const hasExplicitDuration = typeof l.estimatedDuration === "number" && l.estimatedDuration > 0;
+                const allocatedMinutes = hasExplicitDuration
+                    ? l.estimatedDuration
+                    : Math.min(preferences.preferredSessionDuration || 45, 45);
+
                 candidates.push({
                     activityId: `cand-lesson-${l._id}`,
                     activityType: "LESSON",
@@ -248,48 +271,71 @@ export async function collectCandidateActivities(learnerId, preferences) {
                     topicId: topic._id,
                     topicTitle: topic.title,
                     targetId: l._id.toString(),
-                    estimatedDurationMinutes: Math.min(preferences.preferredSessionDuration || 45, 45),
+                    estimatedDurationMinutes: allocatedMinutes,
+                    durationAllocationType: hasExplicitDuration ? "ESTIMATED" : "PLANNING_ALLOCATION",
                     rationale: `Continue sequential progress in ${course.title} — Topic ${topic.order}.`,
                     actionUrl: `/learner/courses/${course._id}/learn?topicId=${topic._id}&lessonId=${l._id}`,
                     priority: 2
                 });
             }
 
-            // Practice in topic
-            const practice = await Practice.findOne({ topicId: topic._id, status: "PUBLISHED" }).lean();
-            if (practice) {
-                candidates.push({
-                    activityId: `cand-practice-${practice._id}`,
-                    activityType: "PRACTICE",
-                    title: `Practice: ${practice.title}`,
-                    courseId: course._id,
-                    courseTitle: course.title,
-                    topicId: topic._id,
-                    topicTitle: topic.title,
-                    targetId: practice._id.toString(),
-                    estimatedDurationMinutes: preferences.preferredSessionDuration || 30,
-                    rationale: `Apply concepts learned in ${topic.title} with formative practice.`,
-                    actionUrl: `/learner/practices/${practice._id}`,
-                    priority: 3
-                });
+            // Practices in this topic
+            const practices = await Practice.find({ topicId: topic._id, status: "PUBLISHED" }).lean();
+            for (const practice of practices) {
+                // Skip if already added in remediation
+                if (!candidates.some((c) => c.targetId === practice._id.toString())) {
+                    candidates.push({
+                        activityId: `cand-practice-${practice._id}`,
+                        activityType: "PRACTICE",
+                        title: `Practice: ${practice.title}`,
+                        courseId: course._id,
+                        courseTitle: course.title,
+                        topicId: topic._id,
+                        topicTitle: topic.title,
+                        targetId: practice._id.toString(),
+                        estimatedDurationMinutes: preferences.preferredSessionDuration || 30,
+                        durationAllocationType: "PLANNING_ALLOCATION",
+                        rationale: `Apply concepts learned in ${topic.title} with formative practice.`,
+                        actionUrl: `/learner/practices/${practice._id}`,
+                        priority: 3
+                    });
+                }
             }
 
-            // Topic Assessment if eligible and not yet passed
-            if (topicAssessment && !assessmentPassed) {
-                candidates.push({
-                    activityId: `cand-assessment-${topicAssessment._id}`,
-                    activityType: "ASSESSMENT",
-                    title: `Topic Assessment: ${topicAssessment.title}`,
-                    courseId: course._id,
-                    courseTitle: course.title,
-                    topicId: topic._id,
-                    topicTitle: topic.title,
-                    targetId: topicAssessment._id.toString(),
-                    estimatedDurationMinutes: topicAssessment.timeLimitMinutes || 30,
-                    rationale: `Formal assessment to verify mastery of Topic ${topic.order}: ${topic.title}.`,
-                    actionUrl: `/learner/assessments/${topic._id}`,
-                    priority: 4
-                });
+            // Multiple formal topic assessments: find all published TOPIC assessments
+            const topicAssessments = await Assessment.find({
+                courseId: course._id,
+                topicId: topic._id,
+                type: "TOPIC",
+                status: "PUBLISHED"
+            }).lean();
+
+            for (const tAssessment of topicAssessments) {
+                const passedAttempt = await AssessmentAttempt.findOne({
+                    assessmentId: tAssessment._id,
+                    learnerId,
+                    status: "SUBMITTED",
+                    passed: true
+                }).lean();
+
+                if (!passedAttempt) {
+                    const hasExplicitLimit = typeof tAssessment.timeLimitMinutes === "number" && tAssessment.timeLimitMinutes > 0;
+                    candidates.push({
+                        activityId: `cand-assessment-${tAssessment._id}`,
+                        activityType: "ASSESSMENT",
+                        title: `Topic Assessment: ${tAssessment.title}`,
+                        courseId: course._id,
+                        courseTitle: course.title,
+                        topicId: topic._id,
+                        topicTitle: topic.title,
+                        targetId: tAssessment._id.toString(),
+                        estimatedDurationMinutes: hasExplicitLimit ? tAssessment.timeLimitMinutes : (preferences.preferredSessionDuration || 30),
+                        durationAllocationType: hasExplicitLimit ? "ESTIMATED" : "PLANNING_ALLOCATION",
+                        rationale: `Formal assessment to verify mastery of Topic ${topic.order}: ${topic.title}.`,
+                        actionUrl: `/learner/assessments/${topic._id}`,
+                        priority: 4
+                    });
+                }
             }
         }
     }
@@ -298,46 +344,200 @@ export async function collectCandidateActivities(learnerId, preferences) {
 }
 
 /**
- * Distributes candidates across weekly study days.
+ * Distributes candidates across weekly study days strictly respecting:
+ * 1. Selected studyDays
+ * 2. dailyStudyTime capacity (minutes per day)
+ * 3. preferredSessionDuration
+ * 4. NEVER duplicating an activity via wrap-around once the candidate list is exhausted
  */
 export function buildDeterministicSchedule(candidates, weekInfo, preferences) {
     const studyDaysSet = new Set(preferences.studyDays || ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]);
+    const dailyCapacityMinutes = parseDailyCapacityMinutes(preferences.dailyStudyTime);
     const scheduled = [];
     let candidateIndex = 0;
 
     for (const day of weekInfo.weekDays) {
         if (!studyDaysSet.has(day.dayOfWeek)) continue;
         if (candidateIndex >= candidates.length) {
-            candidateIndex = 0; // wrap around if more study days than candidates
+            // Once candidate list is exhausted, DO NOT WRAP AROUND. Stop scheduling.
+            break;
         }
-        if (candidates.length === 0) break;
 
-        const cand = candidates[candidateIndex];
-        scheduled.push({
-            activityId: `act-${day.date}-${cand.targetId || candidateIndex}`,
-            dayOfWeek: day.dayOfWeek,
-            scheduledDate: day.date,
-            activityType: cand.activityType,
-            title: cand.title,
-            courseId: cand.courseId,
-            courseTitle: cand.courseTitle,
-            topicId: cand.topicId,
-            topicTitle: cand.topicTitle,
-            targetId: cand.targetId,
-            estimatedDurationMinutes: cand.estimatedDurationMinutes,
-            rationale: cand.rationale,
-            actionUrl: cand.actionUrl,
-            order: 1
-        });
+        let dayAllocatedMinutes = 0;
+        let dayOrder = 1;
 
-        candidateIndex += 1;
+        while (candidateIndex < candidates.length) {
+            const cand = candidates[candidateIndex];
+            const activityDuration = cand.estimatedDurationMinutes || preferences.preferredSessionDuration || 30;
+
+            // If day already has at least one activity and adding another would exceed capacity, advance to next day
+            if (dayAllocatedMinutes > 0 && dayAllocatedMinutes + activityDuration > dailyCapacityMinutes) {
+                break;
+            }
+
+            scheduled.push({
+                activityId: `act-${day.date}-${cand.targetId || candidateIndex}`,
+                dayOfWeek: day.dayOfWeek,
+                scheduledDate: day.date,
+                activityType: cand.activityType,
+                title: cand.title,
+                courseId: cand.courseId,
+                courseTitle: cand.courseTitle,
+                topicId: cand.topicId,
+                topicTitle: cand.topicTitle,
+                targetId: cand.targetId,
+                estimatedDurationMinutes: activityDuration,
+                durationAllocationType: cand.durationAllocationType || "PLANNING_ALLOCATION",
+                rationale: cand.rationale,
+                actionUrl: cand.actionUrl,
+                order: dayOrder
+            });
+
+            dayAllocatedMinutes += activityDuration;
+            dayOrder += 1;
+            candidateIndex += 1;
+
+            // If capacity is reached or exceeded, finish this day
+            if (dayAllocatedMinutes >= dailyCapacityMinutes) {
+                break;
+            }
+        }
     }
 
     return scheduled;
 }
 
 /**
- * Generates or regenerates a personalized weekly study plan.
+ * Revalidates an array of activity specifications against current authoritative data.
+ * Throws ApiError(400) if any activity is invalid, inaccessible, locked, or forged.
+ */
+export async function revalidateActivities(learnerId, activities) {
+    if (!Array.isArray(activities) || activities.length === 0) {
+        return [];
+    }
+
+    const revalidated = [];
+
+    // Pre-fetch active enrollments
+    const activeEnrollments = await Enrollment.find({
+        learnerId,
+        status: "ACTIVE"
+    }).populate("courseId").lean();
+
+    const activeCourseMap = new Map();
+    for (const enr of activeEnrollments) {
+        if (enr.courseId && (enr.courseId.status === "PUBLISHED" || enr.courseId.isPublished)) {
+            activeCourseMap.set(enr.courseId._id.toString(), enr.courseId);
+        }
+    }
+
+    let orderCounter = 1;
+    for (const act of activities) {
+        if (!act.courseId) {
+            throw new ApiError(400, "VALIDATION_ERROR", "Activity missing courseId");
+        }
+
+        const course = activeCourseMap.get(act.courseId.toString());
+        if (!course) {
+            throw new ApiError(400, "VALIDATION_ERROR", `Course ${act.courseId} is not active or published for learner`);
+        }
+
+        let topic = null;
+        if (act.topicId) {
+            topic = await Topic.findById(act.topicId).lean();
+            if (!topic || topic.courseId.toString() !== course._id.toString()) {
+                throw new ApiError(400, "VALIDATION_ERROR", "Topic does not belong to specified course");
+            }
+
+            const unlockStatus = await isTopicUnlockedForLearner(learnerId, course, topic);
+            if (!unlockStatus.isUnlocked) {
+                throw new ApiError(400, "VALIDATION_ERROR", `Topic ${topic.title} is currently locked for learner`);
+            }
+        }
+
+        // Authoritatively check target
+        let authoritativeTitle = act.title;
+        let authoritativeActionUrl = act.actionUrl;
+        let duration = act.estimatedDurationMinutes || 30;
+        let durationAllocationType = "PLANNING_ALLOCATION";
+
+        if (act.activityType === "LESSON") {
+            const lesson = await Lesson.findById(act.targetId).lean();
+            if (!lesson || !topic || lesson.topicId.toString() !== topic._id.toString()) {
+                throw new ApiError(400, "VALIDATION_ERROR", "Target lesson not found or does not belong to topic");
+            }
+            authoritativeTitle = `Lesson: ${lesson.title}`;
+            authoritativeActionUrl = `/learner/courses/${course._id}/learn?topicId=${topic._id}&lessonId=${lesson._id}`;
+            if (typeof lesson.estimatedDuration === "number" && lesson.estimatedDuration > 0) {
+                duration = lesson.estimatedDuration;
+                durationAllocationType = "ESTIMATED";
+            }
+        } else if (act.activityType === "PRACTICE") {
+            const practice = await Practice.findById(act.targetId).lean();
+            if (!practice || practice.status !== "PUBLISHED" || (topic && practice.topicId.toString() !== topic._id.toString())) {
+                throw new ApiError(400, "VALIDATION_ERROR", "Target practice not found, not published, or topic mismatch");
+            }
+            authoritativeTitle = `Practice: ${practice.title}`;
+            authoritativeActionUrl = `/learner/practices/${practice._id}`;
+        } else if (act.activityType === "ASSESSMENT") {
+            const assessment = await Assessment.findById(act.targetId).lean();
+            if (!assessment || assessment.status !== "PUBLISHED") {
+                throw new ApiError(400, "VALIDATION_ERROR", "Target assessment not found or not published");
+            }
+            authoritativeTitle = `${assessment.type} Assessment: ${assessment.title}`;
+            authoritativeActionUrl = `/learner/assessments/${topic?._id || course._id}`;
+            if (typeof assessment.timeLimitMinutes === "number" && assessment.timeLimitMinutes > 0) {
+                duration = assessment.timeLimitMinutes;
+                durationAllocationType = "ESTIMATED";
+            }
+        }
+
+        revalidated.push({
+            activityId: act.activityId || `act-${act.scheduledDate}-${act.targetId || orderCounter}`,
+            dayOfWeek: act.dayOfWeek,
+            scheduledDate: act.scheduledDate,
+            activityType: act.activityType,
+            title: authoritativeTitle,
+            courseId: course._id,
+            courseTitle: course.title,
+            topicId: topic ? topic._id : null,
+            topicTitle: topic ? topic.title : null,
+            targetId: act.targetId,
+            estimatedDurationMinutes: duration,
+            durationAllocationType,
+            rationale: act.rationale || "Scheduled study session",
+            actionUrl: authoritativeActionUrl,
+            order: act.order || orderCounter
+        });
+
+        orderCounter += 1;
+    }
+
+    return revalidated;
+}
+
+/**
+ * Checks if two activity sets represent a meaningful difference.
+ */
+function areActivitySchedulesMeaningfullyDifferent(currentActivities = [], proposedActivities = []) {
+    if (currentActivities.length !== proposedActivities.length) return true;
+    for (let i = 0; i < currentActivities.length; i++) {
+        const c = currentActivities[i];
+        const p = proposedActivities[i];
+        if (
+            c.targetId !== p.targetId ||
+            c.scheduledDate !== p.scheduledDate ||
+            c.activityType !== p.activityType
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Generates or regenerates a personalized weekly study plan safely.
+ * Atomic active plan replacement to avoid leaving the learner without an active plan.
  */
 export async function generateStudyPlanService(learnerId, options = {}) {
     requireObjectId(learnerId, "learnerId");
@@ -351,31 +551,37 @@ export async function generateStudyPlanService(learnerId, options = {}) {
     // 2. Schedule deterministically first as authoritative base
     const scheduledActivities = buildDeterministicSchedule(candidates, weekInfo, preferences);
 
-    // 3. Mark previous active plan as SUPERSEDED (traceable version history)
-    const existingActivePlan = await StudyPlan.findOne({ learnerId, status: "ACTIVE" }).sort({ version: -1 });
-    const newVersion = existingActivePlan ? existingActivePlan.version + 1 : 1;
+    // 3. Concurrency-safe plan creation and superseding via transaction
+    const savedPlan = await withTransaction(async (session) => {
+        const existingActivePlan = await StudyPlan.findOne({ learnerId, status: "ACTIVE" })
+            .sort({ version: -1 })
+            .session(session);
 
-    if (existingActivePlan) {
-        existingActivePlan.status = "SUPERSEDED";
-        await existingActivePlan.save();
-    }
+        const newVersion = existingActivePlan ? existingActivePlan.version + 1 : 1;
 
-    // 4. Create new StudyPlan document
-    const newPlan = new StudyPlan({
-        learnerId,
-        version: newVersion,
-        status: "ACTIVE",
-        startDate: weekInfo.startDate,
-        endDate: weekInfo.endDate,
-        preferencesSnapshot: preferences,
-        scheduledActivities,
-        generationSource: "DETERMINISTIC_FALLBACK",
-        revisionReason: options.revisionReason || "Initial personalized plan generation",
-        previousPlanId: existingActivePlan?._id || null
+        if (existingActivePlan) {
+            existingActivePlan.status = "SUPERSEDED";
+            await existingActivePlan.save({ session });
+        }
+
+        const newPlan = new StudyPlan({
+            learnerId,
+            version: newVersion,
+            status: "ACTIVE",
+            startDate: weekInfo.startDate,
+            endDate: weekInfo.endDate,
+            preferencesSnapshot: preferences,
+            scheduledActivities,
+            generationSource: "DETERMINISTIC_FALLBACK",
+            revisionReason: options.revisionReason || "Initial personalized plan generation",
+            previousPlanId: existingActivePlan?._id || null
+        });
+
+        await newPlan.save({ session });
+        return newPlan;
     });
 
-    await newPlan.save();
-    return enrichPlanWithActualState(newPlan, learnerId);
+    return enrichPlanWithActualState(savedPlan, learnerId);
 }
 
 /**
@@ -383,7 +589,7 @@ export async function generateStudyPlanService(learnerId, options = {}) {
  */
 export async function enrichPlanWithActualState(planDoc, learnerId) {
     const plan = planDoc.toObject ? planDoc.toObject() : planDoc;
-    const courseIds = plan.scheduledActivities.map((a) => a.courseId);
+    const courseIds = (plan.scheduledActivities || []).map((a) => a.courseId);
 
     const [allEvidence, allMastery, allAttempts] = await Promise.all([
         LearningEvidence.find({ learnerId, courseId: { $in: courseIds } }).lean(),
@@ -398,7 +604,7 @@ export async function enrichPlanWithActualState(planDoc, learnerId) {
     let pendingCount = 0;
     let missedCount = 0;
 
-    for (const act of plan.scheduledActivities) {
+    for (const act of plan.scheduledActivities || []) {
         const actualState = await evaluateActivityActualState(act, learnerId, allEvidence, allMastery, allAttempts);
 
         let displayStatus = actualState;
@@ -415,7 +621,8 @@ export async function enrichPlanWithActualState(planDoc, learnerId) {
             ...act,
             actualStatus: displayStatus,
             isCompleted: actualState === "COMPLETED",
-            isToday: act.scheduledDate === todayDate
+            isToday: act.scheduledDate === todayDate,
+            isUntrackedCompletion: act.activityType === "LESSON"
         });
     }
 
@@ -475,7 +682,8 @@ export async function getStudyPlanHistoryService(learnerId) {
 }
 
 /**
- * Proposes a revised plan based on new evidence without immediately overwriting active plan.
+ * Proposes a revised plan based on new evidence or preference changes.
+ * PERSISTS a server-owned StudyPlanProposal with expiry and meaningful change detection.
  */
 export async function proposePlanRevisionService(learnerId, reason = "Evidence update") {
     requireObjectId(learnerId, "learnerId");
@@ -486,50 +694,145 @@ export async function proposePlanRevisionService(learnerId, reason = "Evidence u
     const proposedActivities = buildDeterministicSchedule(candidates, weekInfo, preferences);
 
     const activePlan = await StudyPlan.findOne({ learnerId, status: "ACTIVE" }).sort({ version: -1 }).lean();
+    const basedOnVersion = activePlan?.version || 1;
+    const proposedVersion = basedOnVersion + 1;
+
+    // Detect if there is a meaningful change compared to the active plan
+    const isDifferent = areActivitySchedulesMeaningfullyDifferent(
+        activePlan?.scheduledActivities || [],
+        proposedActivities
+    );
+
+    // Expire any existing pending proposals for this learner
+    await StudyPlanProposal.updateMany(
+        { learnerId, status: "PENDING" },
+        { status: "EXPIRED" }
+    );
+
+    // Save a new server-owned proposal valid for 24 hours
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const proposal = new StudyPlanProposal({
+        learnerId,
+        basedOnPlanId: activePlan?._id || null,
+        basedOnVersion,
+        proposedVersion,
+        status: "PENDING",
+        startDate: weekInfo.startDate,
+        endDate: weekInfo.endDate,
+        reason,
+        isRevisionRecommended: isDifferent,
+        proposedActivities,
+        preferencesSnapshot: preferences,
+        expiresAt
+    });
+
+    await proposal.save();
 
     return {
-        isRevisionRecommended: true,
-        proposedVersion: (activePlan?.version || 1) + 1,
+        proposalId: proposal._id.toString(),
+        isRevisionRecommended: isDifferent,
+        proposedVersion,
         startDate: weekInfo.startDate,
         endDate: weekInfo.endDate,
         reason,
         proposedActivities,
-        preferencesSnapshot: preferences
+        preferencesSnapshot: preferences,
+        expiresAt: proposal.expiresAt
     };
 }
 
 /**
  * Accepts and activates a proposed plan revision.
+ * Revalidates ownership, proposal existence, staleness/expiry, plan version match,
+ * and revalidates all activities authoritatively before safe atomic plan replacement.
  */
 export async function acceptPlanRevisionService(learnerId, revisionData) {
     requireObjectId(learnerId, "learnerId");
 
-    const existingActive = await StudyPlan.findOne({ learnerId, status: "ACTIVE" }).sort({ version: -1 });
-    const version = existingActive ? existingActive.version + 1 : 1;
+    let activitiesToSchedule = [];
+    let revisionReason = "Accepted plan revision";
+    let startDate = null;
+    let endDate = null;
+    let basedOnVersion = null;
 
-    if (existingActive) {
-        existingActive.status = "SUPERSEDED";
-        await existingActive.save();
+    if (revisionData?.proposalId) {
+        requireObjectId(revisionData.proposalId, "proposalId");
+        const proposal = await StudyPlanProposal.findById(revisionData.proposalId);
+
+        if (!proposal) {
+            throw new ApiError(404, "PROPOSAL_NOT_FOUND", "Revision proposal not found");
+        }
+
+        if (proposal.learnerId.toString() !== learnerId.toString()) {
+            throw new ApiError(403, "FORBIDDEN", "You do not own this revision proposal");
+        }
+
+        if (proposal.status !== "PENDING" || proposal.expiresAt < new Date()) {
+            throw new ApiError(409, "PROPOSAL_STALE", "This revision proposal is expired or already resolved");
+        }
+
+        // Verify active plan version has not changed since proposal creation
+        const currentActive = await StudyPlan.findOne({ learnerId, status: "ACTIVE" }).sort({ version: -1 }).lean();
+        if (currentActive && currentActive.version !== proposal.basedOnVersion) {
+            proposal.status = "EXPIRED";
+            await proposal.save();
+            throw new ApiError(409, "PROPOSAL_STALE", "Active study plan has evolved since this proposal was created");
+        }
+
+        activitiesToSchedule = proposal.proposedActivities;
+        revisionReason = proposal.reason || revisionReason;
+        startDate = proposal.startDate;
+        endDate = proposal.endDate;
+        basedOnVersion = proposal.basedOnVersion;
+
+        // Mark proposal accepted
+        proposal.status = "ACCEPTED";
+        await proposal.save();
+    } else {
+        // Fallback for direct dates/activities payload: revalidate everything rigorously
+        startDate = revisionData?.startDate;
+        endDate = revisionData?.endDate;
+        revisionReason = revisionData?.reason || revisionReason;
+        activitiesToSchedule = revisionData?.proposedActivities || [];
     }
+
+    // Authoritative Server-Side Revalidation of each activity
+    const revalidatedActivities = await revalidateActivities(learnerId, activitiesToSchedule);
 
     const weekInfo = getWeekDates();
     const preferences = await getLearnerStudyPreferences(learnerId);
 
-    const newPlan = new StudyPlan({
-        learnerId,
-        version,
-        status: "ACTIVE",
-        startDate: revisionData?.startDate || weekInfo.startDate,
-        endDate: revisionData?.endDate || weekInfo.endDate,
-        preferencesSnapshot: preferences,
-        scheduledActivities: revisionData?.proposedActivities || [],
-        generationSource: "DETERMINISTIC_FALLBACK",
-        revisionReason: revisionData?.reason || "Accepted plan revision",
-        previousPlanId: existingActive?._id || null
+    // Atomically supersede active plan and insert new version
+    const newActivePlan = await withTransaction(async (session) => {
+        const existingActive = await StudyPlan.findOne({ learnerId, status: "ACTIVE" })
+            .sort({ version: -1 })
+            .session(session);
+
+        const version = existingActive ? existingActive.version + 1 : 1;
+
+        if (existingActive) {
+            existingActive.status = "SUPERSEDED";
+            await existingActive.save({ session });
+        }
+
+        const newPlan = new StudyPlan({
+            learnerId,
+            version,
+            status: "ACTIVE",
+            startDate: startDate || weekInfo.startDate,
+            endDate: endDate || weekInfo.endDate,
+            preferencesSnapshot: preferences,
+            scheduledActivities: revalidatedActivities,
+            generationSource: "DETERMINISTIC_FALLBACK",
+            revisionReason,
+            previousPlanId: existingActive?._id || null
+        });
+
+        await newPlan.save({ session });
+        return newPlan;
     });
 
-    await newPlan.save();
-    return enrichPlanWithActualState(newPlan, learnerId);
+    return enrichPlanWithActualState(newActivePlan, learnerId);
 }
 
 /**
