@@ -13,6 +13,11 @@ export interface NextBestAction {
   title: string;
   description: string;
   targetId: string;
+  courseId?: string;
+  topicId?: string;
+  targetType?: string;
+  actionType?: string;
+  isActionable?: boolean;
 }
 
 export interface LearningStrength {
@@ -22,6 +27,7 @@ export interface LearningStrength {
 
 export interface LearningWeakness {
   topicId: string;
+  courseId?: string;
   title: string;
 }
 
@@ -41,6 +47,7 @@ export interface RecommendedCourse {
 
 export interface RecentActivityItem {
   id: string;
+  courseId?: string;
   type: 'LESSON_COMPLETED' | 'PRACTICE_COMPLETED' | 'ASSESSMENT_PASSED' | 'COURSE_ENROLLED';
   title: string;
   date: string;
@@ -126,4 +133,3 @@ export interface LearnerAnalyticsOverviewData {
   dailyTrends: DailyTrendItem[];
   courseProgressList: CourseProgressSummary[];
 }
-
