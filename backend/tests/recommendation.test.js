@@ -1027,6 +1027,165 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
             assert.equal(res.nextBestAction.actionType, "EXPLORE_COURSE", "Unified NBA should select course discovery when active course items are locked");
             assert.equal(res.nextBestAction.isActionable, true, "Discovery NBA must be actionable");
         });
+
+        await t.test("5.6 Priority Alignment: Published unmet prerequisite takes priority over actionable active-course practice", async () => {
+            // Setup a learner who is actively enrolled in a course with an actionable weak practice recommendation
+            const activeLearnerId = new mongoose.Types.ObjectId();
+            const activeCourseId = new mongoose.Types.ObjectId();
+            const activeTopicId = new mongoose.Types.ObjectId();
+            const activePracticeId = new mongoose.Types.ObjectId();
+
+            const targetDiscoveryCourseId = new mongoose.Types.ObjectId();
+            const publishedPrereqCourseId = new mongoose.Types.ObjectId();
+
+            createdUserIds.push(activeLearnerId);
+            createdCourseIds.push(activeCourseId, targetDiscoveryCourseId, publishedPrereqCourseId);
+            createdTopicIds.push(activeTopicId);
+            createdPracticeIds.push(activePracticeId);
+
+            await User.create({
+                _id: activeLearnerId,
+                name: "Priority Learner",
+                email: "priority_learner@test.com",
+                passwordHash: "hash123",
+                role: "LEARNER",
+            });
+
+            // Learner has interest in "Robotics"
+            await LearnerProfile.create({
+                userId: activeLearnerId,
+                interests: ["Robotics"],
+                onboardingState: "COMPLETED",
+            });
+
+            // Active course the learner is currently studying
+            await Course.create({
+                _id: activeCourseId,
+                title: "Active Embedded Systems",
+                description: "Embedded Systems course",
+                domain: "Engineering",
+                category: "Hardware",
+                difficulty: "BEGINNER",
+                status: "PUBLISHED",
+                createdBy: instructorId,
+            });
+
+            await Topic.create({
+                _id: activeTopicId,
+                courseId: activeCourseId,
+                title: "Microcontrollers",
+                order: 1,
+            });
+
+            await Practice.create({
+                _id: activePracticeId,
+                courseId: activeCourseId,
+                topicId: activeTopicId,
+                questionBankId: qBankId,
+                createdBy: instructorId,
+                title: "Practice: Microcontrollers",
+                status: "PUBLISHED",
+            });
+
+            await Enrollment.create({
+                learnerId: activeLearnerId,
+                courseId: activeCourseId,
+                status: "ACTIVE",
+            });
+
+            // Learner has weak mastery in Microcontrollers (ordinarily top priority among active candidates)
+            await TopicMastery.create({
+                learnerId: activeLearnerId,
+                courseId: activeCourseId,
+                topicId: activeTopicId,
+                masteryScore: 45,
+                status: MASTERY_STATUS.NEEDS_IMPROVEMENT,
+                confidence: 0.8,
+                evidenceCount: 4,
+            });
+
+            // Discovery courses:
+            // 1. Target course matching interest "Robotics", which has a required course prerequisite
+            // 2. The prerequisite course, which is PUBLISHED
+            await Course.create([
+                {
+                    _id: publishedPrereqCourseId,
+                    title: "Foundations of Mechanics",
+                    description: "Essential mechanics prerequisite",
+                    domain: "Engineering",
+                    category: "Robotics",
+                    difficulty: "BEGINNER",
+                    status: "PUBLISHED",
+                    createdBy: instructorId,
+                },
+                {
+                    _id: targetDiscoveryCourseId,
+                    title: "Advanced Autonomous Robotics",
+                    description: "Robotics course matching learner interest",
+                    domain: "Engineering",
+                    category: "Robotics",
+                    difficulty: "ADVANCED",
+                    status: "PUBLISHED",
+                    createdBy: instructorId,
+                    prerequisites: {
+                        courses: [publishedPrereqCourseId],
+                    },
+                },
+            ]);
+
+            const resWithPrereq = await getLearnerRecommendationsService(activeLearnerId);
+
+            // Active candidate (practice) exists and is actionable
+            const activePracticeRec = resWithPrereq.recommendations.find((r) => r.actionType === RECOMMENDATION_ACTION_TYPES.ATTEMPT_PRACTICE);
+            assert.ok(activePracticeRec, "Active practice recommendation must exist");
+            assert.equal(activePracticeRec.isActionable, true);
+
+            // BUT Section 27 / 28.1 dictates: Blocking published prerequisite MUST take priority over active-course practice
+            assert.ok(resWithPrereq.nextBestAction, "nextBestAction must be populated");
+            assert.equal(
+                resWithPrereq.nextBestAction.courseId.toString(),
+                publishedPrereqCourseId.toString(),
+                "Blocking published prerequisite course must take priority over active-course remediation"
+            );
+            assert.equal(resWithPrereq.nextBestAction.reasonCode, "PREREQUISITE_COURSE_REQUIRED");
+            assert.equal(resWithPrereq.nextBestAction.isActionable, true);
+
+            // Case B: When prerequisite course is ARCHIVED/UNPUBLISHED, it must NOT become the nextBestAction.
+            // Active-course recommendation (practice) must be selected instead!
+            await Course.updateOne({ _id: publishedPrereqCourseId }, { $set: { status: "ARCHIVED" } });
+
+            const resWithArchivedPrereq = await getLearnerRecommendationsService(activeLearnerId);
+            assert.ok(resWithArchivedPrereq.nextBestAction);
+            assert.notEqual(
+                resWithArchivedPrereq.nextBestAction.courseId.toString(),
+                publishedPrereqCourseId.toString(),
+                "Archived prerequisite must never become nextBestAction"
+            );
+            assert.equal(
+                resWithArchivedPrereq.nextBestAction.actionType,
+                RECOMMENDATION_ACTION_TYPES.ATTEMPT_PRACTICE,
+                "Highest-ranked actionable active-course candidate should be selected when no published prerequisite blocks"
+            );
+            assert.equal(resWithArchivedPrereq.nextBestAction.targetId.toString(), activePracticeId.toString());
+
+            // Case C: When the prerequisite course is SATISFIED (learner completed it),
+            // active-course practice is retained as NBA (no blocking prerequisite)
+            await Course.updateOne({ _id: publishedPrereqCourseId }, { $set: { status: "PUBLISHED" } });
+            await Enrollment.create({
+                learnerId: activeLearnerId,
+                courseId: publishedPrereqCourseId,
+                status: "COMPLETED",
+            });
+
+            const resWithCompletedPrereq = await getLearnerRecommendationsService(activeLearnerId);
+            assert.ok(resWithCompletedPrereq.nextBestAction);
+            assert.equal(
+                resWithCompletedPrereq.nextBestAction.actionType,
+                RECOMMENDATION_ACTION_TYPES.ATTEMPT_PRACTICE,
+                "When prerequisite is completed, active-course practice remains highest priority"
+            );
+            assert.equal(resWithCompletedPrereq.nextBestAction.targetId.toString(), activePracticeId.toString());
+        });
     });
 
     // Cleanup

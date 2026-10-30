@@ -200,16 +200,15 @@ export async function findCourseDiscoveryRecommendations(learnerId, excludedCour
 }
 
 /**
- * Helper to determine the top next best action when course discovery is active
- * and there are no higher-priority active-course candidates.
- * Prioritizes required published prerequisite courses over regular course exploration.
+ * Helper to identify a published, unmet prerequisite action from course discovery recommendations.
+ * Per docs/09 Section 27 and 28.1, blocking published prerequisites represent hard constraints
+ * and have top priority over ordinary recommendations.
  */
-function resolveCourseDiscoveryNextBestAction(courseDiscoveryRecommendations = []) {
+function resolveBlockingPrerequisiteNextBestAction(courseDiscoveryRecommendations = []) {
     if (!courseDiscoveryRecommendations || courseDiscoveryRecommendations.length === 0) {
         return null;
     }
 
-    // Check if any discovery recommendation has unmet prerequisites that are published courses
     for (const rec of courseDiscoveryRecommendations) {
         if (!rec.prerequisitesSatisfied && Array.isArray(rec.unmetPrerequisites)) {
             const firstPublishedPrereq = rec.unmetPrerequisites.find((p) => p.isPublished);
@@ -229,6 +228,24 @@ function resolveCourseDiscoveryNextBestAction(courseDiscoveryRecommendations = [
                 };
             }
         }
+    }
+
+    return null;
+}
+
+/**
+ * Helper to determine the top next best action when course discovery is active
+ * and there are no higher-priority active-course candidates.
+ * Prioritizes required published prerequisite courses over regular course exploration.
+ */
+function resolveCourseDiscoveryNextBestAction(courseDiscoveryRecommendations = []) {
+    const blockingPrereq = resolveBlockingPrerequisiteNextBestAction(courseDiscoveryRecommendations);
+    if (blockingPrereq) {
+        return blockingPrereq;
+    }
+
+    if (!courseDiscoveryRecommendations || courseDiscoveryRecommendations.length === 0) {
+        return null;
     }
 
     const topCourse = courseDiscoveryRecommendations[0];
@@ -761,15 +778,19 @@ export async function getLearnerRecommendationsService(learnerId, options = {}) 
     candidates.sort(compareRecommendations);
 
     // Identify Next Best Action:
-    // Unified priority:
-    // 1. Highest-ranked actionable active-course candidate
-    // 2. If no actionable active-course candidates exist: course discovery Next Best Action (prerequisite before plain exploration)
-    // 3. Fallback to first active candidate (even if non-actionable) or null
+    // Priority order per docs/09 Section 27 & 28.1:
+    // 1. Blocking published prerequisite course from course discovery (hard constraint)
+    // 2. Highest-ranked actionable active-course candidate (remediation, practice, introductory lesson, unlocked progression)
+    // 3. General course discovery (exploration) if no active actionable items exist
+    // 4. Fallback to first active candidate (even if non-actionable) or null
+    const blockingPrereqNBA = resolveBlockingPrerequisiteNextBestAction(courseDiscoveryRecommendations);
     const topActionableActive = candidates.find((c) => c.isActionable) || null;
     const discoveryNBA = resolveCourseDiscoveryNextBestAction(courseDiscoveryRecommendations);
 
     let nextBestAction = null;
-    if (topActionableActive) {
+    if (blockingPrereqNBA) {
+        nextBestAction = blockingPrereqNBA;
+    } else if (topActionableActive) {
         nextBestAction = {
             type: topActionableActive.actionType,
             title: topActionableActive.title,
