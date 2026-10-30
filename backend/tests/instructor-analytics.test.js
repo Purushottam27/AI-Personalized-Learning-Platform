@@ -333,20 +333,20 @@ test("Instructor Course Analytics Test Suite", async (t) => {
         assert.equal(topic2.masteryDistribution.INSUFFICIENT_EVIDENCE.count, 2);
     });
 
-    await t.test("Weak-topic identification is evidence-based and does not classify topic as weak solely due to insufficient evidence", async () => {
+    await t.test("Evidence-based topic performance calculates needs-improvement distribution and does not invent arbitrary weak thresholds", async () => {
         const data = await getInstructorCourseAnalyticsService(instructor1Id, course1Id);
 
-        // Topic 1 has 1 of 2 evaluated learners with NEEDS_IMPROVEMENT (50% >= 30%) -> isWeak: true
+        // Topic 1 has 1 of 2 evaluated learners with NEEDS_IMPROVEMENT (50%)
         const topic1 = data.topicsPerformance.find((t) => t.topicId === topic1Id.toString());
-        assert.equal(topic1.isWeak, true);
+        assert.equal(topic1.needsImprovementCount, 1);
+        assert.equal(topic1.evaluatedLearnersCount, 2);
+        assert.equal(topic1.needsImprovementPercentage, 50);
 
-        // Topic 2 has 2 learners with INSUFFICIENT_EVIDENCE, but 0 NEEDS_IMPROVEMENT -> isWeak: false!
+        // Topic 2 has 2 learners with INSUFFICIENT_EVIDENCE, but 0 NEEDS_IMPROVEMENT -> 0%
         const topic2 = data.topicsPerformance.find((t) => t.topicId === topic2Id.toString());
-        assert.equal(topic2.isWeak, false);
-
-        assert.equal(data.weakTopics.length, 1);
-        assert.equal(data.weakTopics[0].topicId, topic1Id.toString());
-        assert.equal(data.weakTopics[0].weaknessPercentage, 50);
+        assert.equal(topic2.needsImprovementCount, 0);
+        assert.equal(topic2.evaluatedLearnersCount, 1);
+        assert.equal(topic2.needsImprovementPercentage, 0);
     });
 
     await t.test("Learner breakdown includes privacy-safe identity, confidence, evidence count, and null-safe scores", async () => {
@@ -388,9 +388,178 @@ test("Instructor Course Analytics Test Suite", async (t) => {
         assert.equal(data.overview.activeLearners.totalActiveAllTime, 0);
         assert.equal(data.overview.totalEligibleAttempts, 0);
         assert.equal(data.overview.overallAverageAccuracy, null);
-        assert.equal(data.weakTopics.length, 0);
         assert.equal(data.learners.items.length, 0);
         assert.equal(data.learners.pagination.totalItems, 0);
+    });
+
+    // ==========================================
+    // Regression Tests
+    // ==========================================
+
+    await t.test("Regression: Learner with historical WITHDRAWN enrollment followed by current ACTIVE enrollment is counted exactly once", async () => {
+        const reenrollLearnerId = new mongoose.Types.ObjectId();
+        const reenrollCourseId = new mongoose.Types.ObjectId();
+        const reenrollTopicId = new mongoose.Types.ObjectId();
+
+        createdUserIds.push(reenrollLearnerId);
+        createdCourseIds.push(reenrollCourseId);
+        createdTopicIds.push(reenrollTopicId);
+
+        await User.create({
+            _id: reenrollLearnerId,
+            name: "Reenrolled Learner",
+            email: "reenrolled@test.com",
+            password: "password123",
+            role: "LEARNER",
+            status: "ACTIVE",
+        });
+
+        await Course.create({
+            _id: reenrollCourseId,
+            title: "Course with Re-enrolled Learner",
+            description: "Testing historical enrollment deduplication.",
+            createdBy: instructor1Id,
+            domain: "Computer Science",
+            category: "Algorithms",
+            difficulty: "INTERMEDIATE",
+            status: "PUBLISHED",
+        });
+
+        await Topic.create({
+            _id: reenrollTopicId,
+            courseId: reenrollCourseId,
+            title: "Reenroll Topic",
+            order: 1,
+        });
+
+        // 1st historical enrollment: WITHDRAWN (created earlier)
+        const oldEnr = await Enrollment.create({
+            learnerId: reenrollLearnerId,
+            courseId: reenrollCourseId,
+            status: "WITHDRAWN",
+            enrolledAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+            updatedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+        });
+
+        // 2nd current enrollment: ACTIVE (created later)
+        const currentEnr = await Enrollment.create({
+            learnerId: reenrollLearnerId,
+            courseId: reenrollCourseId,
+            status: "ACTIVE",
+            enrolledAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+            updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+        });
+        createdEnrollmentIds.push(oldEnr._id, currentEnr._id);
+
+        const data = await getInstructorCourseAnalyticsService(instructor1Id, reenrollCourseId);
+
+        // Verify deduplication: single learner counted
+        assert.equal(data.overview.totalEnrolledLearners, 1);
+        assert.equal(data.overview.enrollmentBreakdown.active, 1);
+        assert.equal(data.overview.enrollmentBreakdown.withdrawn, 0);
+
+        // Topic performance totalEnrolled should not be inflated
+        assert.equal(data.topicsPerformance[0].totalEnrolled, 1);
+
+        // Learner items contains exactly one entry with current status ACTIVE
+        assert.equal(data.learners.items.length, 1);
+        assert.equal(data.learners.items[0].learnerId, reenrollLearnerId.toString());
+        assert.equal(data.learners.items[0].enrollmentStatus, "ACTIVE");
+    });
+
+    await t.test("Regression: Overview metrics remain invariant when learner table filters and search are applied", async () => {
+        // Query course1 with status=COMPLETED (which matches 0 learners)
+        const filteredData = await getInstructorCourseAnalyticsService(instructor1Id, course1Id, {
+            status: "COMPLETED",
+        });
+
+        // Learners items filtered down to 0
+        assert.equal(filteredData.learners.items.length, 0);
+        assert.equal(filteredData.learners.pagination.totalItems, 0);
+
+        // Overview metrics MUST remain course-wide invariant
+        assert.equal(filteredData.overview.totalEnrolledLearners, 3);
+        assert.equal(filteredData.overview.enrollmentBreakdown.active, 3);
+        assert.equal(filteredData.overview.learnersWithNeedsImprovementCount, 1);
+        assert.equal(filteredData.overview.learnersAwaitingEvidenceCount, 1);
+
+        // Query with search that matches no learners
+        const searchedData = await getInstructorCourseAnalyticsService(instructor1Id, course1Id, {
+            search: "NonexistentLearnerXYZ",
+        });
+
+        assert.equal(searchedData.learners.items.length, 0);
+        assert.equal(searchedData.overview.totalEnrolledLearners, 3);
+        assert.equal(searchedData.overview.learnersWithNeedsImprovementCount, 1);
+        assert.equal(searchedData.overview.learnersAwaitingEvidenceCount, 1);
+    });
+
+    await t.test("Regression: Legacy FUNCTIONAL mastery status is preserved and not classified as INSUFFICIENT_EVIDENCE", async () => {
+        const funcLearnerId = new mongoose.Types.ObjectId();
+        const funcCourseId = new mongoose.Types.ObjectId();
+        const funcTopicId = new mongoose.Types.ObjectId();
+
+        createdUserIds.push(funcLearnerId);
+        createdCourseIds.push(funcCourseId);
+        createdTopicIds.push(funcTopicId);
+
+        await User.create({
+            _id: funcLearnerId,
+            name: "Functional Learner",
+            email: "functional@test.com",
+            password: "password123",
+            role: "LEARNER",
+            status: "ACTIVE",
+        });
+
+        await Course.create({
+            _id: funcCourseId,
+            title: "Course with Functional Mastery",
+            description: "Testing FUNCTIONAL mastery status preservation.",
+            difficulty: "INTERMEDIATE",
+            domain: "Computer Science",
+            category: "Algorithms",
+            createdBy: instructor1Id,
+            status: "PUBLISHED",
+        });
+
+        await Topic.create({
+            _id: funcTopicId,
+            courseId: funcCourseId,
+            title: "Functional Topic",
+            order: 1,
+        });
+
+        const funcEnr = await Enrollment.create({
+            learnerId: funcLearnerId,
+            courseId: funcCourseId,
+            status: "ACTIVE",
+        });
+        createdEnrollmentIds.push(funcEnr._id);
+
+        const funcTm = await TopicMastery.create({
+            learnerId: funcLearnerId,
+            courseId: funcCourseId,
+            topicId: funcTopicId,
+            status: MASTERY_STATUS.FUNCTIONAL,
+            masteryScore: 70,
+            confidence: 0.7,
+            evidenceCount: 2,
+        });
+        createdMasteryIds.push(funcTm._id);
+
+        const data = await getInstructorCourseAnalyticsService(instructor1Id, funcCourseId);
+
+        const topic = data.topicsPerformance[0];
+        assert.equal(topic.evaluatedLearnersCount, 1);
+        // FUNCTIONAL counted in STRONG/Proficient bucket
+        assert.equal(topic.masteryDistribution.STRONG.count, 1);
+        assert.equal(topic.masteryDistribution.INSUFFICIENT_EVIDENCE.count, 0);
+
+        const learner = data.learners.items[0];
+        assert.equal(learner.isAwaitingEvidence, false);
+        assert.equal(learner.topics[0].status, "FUNCTIONAL");
+        assert.equal(learner.topics[0].masteryScore, 70);
     });
 
     // ==========================================

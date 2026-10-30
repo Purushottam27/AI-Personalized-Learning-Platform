@@ -236,52 +236,19 @@ export const InstructorAnalyticsPage: React.FC = () => {
 
                 <div className="p-5 rounded-2xl border border-border bg-surface flex flex-col justify-between">
                   <div className="flex items-center justify-between text-text-tertiary mb-3">
-                    <span className="text-xs font-bold uppercase tracking-wider">Attention Needed</span>
+                    <span className="text-xs font-bold uppercase tracking-wider">Needs Improvement</span>
                     <AlertTriangle className="w-5 h-5 text-rose-500" />
                   </div>
                   <div>
                     <span className="text-3xl font-bold font-display text-text-primary">
-                      {analytics.overview.learnersNeedingAttentionCount}
+                      {analytics.overview.learnersWithNeedsImprovementCount ?? analytics.overview.learnersNeedingAttentionCount}
                     </span>
                     <span className="text-xs text-text-tertiary block mt-1">
-                      {analytics.overview.weakTopicsCount} topics identified with weakness
+                      Learners with Needs Improvement Evidence
                     </span>
                   </div>
                 </div>
               </div>
-
-              {/* Weak Topics Warning Banner */}
-              {analytics.weakTopics.length > 0 && (
-                <div className="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-3">
-                  <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-sm">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>Topics Showing Evidence of Learning Difficulty</span>
-                  </div>
-                  <p className="text-xs text-text-secondary leading-relaxed">
-                    The following topics have a notable concentration of learners classified as Needs Improvement based on practice and assessment attempts. Consider revising lesson explanations or adding practice variations.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-                    {analytics.weakTopics.map((wt) => (
-                      <div
-                        key={wt.topicId}
-                        className="p-3.5 rounded-xl bg-surface border border-rose-500/30 flex items-center justify-between shadow-xs"
-                      >
-                        <div>
-                          <span className="text-xs font-bold text-text-primary block">
-                            Topic {wt.order}: {wt.title}
-                          </span>
-                          <span className="text-[11px] text-text-tertiary">
-                            {wt.needsImprovementCount} of {wt.evaluatedLearnersCount} evaluated learners need improvement
-                          </span>
-                        </div>
-                        <span className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-1 rounded-md">
-                          {wt.weaknessPercentage}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Course-level topics summary preview */}
               <div className="p-6 rounded-2xl border border-border bg-surface space-y-4">
@@ -313,9 +280,9 @@ export const InstructorAnalyticsPage: React.FC = () => {
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
-                          {tp.isWeak && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                              Difficulty Detected
+                          {tp.needsImprovementCount > 0 && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                              {tp.needsImprovementCount} Needs Impr. ({tp.needsImprovementPercentage}%)
                             </span>
                           )}
                           <div className="w-32 hidden sm:flex h-2 rounded-full overflow-hidden bg-surface-elevated border border-border">
@@ -398,9 +365,9 @@ export const InstructorAnalyticsPage: React.FC = () => {
                               Topic {tp.order}
                             </span>
                             <h3 className="text-sm font-bold text-text-primary">{tp.title}</h3>
-                            {tp.isWeak && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                                Weakness Detected
+                            {tp.needsImprovementCount > 0 && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                                {tp.needsImprovementCount} Needs Improvement ({tp.needsImprovementPercentage}%)
                               </span>
                             )}
                           </div>
@@ -539,9 +506,9 @@ export const InstructorAnalyticsPage: React.FC = () => {
                               <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-surface-disabled text-text-secondary border border-border">
                                 {learner.enrollmentStatus}
                               </span>
-                              {learner.needsAttention && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                                  <AlertTriangle className="w-3 h-3" /> Needs Attention
+                              {(learner.hasNeedsImprovementEvidence || learner.needsAttention) && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20" title="At least one evaluated topic has Needs Improvement status">
+                                  <AlertTriangle className="w-3 h-3" /> Needs Improvement Evidence
                                 </span>
                               )}
                               {learner.isAwaitingEvidence && (
@@ -579,12 +546,15 @@ export const InstructorAnalyticsPage: React.FC = () => {
                             if (t.status === 'STRONG' || t.status === 'MASTERED') {
                               badgeClass = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
                               label = `${t.masteryScore}%`;
+                            } else if (t.status === 'FUNCTIONAL') {
+                              badgeClass = 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20';
+                              label = `${t.masteryScore}% (Functional)`;
                             } else if (t.status === 'DEVELOPING') {
                               badgeClass = 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20';
                               label = `${t.masteryScore}%`;
                             } else if (t.status === 'NEEDS_IMPROVEMENT') {
                               badgeClass = 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
-                              label = `${t.masteryScore}% (Weak)`;
+                              label = `${t.masteryScore}% (Needs Impr.)`;
                             }
 
                             return (

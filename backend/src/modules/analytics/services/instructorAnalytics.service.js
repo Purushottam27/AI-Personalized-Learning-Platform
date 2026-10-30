@@ -44,10 +44,40 @@ export async function getInstructorCourseAnalyticsService(instructorId, courseId
     const topicIds = topics.map((t) => t._id);
 
     // 3. Fetch All Enrollments for this course
-    const enrollments = await Enrollment.find({ courseId: courseObjectId }).lean();
+    // The model permits historical WITHDRAWN/COMPLETED enrollment records and later re-enrollment.
+    // Determine the single authoritative/current enrollment per learner.
+    // Lifecycle precedence: ACTIVE > COMPLETED > WITHDRAWN, tie-broken by latest enrolledAt / updatedAt.
+    const allEnrollments = await Enrollment.find({ courseId: courseObjectId }).sort({ enrolledAt: -1, updatedAt: -1 }).lean();
+
+    const learnerLatestEnrollmentMap = new Map();
+    const statusPriority = { ACTIVE: 3, COMPLETED: 2, WITHDRAWN: 1 };
+
+    for (const enr of allEnrollments) {
+        const lid = enr.learnerId.toString();
+        if (!learnerLatestEnrollmentMap.has(lid)) {
+            learnerLatestEnrollmentMap.set(lid, enr);
+        } else {
+            const existing = learnerLatestEnrollmentMap.get(lid);
+            const existingScore = statusPriority[existing.status] || 0;
+            const currentScore = statusPriority[enr.status] || 0;
+
+            if (currentScore > existingScore) {
+                learnerLatestEnrollmentMap.set(lid, enr);
+            } else if (currentScore === existingScore) {
+                const existingTime = new Date(existing.enrolledAt || existing.createdAt || 0).getTime();
+                const currentTime = new Date(enr.enrolledAt || enr.createdAt || 0).getTime();
+                if (currentTime > existingTime) {
+                    learnerLatestEnrollmentMap.set(lid, enr);
+                }
+            }
+        }
+    }
+
+    // Authoritative unique learner enrollments
+    const enrollments = Array.from(learnerLatestEnrollmentMap.values());
     const enrolledLearnerIds = enrollments.map((e) => e.learnerId);
 
-    // Total enrolled learners count
+    // Total unique enrolled learners count (each learner counted only once)
     const totalEnrolledLearners = enrollments.length;
     const activeEnrollmentsCount = enrollments.filter((e) => e.status === "ACTIVE").length;
     const completedEnrollmentsCount = enrollments.filter((e) => e.status === "COMPLETED").length;
@@ -144,7 +174,11 @@ export async function getInstructorCourseAnalyticsService(instructorId, courseId
         let scoreCount = 0;
 
         for (const tm of topicMasteries) {
-            if (tm.status === MASTERY_STATUS.MASTERED || tm.status === MASTERY_STATUS.STRONG) {
+            if (
+                tm.status === MASTERY_STATUS.MASTERED ||
+                tm.status === MASTERY_STATUS.STRONG ||
+                tm.status === MASTERY_STATUS.FUNCTIONAL
+            ) {
                 strongCount++;
             } else if (tm.status === MASTERY_STATUS.DEVELOPING) {
                 developingCount++;
@@ -167,6 +201,9 @@ export async function getInstructorCourseAnalyticsService(instructorId, courseId
 
         const evaluatedLearnersCount = scoreCount;
         const averageMasteryScore = scoreCount > 0 ? Math.round(scoreSum / scoreCount) : null;
+        const needsImprovementPercentage = evaluatedLearnersCount > 0
+            ? Math.round((needsImprovementCount / evaluatedLearnersCount) * 100)
+            : 0;
 
         // Calculate distribution percentages relative to total enrolled learners (or 0 if no enrolled learners)
         const distribution = {
@@ -188,13 +225,6 @@ export async function getInstructorCourseAnalyticsService(instructorId, courseId
             },
         };
 
-        // Determine if topic is identified as weak based on ACTUAL learner evidence
-        // Rule: needsImprovementCount > 0 AND (needsImprovementCount / evaluatedLearnersCount >= 0.3 or needsImprovementCount >= 3)
-        // Insufficient evidence alone does NOT classify a topic as weak!
-        const isWeak = evaluatedLearnersCount > 0 && needsImprovementCount > 0 && (
-            (needsImprovementCount / evaluatedLearnersCount) >= 0.3 || needsImprovementCount >= 3
-        );
-
         const topicSummary = {
             topicId: topic._id.toString(),
             title: topic.title,
@@ -202,28 +232,13 @@ export async function getInstructorCourseAnalyticsService(instructorId, courseId
             totalEnrolled: totalEnrolledLearners,
             evaluatedLearnersCount,
             averageMasteryScore,
-            masteryDistribution: distribution,
-            isWeak,
             needsImprovementCount,
+            needsImprovementPercentage,
+            masteryDistribution: distribution,
         };
 
         topicPerformanceList.push(topicSummary);
-
-        if (isWeak) {
-            weakTopicsList.push({
-                topicId: topic._id.toString(),
-                title: topic.title,
-                order: topic.order,
-                needsImprovementCount,
-                evaluatedLearnersCount,
-                weaknessPercentage: evaluatedLearnersCount > 0 ? Math.round((needsImprovementCount / evaluatedLearnersCount) * 100) : 0,
-                averageMasteryScore,
-            });
-        }
     }
-
-    // Sort weak topics by weakness severity
-    weakTopicsList.sort((a, b) => b.weaknessPercentage - a.weaknessPercentage || b.needsImprovementCount - a.needsImprovementCount);
 
     // 7. Paginated Learner Performance Breakdown
     // Filter enrollments by status/search if requested
@@ -239,7 +254,7 @@ export async function getInstructorCourseAnalyticsService(instructorId, courseId
     const userMap = new Map(users.map((u) => [u._id.toString(), u]));
 
     // Build enriched learner records
-    let enrichedLearners = enrollments.map((enr) => {
+    const allEnrichedLearners = enrollments.map((enr) => {
         const lid = enr.learnerId.toString();
         const user = userMap.get(lid) || {
             _id: enr.learnerId,
@@ -276,7 +291,11 @@ export async function getInstructorCourseAnalyticsService(instructorId, courseId
                 };
             }
 
-            if (tm.status === MASTERY_STATUS.MASTERED || tm.status === MASTERY_STATUS.STRONG) {
+            if (
+                tm.status === MASTERY_STATUS.MASTERED ||
+                tm.status === MASTERY_STATUS.STRONG ||
+                tm.status === MASTERY_STATUS.FUNCTIONAL
+            ) {
                 masteredTopicsCount++;
             } else if (tm.status === MASTERY_STATUS.DEVELOPING) {
                 developingTopicsCount++;
@@ -330,25 +349,32 @@ export async function getInstructorCourseAnalyticsService(instructorId, courseId
             developingTopicsCount,
             needsImprovementTopicsCount,
             insufficientEvidenceTopicsCount,
+            hasNeedsImprovementEvidence: needsAttention,
             needsAttention,
             isAwaitingEvidence,
             topics: topicBreakdown,
         };
     });
 
-    // Apply filtering
+    // Calculate course-wide overview learner metrics from the COMPLETE set of enrolled learners,
+    // INDEPENDENTLY of table search, status filter, and pagination
+    const courseWideLearnersNeedingAttentionCount = allEnrichedLearners.filter((l) => l.needsAttention).length;
+    const courseWideLearnersAwaitingEvidenceCount = allEnrichedLearners.filter((l) => l.isAwaitingEvidence).length;
+
+    // Apply filtering for learner table view only
+    let filteredLearners = allEnrichedLearners;
     if (filterStatus !== "ALL") {
-        enrichedLearners = enrichedLearners.filter((l) => l.enrollmentStatus === filterStatus);
+        filteredLearners = filteredLearners.filter((l) => l.enrollmentStatus === filterStatus);
     }
 
     if (searchTerm) {
-        enrichedLearners = enrichedLearners.filter(
+        filteredLearners = filteredLearners.filter(
             (l) => l.name.toLowerCase().includes(searchTerm) || l.email.toLowerCase().includes(searchTerm)
         );
     }
 
     // Sort learners: those with needsAttention first, then by lowest averageMasteryScore, then by enrolledAt
-    enrichedLearners.sort((a, b) => {
+    filteredLearners.sort((a, b) => {
         if (a.needsAttention && !b.needsAttention) return -1;
         if (!a.needsAttention && b.needsAttention) return 1;
         if (a.averageMasteryScore !== null && b.averageMasteryScore !== null) {
@@ -359,9 +385,9 @@ export async function getInstructorCourseAnalyticsService(instructorId, courseId
         return new Date(b.enrolledAt).getTime() - new Date(a.enrolledAt).getTime();
     });
 
-    const totalFilteredLearners = enrichedLearners.length;
+    const totalFilteredLearners = filteredLearners.length;
     const totalPages = Math.ceil(totalFilteredLearners / limit) || 1;
-    const paginatedLearners = enrichedLearners.slice((page - 1) * limit, page * limit);
+    const paginatedLearners = filteredLearners.slice((page - 1) * limit, page * limit);
 
     // 8. Overall Course-Level Summary
     return {
@@ -388,12 +414,11 @@ export async function getInstructorCourseAnalyticsService(instructorId, courseId
             },
             totalEligibleAttempts,
             overallAverageAccuracy,
-            weakTopicsCount: weakTopicsList.length,
-            learnersNeedingAttentionCount: enrichedLearners.filter((l) => l.needsAttention).length,
-            learnersAwaitingEvidenceCount: enrichedLearners.filter((l) => l.isAwaitingEvidence).length,
+            learnersWithNeedsImprovementCount: courseWideLearnersNeedingAttentionCount,
+            learnersNeedingAttentionCount: courseWideLearnersNeedingAttentionCount, // Backwards compatible alias
+            learnersAwaitingEvidenceCount: courseWideLearnersAwaitingEvidenceCount,
         },
         topicsPerformance: topicPerformanceList,
-        weakTopics: weakTopicsList,
         learners: {
             items: paginatedLearners,
             pagination: {

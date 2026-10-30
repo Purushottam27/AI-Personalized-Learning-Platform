@@ -17,26 +17,16 @@ export interface TopicPerformanceSummary {
   totalEnrolled: number;
   evaluatedLearnersCount: number;
   averageMasteryScore: number | null;
+  needsImprovementCount: number;
+  needsImprovementPercentage: number;
   masteryDistribution: MasteryDistribution;
-  isWeak: boolean;
-  needsImprovementCount: number;
-}
-
-export interface WeakTopicSummary {
-  topicId: string;
-  title: string;
-  order: number;
-  needsImprovementCount: number;
-  evaluatedLearnersCount: number;
-  weaknessPercentage: number;
-  averageMasteryScore: number | null;
 }
 
 export interface LearnerTopicPerformance {
   topicId: string;
   title: string;
   order: number;
-  status: 'STRONG' | 'MASTERED' | 'DEVELOPING' | 'NEEDS_IMPROVEMENT' | 'INSUFFICIENT_EVIDENCE';
+  status: 'STRONG' | 'MASTERED' | 'FUNCTIONAL' | 'DEVELOPING' | 'NEEDS_IMPROVEMENT' | 'INSUFFICIENT_EVIDENCE';
   masteryScore: number | null;
   confidence: number;
   evidenceCount: number;
@@ -59,6 +49,7 @@ export interface LearnerPerformanceItem {
   developingTopicsCount: number;
   needsImprovementTopicsCount: number;
   insufficientEvidenceTopicsCount: number;
+  hasNeedsImprovementEvidence: boolean;
   needsAttention: boolean;
   isAwaitingEvidence: boolean;
   topics: LearnerTopicPerformance[];
@@ -88,12 +79,11 @@ export interface InstructorCourseAnalytics {
     };
     totalEligibleAttempts: number;
     overallAverageAccuracy: number | null;
-    weakTopicsCount: number;
-    learnersNeedingAttentionCount: number;
+    learnersWithNeedsImprovementCount: number;
+    learnersNeedingAttentionCount?: number;
     learnersAwaitingEvidenceCount: number;
   };
   topicsPerformance: TopicPerformanceSummary[];
-  weakTopics: WeakTopicSummary[];
   learners: {
     items: LearnerPerformanceItem[];
     pagination: {
