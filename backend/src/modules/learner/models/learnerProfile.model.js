@@ -52,6 +52,33 @@ const learnerProfileSchema = new mongoose.Schema({
                 "Projects"
             ],
             default:[]
+        },
+
+        studyDays: {
+            type: [String],
+            enum: [
+                "MONDAY",
+                "TUESDAY",
+                "WEDNESDAY",
+                "THURSDAY",
+                "FRIDAY",
+                "SATURDAY",
+                "SUNDAY"
+            ],
+            default: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]
+        },
+
+        preferredSessionDuration: {
+            type: Number, // duration in minutes
+            min: 15,
+            max: 180,
+            default: 45
+        },
+
+        preferredTimeOfDay: {
+            type: String,
+            enum: ["MORNING", "AFTERNOON", "EVENING", "NIGHT", "ANYTIME"],
+            default: "ANYTIME"
         }
     },
     onboardingState:{
@@ -63,6 +90,4 @@ const learnerProfileSchema = new mongoose.Schema({
 
 },{timestamps:true})
 
-
 export const LearnerProfile = mongoose.model('LearnerProfile',learnerProfileSchema)
-

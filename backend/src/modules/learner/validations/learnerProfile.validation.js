@@ -6,7 +6,7 @@ const EXPERIENCE_LEVELS = [
     'I am comfortable with the fundamentals',
     'I have substantial experience',
     "I'm not sure"
-]
+];
 
 const DAILY_STUDY_TIMES = [
     "Less than 1 hour",
@@ -14,7 +14,7 @@ const DAILY_STUDY_TIMES = [
     "2-3 hours",
     "3-4 hours",
     "5 or more hours"
-]
+];
 
 const PREFERRED_LEARNING_FORMATS = [
     "Reading",
@@ -22,7 +22,25 @@ const PREFERRED_LEARNING_FORMATS = [
     "Interactive Learning",
     "Practice Exercises",
     "Projects"
-]
+];
+
+const STUDY_DAYS = [
+    "MONDAY",
+    "TUESDAY",
+    "WEDNESDAY",
+    "THURSDAY",
+    "FRIDAY",
+    "SATURDAY",
+    "SUNDAY"
+];
+
+const PREFERRED_TIMES_OF_DAY = [
+    "MORNING",
+    "AFTERNOON",
+    "EVENING",
+    "NIGHT",
+    "ANYTIME"
+];
 
 const updateLearnerProfileSchema = z.object({
     interests: z.array(z.string().trim().min(1, 'Interest cannot be empty')).optional(),
@@ -30,7 +48,10 @@ const updateLearnerProfileSchema = z.object({
     experienceLevel: z.enum(EXPERIENCE_LEVELS).nullable().optional(),
     studyPreferences: z.object({
         dailyStudyTime: z.enum(DAILY_STUDY_TIMES).nullable().optional(),
-        preferredLearningFormat: z.array(z.enum(PREFERRED_LEARNING_FORMATS)).optional()
+        preferredLearningFormat: z.array(z.enum(PREFERRED_LEARNING_FORMATS)).optional(),
+        studyDays: z.array(z.enum(STUDY_DAYS)).optional(),
+        preferredSessionDuration: z.number().int().min(15).max(180).optional(),
+        preferredTimeOfDay: z.enum(PREFERRED_TIMES_OF_DAY).optional(),
     }).optional()
 }).strict().refine(
     (data) => Object.keys(data).length > 0,
@@ -59,5 +80,10 @@ const learnerOnboardingSchema = z.object({
 
 export {
     updateLearnerProfileSchema,
-    learnerOnboardingSchema
+    learnerOnboardingSchema,
+    EXPERIENCE_LEVELS,
+    DAILY_STUDY_TIMES,
+    PREFERRED_LEARNING_FORMATS,
+    STUDY_DAYS,
+    PREFERRED_TIMES_OF_DAY
 };

@@ -6,6 +6,7 @@ import { NextBestAction } from '../components/NextBestAction';
 import { CourseProgressCard } from '../components/CourseProgressCard';
 import { StrengthsWeaknesses } from '../components/StrengthsWeaknesses';
 import { LearningSummary } from '../components/LearningSummary';
+import { StudyPlannerWidget } from '../components/StudyPlannerWidget';
 import { RecommendedCourses } from '../components/RecommendedCourses';
 import { RecentActivity } from '../components/RecentActivity';
 import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
@@ -55,6 +56,7 @@ export const LearnerDashboardPage: React.FC = () => {
       <WelcomeHeader />
 
       <div className="space-y-6">
+        <StudyPlannerWidget />
         <ContinueLearningCard progress={data.continueLearning} />
 
         {data.nextBestAction && (

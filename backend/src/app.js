@@ -26,6 +26,7 @@ import { recommendationRouter } from './modules/recommendation/routes/recommenda
 import { aiAssistantRouter } from './modules/aiAssistant/routes/aiAssistant.route.js';
 import { learnerAnalyticsRouter } from './modules/analytics/routes/learnerAnalytics.route.js';
 import { instructorAnalyticsRouter } from './modules/analytics/routes/instructorAnalytics.route.js';
+import { studyPlanRouter } from './modules/studyPlan/routes/studyPlan.route.js';
 
 const app = express();
 const logger = pino();
@@ -64,6 +65,7 @@ app.use('/api/v1', recommendationRouter);
 app.use('/api/v1', aiAssistantRouter);
 app.use('/api/v1', learnerAnalyticsRouter);
 app.use('/api/v1', instructorAnalyticsRouter);
+app.use('/api/v1', studyPlanRouter);
 
 // Global Error-handling response Middleware
 app.use(errorMiddleware);

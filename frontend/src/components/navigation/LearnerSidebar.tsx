@@ -5,6 +5,7 @@ import {
   BookOpen,
   Compass,
   Sparkles,
+  CalendarCheck2,
   BarChart3,
   UserRoundCog,
 } from 'lucide-react';
@@ -51,6 +52,7 @@ export const SidebarNav: React.FC<{ onItemClick?: () => void }> = ({ onItemClick
         </h3>
         <SidebarItem to="/learner/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onItemClick} />
         <SidebarItem to="/learner/courses" icon={BookOpen} label="My Courses" onClick={onItemClick} />
+        <SidebarItem to="/learner/study-planner" icon={CalendarCheck2} label="AI Study Planner" onClick={onItemClick} />
         <SidebarItem to="/learner/explore" icon={Compass} label="Explore" onClick={onItemClick} />
         <SidebarItem to="/learner/recommended" icon={Sparkles} label="Recommended" onClick={onItemClick} />
       </div>

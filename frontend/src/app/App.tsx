@@ -26,6 +26,7 @@ import { PracticeOverviewPage } from '../features/learner/pages/PracticeOverview
 import { PracticeSessionPage } from '../features/learner/pages/PracticeSessionPage';
 import { AssessmentOverviewPage } from '../features/learner/pages/AssessmentOverviewPage';
 import { AssessmentSessionPage } from '../features/learner/pages/AssessmentSessionPage';
+import { StudyPlannerPage } from '../features/learner/pages/StudyPlannerPage';
 
 // Instructor App
 import InstructorLayout from '../features/instructor/layouts/InstructorLayout';
@@ -72,6 +73,7 @@ function App() {
                   <Route path="courses/:courseId" element={<CourseDetailPage />} />
                   <Route path="courses/:courseId/learn" element={<CourseStudyPage />} />
                   <Route path="explore" element={<ExploreCoursesPage />} />
+                  <Route path="study-planner" element={<StudyPlannerPage />} />
                   <Route path="recommended" element={<LearnerRecommendationsPage />} />
                   <Route path="analytics" element={<LearnerAnalyticsPage />} />
                   <Route path="profile" element={<LearnerProfilePage />} />
