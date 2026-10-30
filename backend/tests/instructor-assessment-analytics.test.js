@@ -415,16 +415,17 @@ test("Instructor Assessment and Question Analytics Test Suite", async (t) => {
         assert.equal(diag.topicId, null);
         assert.equal(diag.totalAttempts, 0);
         assert.equal(diag.averageScore, null); // null-safe
-        assert.equal(diag.hasSufficientData, false);
+        assert.equal(diag.hasEvaluatedData, false);
 
         const finalAssm = data.assessments.find((a) => a.assessmentId === finalAssessmentId.toString());
         assert.ok(finalAssm);
         assert.equal(finalAssm.type, "FINAL");
         assert.equal(finalAssm.topicId, null);
         assert.equal(finalAssm.totalAttempts, 0);
+        assert.equal(finalAssm.hasEvaluatedData, false);
     });
 
-    await t.test("Generates explainable, evidence-backed instructor insights with traceable references", async () => {
+    await t.test("Generates explainable, evidence-backed instructor insights with traceable references and no unapproved thresholds", async () => {
         const data = await getInstructorAssessmentAnalyticsService(instructor1Id, course1Id);
         assert.ok(data.insights.length > 0);
 
@@ -433,13 +434,13 @@ test("Instructor Assessment and Question Analytics Test Suite", async (t) => {
         assert.ok(emptyInsight);
         assert.equal(emptyInsight.category, "DATA_LIMITATION");
 
-        // Verification of High Failure Rate insight for Topic assessment (fail rate: 67% >= 40%)
-        const failInsight = data.insights.find(
+        // Verification of Performance Distribution insight for Topic assessment
+        const perfInsight = data.insights.find(
             (i) => i.reference.id === topicAssessmentId.toString() && i.category === "PERFORMANCE"
         );
-        assert.ok(failInsight);
-        assert.match(failInsight.title, /High Failure Rate/);
-        assert.ok(failInsight.suggestedAction.length > 10);
+        assert.ok(perfInsight);
+        assert.match(perfInsight.title, /Performance Distribution/);
+        assert.ok(perfInsight.suggestedAction.length > 10);
     });
 
     // ==========================================
@@ -461,7 +462,6 @@ test("Instructor Assessment and Question Analytics Test Suite", async (t) => {
         assert.equal(q1.incorrectCount, 0);
         assert.equal(q1.unansweredCount, 0);
         assert.equal(q1.correctPercentage, 100);
-        assert.equal(q1.responsePatternSignal, "HIGH_ACCURACY");
 
         // Question 3: Answered 'A' in att1 (correct), 'B' in att2 (incorrect), 'B' in att3 (incorrect)
         const q3 = data.questions.find((q) => q.questionId === createdQuestionIds[2].toString());
@@ -470,7 +470,6 @@ test("Instructor Assessment and Question Analytics Test Suite", async (t) => {
         assert.equal(q3.incorrectCount, 2);
         assert.equal(q3.unansweredCount, 0);
         assert.equal(q3.incorrectPercentage, 67); // 2/3 = 67%
-        assert.equal(q3.responsePatternSignal, "HIGH_INCORRECT_RATE");
 
         // Question 5: Answered 'A' in att1 (correct), null in att2, null in att3 (unanswered)
         const q5 = data.questions.find((q) => q.questionId === createdQuestionIds[4].toString());
@@ -479,14 +478,276 @@ test("Instructor Assessment and Question Analytics Test Suite", async (t) => {
         assert.equal(q5.incorrectCount, 0);
         assert.equal(q5.unansweredCount, 2);
         assert.equal(q5.unansweredPercentage, 67); // 2/3 = 67%
-        assert.equal(q5.responsePatternSignal, "HIGH_UNANSWERED_RATE");
 
         // Question insights check
         assert.ok(data.questionInsights.length >= 2);
-        const incorrectInsight = data.questionInsights.find((qi) => qi.reference.id === createdQuestionIds[2].toString());
-        assert.ok(incorrectInsight);
-        assert.equal(incorrectInsight.category, "QUESTION_PERFORMANCE");
-        assert.match(incorrectInsight.title, /High Incorrect Rate/);
+        const qInsight = data.questionInsights.find((qi) => qi.reference.id === createdQuestionIds[2].toString());
+        assert.ok(qInsight);
+        assert.equal(qInsight.category, "QUESTION_PERFORMANCE");
+        assert.match(qInsight.title, /Response Breakdown/);
+    });
+
+    // ==========================================
+    // 3. Regression Tests for Targeted Corrections
+    // ==========================================
+
+    await t.test("Regression: Submitted but unevaluated attempts (null score/passed) are not counted as 0 or failed", async () => {
+        const unevalCourseId = new mongoose.Types.ObjectId();
+        const unevalTopicId = new mongoose.Types.ObjectId();
+        const unevalAssmId = new mongoose.Types.ObjectId();
+
+        createdCourseIds.push(unevalCourseId);
+        createdTopicIds.push(unevalTopicId);
+        createdAssessmentIds.push(unevalAssmId);
+
+        await Course.create({
+            _id: unevalCourseId,
+            title: "Course for Unevaluated Attempts",
+            description: "Testing null score and unevaluated attempt handling.",
+            domain: "Computer Science",
+            category: "Databases",
+            difficulty: "BEGINNER",
+            createdBy: instructor1Id,
+            status: "PUBLISHED",
+        });
+
+        await Topic.create({
+            _id: unevalTopicId,
+            courseId: unevalCourseId,
+            title: "Uneval Topic",
+            order: 1,
+        });
+
+        await Assessment.create({
+            _id: unevalAssmId,
+            courseId: unevalCourseId,
+            topicId: unevalTopicId,
+            createdBy: instructor1Id,
+            type: "TOPIC",
+            title: "Uneval Assessment",
+            questionIds: createdQuestionIds,
+            questionsPerAttempt: 5,
+            passingScore: 60,
+            status: "PUBLISHED",
+        });
+
+        // Submitted attempt with null scorePercent and null passed
+        const unevalAttempt = await AssessmentAttempt.create({
+            assessmentId: unevalAssmId,
+            learnerId: learner1Id,
+            courseId: unevalCourseId,
+            assessmentType: "TOPIC",
+            attemptNumber: 1,
+            status: "SUBMITTED",
+            startedAt: new Date(Date.now() - 3600000),
+            submittedAt: new Date(),
+            passingScore: 60,
+            questions: snapshots,
+            answers: [],
+            totalMarks: 10,
+            marksAwarded: null,
+            scorePercent: null, // NOT zero!
+            passed: null, // NOT false!
+        });
+        createdAttemptIds.push(unevalAttempt._id);
+
+        const data = await getInstructorAssessmentAnalyticsService(instructor1Id, unevalCourseId);
+        const assm = data.assessments[0];
+
+        assert.equal(assm.totalAttempts, 1);
+        assert.equal(assm.evaluatedAttemptsCount, 0);
+        assert.equal(assm.unevaluatedAttemptsCount, 1);
+        assert.equal(assm.passedCount, 0);
+        assert.equal(assm.failedCount, 0); // Must NOT be counted as failed!
+        assert.equal(assm.averageScore, null); // Must be null, NOT zero!
+        assert.equal(assm.passPercentage, null);
+        assert.equal(assm.failPercentage, null);
+    });
+
+    await t.test("Regression: Historical attempt passingScore is used as fallback, never current Assessment passingScore", async () => {
+        const histCourseId = new mongoose.Types.ObjectId();
+        const histTopicId = new mongoose.Types.ObjectId();
+        const histAssmId = new mongoose.Types.ObjectId();
+
+        createdCourseIds.push(histCourseId);
+        createdTopicIds.push(histTopicId);
+        createdAssessmentIds.push(histAssmId);
+
+        await Course.create({
+            _id: histCourseId,
+            title: "Course for Historical Passing Score",
+            description: "Testing historical attempt passingScore snapshot precedence.",
+            domain: "Computer Science",
+            category: "Databases",
+            difficulty: "BEGINNER",
+            createdBy: instructor1Id,
+            status: "PUBLISHED",
+        });
+
+        await Topic.create({
+            _id: histTopicId,
+            courseId: histCourseId,
+            title: "Hist Topic",
+            order: 1,
+        });
+
+        // Assessment currently has passingScore = 80
+        await Assessment.create({
+            _id: histAssmId,
+            courseId: histCourseId,
+            topicId: histTopicId,
+            createdBy: instructor1Id,
+            type: "TOPIC",
+            title: "Hist Assessment",
+            questionIds: createdQuestionIds,
+            questionsPerAttempt: 5,
+            passingScore: 80, // Updated by instructor later
+            status: "PUBLISHED",
+        });
+
+        // Attempt was created earlier when passingScore was 60. Score is 70, passed is null.
+        // Under attempt.passingScore (60): 70 >= 60 -> PASSED
+        // Under current Assessment.passingScore (80): 70 < 80 -> FAILED
+        const histAttempt = await AssessmentAttempt.create({
+            assessmentId: histAssmId,
+            learnerId: learner1Id,
+            courseId: histCourseId,
+            assessmentType: "TOPIC",
+            attemptNumber: 1,
+            status: "SUBMITTED",
+            startedAt: new Date(Date.now() - 3600000),
+            submittedAt: new Date(),
+            passingScore: 60, // HISTORICAL SNAPSHOT
+            questions: snapshots,
+            answers: [],
+            totalMarks: 10,
+            marksAwarded: 7,
+            scorePercent: 70,
+            passed: null, // triggers fallback evaluation
+        });
+        createdAttemptIds.push(histAttempt._id);
+
+        const data = await getInstructorAssessmentAnalyticsService(instructor1Id, histCourseId);
+        const assm = data.assessments[0];
+
+        assert.equal(assm.evaluatedAttemptsCount, 1);
+        // Correctly passed using historical 60% threshold, not current 80%
+        assert.equal(assm.passedCount, 1);
+        assert.equal(assm.failedCount, 0);
+        assert.equal(assm.passPercentage, 100);
+    });
+
+    await t.test("Regression: Topic and assessment evidence are correlated ONLY for matching learners", async () => {
+        const corrCourseId = new mongoose.Types.ObjectId();
+        const corrTopicId = new mongoose.Types.ObjectId();
+        const corrAssmId = new mongoose.Types.ObjectId();
+        const matchingLearnerId = new mongoose.Types.ObjectId();
+        const mismatchLearnerId = new mongoose.Types.ObjectId();
+
+        createdCourseIds.push(corrCourseId);
+        createdTopicIds.push(corrTopicId);
+        createdAssessmentIds.push(corrAssmId);
+        createdUserIds.push(matchingLearnerId, mismatchLearnerId);
+
+        await User.create([
+            { _id: matchingLearnerId, name: "Matching Learner", email: "match@test.com", password: "p", role: "LEARNER", status: "ACTIVE" },
+            { _id: mismatchLearnerId, name: "Mismatch Learner", email: "mismatch@test.com", password: "p", role: "LEARNER", status: "ACTIVE" },
+        ]);
+
+        await Course.create({
+            _id: corrCourseId,
+            title: "Course for Learner Correlation",
+            description: "Testing strict learner ID matching in topic-assessment insights.",
+            domain: "Computer Science",
+            category: "Databases",
+            difficulty: "BEGINNER",
+            createdBy: instructor1Id,
+            status: "PUBLISHED",
+        });
+
+        await Topic.create({
+            _id: corrTopicId,
+            courseId: corrCourseId,
+            title: "Corr Topic",
+            order: 1,
+        });
+
+        await Assessment.create({
+            _id: corrAssmId,
+            courseId: corrCourseId,
+            topicId: corrTopicId,
+            createdBy: instructor1Id,
+            type: "TOPIC",
+            title: "Corr Assessment",
+            questionIds: createdQuestionIds,
+            questionsPerAttempt: 5,
+            passingScore: 60,
+            status: "PUBLISHED",
+        });
+
+        // Learner 1 (matching): has TopicMastery NEEDS_IMPROVEMENT AND failed the assessment
+        const tm = await TopicMastery.create({
+            learnerId: matchingLearnerId,
+            courseId: corrCourseId,
+            topicId: corrTopicId,
+            status: MASTERY_STATUS.NEEDS_IMPROVEMENT,
+            masteryScore: 40,
+            confidence: 0.8,
+            evidenceCount: 2,
+        });
+        createdMasteryIds.push(tm._id);
+
+        const attFail = await AssessmentAttempt.create({
+            assessmentId: corrAssmId,
+            learnerId: matchingLearnerId,
+            courseId: corrCourseId,
+            assessmentType: "TOPIC",
+            attemptNumber: 1,
+            status: "SUBMITTED",
+            startedAt: new Date(Date.now() - 3600000),
+            submittedAt: new Date(),
+            passingScore: 60,
+            questions: snapshots,
+            answers: [],
+            totalMarks: 10,
+            marksAwarded: 4,
+            scorePercent: 40,
+            passed: false,
+        });
+        createdAttemptIds.push(attFail._id);
+
+        // Case 1: Correlated learner exists -> Insight generated with explicit matching learner count
+        const data1 = await getInstructorAssessmentAnalyticsService(instructor1Id, corrCourseId);
+        const corrInsight = data1.insights.find((i) => i.category === "CURRICULUM_ALIGNMENT");
+        assert.ok(corrInsight);
+        assert.match(corrInsight.observation, /1 learner\(s\) exhibit both Needs Improvement/);
+
+        // Case 2: Learner 2 has failed assessment, but does NOT have NEEDS_IMPROVEMENT topic mastery
+        // Verify learner without matching mastery is NOT added to correlation count
+        const attFail2 = await AssessmentAttempt.create({
+            assessmentId: corrAssmId,
+            learnerId: mismatchLearnerId,
+            courseId: corrCourseId,
+            assessmentType: "TOPIC",
+            attemptNumber: 1,
+            status: "SUBMITTED",
+            startedAt: new Date(Date.now() - 1800000),
+            submittedAt: new Date(),
+            passingScore: 60,
+            questions: snapshots,
+            answers: [],
+            totalMarks: 10,
+            marksAwarded: 4,
+            scorePercent: 40,
+            passed: false,
+        });
+        createdAttemptIds.push(attFail2._id);
+
+        const data2 = await getInstructorAssessmentAnalyticsService(instructor1Id, corrCourseId);
+        const corrInsight2 = data2.insights.find((i) => i.category === "CURRICULUM_ALIGNMENT");
+        assert.ok(corrInsight2);
+        // Count must still be 1, because mismatchLearnerId has no topic mastery record
+        assert.match(corrInsight2.observation, /1 learner\(s\) exhibit both Needs Improvement/);
     });
 
     // ==========================================

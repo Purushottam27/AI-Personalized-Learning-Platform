@@ -640,26 +640,32 @@ export const InstructorAnalyticsPage: React.FC = () => {
                         {/* Breakdown bar */}
                         <div className="space-y-1 pt-1">
                           <div className="h-2 rounded-full overflow-hidden flex bg-surface-elevated border border-border">
-                            <div
-                              style={{ width: `${q.correctPercentage || 0}%` }}
-                              className="bg-emerald-500"
-                              title={`Correct: ${q.correctCount}`}
-                            />
-                            <div
-                              style={{ width: `${q.incorrectPercentage || 0}%` }}
-                              className="bg-rose-500"
-                              title={`Incorrect: ${q.incorrectCount}`}
-                            />
-                            <div
-                              style={{ width: `${q.unansweredPercentage || 0}%` }}
-                              className="bg-neutral-400"
-                              title={`Unanswered: ${q.unansweredCount}`}
-                            />
+                            {q.totalExposures > 0 ? (
+                              <>
+                                <div
+                                  style={{ width: `${q.correctPercentage || 0}%` }}
+                                  className="bg-emerald-500"
+                                  title={`Correct: ${q.correctCount}`}
+                                />
+                                <div
+                                  style={{ width: `${q.incorrectPercentage || 0}%` }}
+                                  className="bg-rose-500"
+                                  title={`Incorrect: ${q.incorrectCount}`}
+                                />
+                                <div
+                                  style={{ width: `${q.unansweredPercentage || 0}%` }}
+                                  className="bg-neutral-400"
+                                  title={`Unanswered: ${q.unansweredCount}`}
+                                />
+                              </>
+                            ) : (
+                              <div className="w-full bg-surface-disabled" title="No response data" />
+                            )}
                           </div>
                           <div className="flex items-center justify-between text-[11px] text-text-tertiary">
-                            <span>Correct: <strong className="text-emerald-600 dark:text-emerald-400">{q.correctCount}</strong> ({q.correctPercentage ?? 0}%)</span>
-                            <span>Incorrect: <strong className="text-rose-600 dark:text-rose-400">{q.incorrectCount}</strong> ({q.incorrectPercentage ?? 0}%)</span>
-                            <span>Unanswered: <strong>{q.unansweredCount}</strong> ({q.unansweredPercentage ?? 0}%)</span>
+                            <span>Correct: <strong className="text-emerald-600 dark:text-emerald-400">{q.correctCount}</strong> ({q.correctPercentage !== null ? `${q.correctPercentage}%` : 'N/A'})</span>
+                            <span>Incorrect: <strong className="text-rose-600 dark:text-rose-400">{q.incorrectCount}</strong> ({q.incorrectPercentage !== null ? `${q.incorrectPercentage}%` : 'N/A'})</span>
+                            <span>Unanswered: <strong>{q.unansweredCount}</strong> ({q.unansweredPercentage !== null ? `${q.unansweredPercentage}%` : 'N/A'})</span>
                           </div>
                         </div>
                       </div>
@@ -736,13 +742,13 @@ export const InstructorAnalyticsPage: React.FC = () => {
                         <div>
                           <span className="text-[10px] uppercase tracking-wider text-text-tertiary block">Passed</span>
                           <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                            {a.passedCount} ({a.passPercentage ?? 0}%)
+                            {a.passedCount} ({a.passPercentage !== null ? `${a.passPercentage}%` : 'N/A'})
                           </span>
                         </div>
                         <div>
                           <span className="text-[10px] uppercase tracking-wider text-text-tertiary block">Failed</span>
                           <span className="font-bold text-rose-600 dark:text-rose-400">
-                            {a.failedCount} ({a.failPercentage ?? 0}%)
+                            {a.failedCount} ({a.failPercentage !== null ? `${a.failPercentage}%` : 'N/A'})
                           </span>
                         </div>
                       </div>
@@ -766,9 +772,9 @@ export const InstructorAnalyticsPage: React.FC = () => {
               {!assessmentAnalytics || assessmentAnalytics.insights.length === 0 ? (
                 <div className="p-12 text-center text-xs text-text-tertiary bg-surface rounded-2xl border border-border space-y-2">
                   <Sparkles className="w-8 h-8 text-signal mx-auto opacity-60" />
-                  <p className="font-semibold text-text-primary">No Performance Issues or Outliers Detected</p>
+                  <p className="font-semibold text-text-primary">No Actionable Insights Available from Current Evidence</p>
                   <p className="max-w-md mx-auto">
-                    As learners submit attempts and complete curriculum topics, evidence-based recommendations will appear here.
+                    Evidence-backed insights and recommended pedagogical actions will appear as learners submit attempts and complete curriculum topics.
                   </p>
                 </div>
               ) : (

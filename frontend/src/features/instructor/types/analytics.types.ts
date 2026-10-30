@@ -122,6 +122,8 @@ export interface AssessmentPerformanceSummary {
   totalPoolQuestions: number;
   totalAttempts: number;
   uniqueLearnersCount: number;
+  evaluatedAttemptsCount: number;
+  unevaluatedAttemptsCount: number;
   inProgressAttemptsCount: number;
   passedCount: number;
   failedCount: number;
@@ -131,7 +133,7 @@ export interface AssessmentPerformanceSummary {
   participationRate: number | null;
   completionRate: number | null;
   scoreDistribution: ScoreDistribution;
-  hasSufficientData: boolean;
+  hasEvaluatedData: boolean;
 }
 
 export interface ActionableInsight {
@@ -177,8 +179,8 @@ export interface QuestionPerformanceItem {
   correctPercentage: number | null;
   incorrectPercentage: number | null;
   unansweredPercentage: number | null;
-  responsePatternSignal: 'NORMAL' | 'HIGH_ACCURACY' | 'HIGH_INCORRECT_RATE' | 'HIGH_UNANSWERED_RATE' | 'INSUFFICIENT_DATA';
-  hasSufficientData: boolean;
+  responsePatternSignal?: string;
+  hasResponses?: boolean;
 }
 
 export interface InstructorQuestionAnalyticsResponse {

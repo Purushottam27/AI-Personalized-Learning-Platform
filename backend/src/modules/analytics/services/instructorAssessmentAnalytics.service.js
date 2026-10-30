@@ -15,6 +15,24 @@ function requireObjectId(value, fieldName = "ID") {
     }
 }
 
+function sameId(a, b) {
+    return a != null && b != null && a.toString() === b.toString();
+}
+
+/**
+ * Authoritative answer equality check matching assessmentAttempt.service.js
+ */
+function answersEqual(type, actual, expected) {
+    if (actual == null) return false;
+    if (type === "MCQ_MULTIPLE") {
+        if (!Array.isArray(actual) || !Array.isArray(expected)) return false;
+        const left = [...actual].sort();
+        const right = [...expected].sort();
+        return left.length === right.length && left.every((value, index) => value === right[index]);
+    }
+    return actual === expected;
+}
+
 /**
  * Service to aggregate assessment-level analytics and actionable insights for a course.
  *
@@ -38,7 +56,7 @@ export async function getInstructorAssessmentAnalyticsService(instructorId, cour
         throw new ApiError(403, "COURSE_ACCESS_DENIED", "You do not have permission to view analytics for this course");
     }
 
-    // 2. Fetch Topics for Course (for topic mapping & context)
+    // 2. Fetch Topics for Course
     const topics = await Topic.find({ courseId: courseObjectId }).sort({ order: 1 }).lean();
     const topicMap = new Map();
     for (const t of topics) {
@@ -52,18 +70,16 @@ export async function getInstructorAssessmentAnalyticsService(instructorId, cour
 
     // 4. Fetch All Assessments for this course
     const assessments = await Assessment.find({ courseId: courseObjectId }).sort({ createdAt: 1 }).lean();
-    const assessmentIds = assessments.map((a) => a._id);
 
     // 5. Fetch All SUBMITTED AssessmentAttempts for this course
-    // IMPORTANT: In-progress attempts are not counted in completed/submitted statistics
-    const attempts = await AssessmentAttempt.find({
+    const submittedAttempts = await AssessmentAttempt.find({
         courseId: courseObjectId,
         status: "SUBMITTED",
     }).lean();
 
-    // Map attempts by assessmentId
+    // Map submitted attempts by assessmentId
     const attemptsByAssessmentMap = new Map();
-    for (const att of attempts) {
+    for (const att of submittedAttempts) {
         const aid = att.assessmentId.toString();
         if (!attemptsByAssessmentMap.has(aid)) {
             attemptsByAssessmentMap.set(aid, []);
@@ -71,7 +87,7 @@ export async function getInstructorAssessmentAnalyticsService(instructorId, cour
         attemptsByAssessmentMap.get(aid).push(att);
     }
 
-    // Also count in-progress attempts for completion-ratio metrics
+    // In-progress attempts for completion-ratio metrics
     const inProgressAttempts = await AssessmentAttempt.find({
         courseId: courseObjectId,
         status: "IN_PROGRESS",
@@ -87,24 +103,27 @@ export async function getInstructorAssessmentAnalyticsService(instructorId, cour
 
     // 6. Aggregate Metrics Per Assessment
     const assessmentSummaries = [];
-    const assessmentStatsForInsights = [];
+    const assessmentLearnerResultsMap = new Map(); // assessmentId -> Map(learnerId -> latestEvaluatedResult)
 
     for (const asm of assessments) {
         const aid = asm._id.toString();
-        const submittedAttempts = attemptsByAssessmentMap.get(aid) || [];
+        const asmSubmittedAttempts = attemptsByAssessmentMap.get(aid) || [];
         const inProgressList = inProgressByAssessmentMap.get(aid) || [];
 
-        const totalAttempts = submittedAttempts.length;
+        const totalAttempts = asmSubmittedAttempts.length;
         const inProgressCount = inProgressList.length;
 
-        const uniqueAttemptingLearners = new Set(submittedAttempts.map((att) => att.learnerId.toString()));
+        const uniqueAttemptingLearners = new Set(asmSubmittedAttempts.map((att) => att.learnerId.toString()));
         const uniqueLearnersCount = uniqueAttemptingLearners.size;
 
         const topic = asm.topicId ? topicMap.get(asm.topicId.toString()) : null;
 
-        let passedCount = 0;
-        let failedCount = 0;
-        let totalScoreSum = 0;
+        // Evaluated vs Unevaluated separation
+        let evaluatedAttemptsCount = 0;
+        let unevaluatedAttemptsCount = 0;
+        let evaluatedPassedCount = 0;
+        let evaluatedFailedCount = 0;
+        let totalEvaluatedScoreSum = 0;
 
         const scoreDistribution = {
             range0To49: 0,
@@ -113,42 +132,68 @@ export async function getInstructorAssessmentAnalyticsService(instructorId, cour
             range85To100: 0,
         };
 
-        for (const att of submittedAttempts) {
-            // Using actual configured passing criteria stored on attempt (or assessment fallback)
-            const passed = att.passed !== null && att.passed !== undefined
-                ? att.passed
-                : (att.scorePercent != null ? att.scorePercent >= (asm.passingScore || 60) : false);
+        const learnerEvaluatedAttempts = new Map(); // learnerId -> list of evaluated attempts
 
-            if (passed) {
-                passedCount += 1;
-            } else {
-                failedCount += 1;
+        for (const att of asmSubmittedAttempts) {
+            const hasScore = att.scorePercent !== null && att.scorePercent !== undefined && typeof att.scorePercent === "number";
+
+            // Fallback rule: Prefer stored att.passed; if null, compare scorePercent against att.passingScore (never current Assessment.passingScore)
+            let passed = null;
+            if (att.passed !== null && att.passed !== undefined && typeof att.passed === "boolean") {
+                passed = att.passed;
+            } else if (hasScore && att.passingScore !== null && att.passingScore !== undefined && typeof att.passingScore === "number") {
+                passed = att.scorePercent >= att.passingScore;
             }
 
-            const score = att.scorePercent != null ? att.scorePercent : 0;
-            totalScoreSum += score;
+            const isEvaluated = hasScore && passed !== null;
 
-            if (score < 50) {
-                scoreDistribution.range0To49 += 1;
-            } else if (score < 70) {
-                scoreDistribution.range50To69 += 1;
-            } else if (score < 85) {
-                scoreDistribution.range70To84 += 1;
+            if (isEvaluated) {
+                evaluatedAttemptsCount += 1;
+                totalEvaluatedScoreSum += att.scorePercent;
+
+                if (passed) {
+                    evaluatedPassedCount += 1;
+                } else {
+                    evaluatedFailedCount += 1;
+                }
+
+                if (att.scorePercent < 50) {
+                    scoreDistribution.range0To49 += 1;
+                } else if (att.scorePercent < 70) {
+                    scoreDistribution.range50To69 += 1;
+                } else if (att.scorePercent < 85) {
+                    scoreDistribution.range70To84 += 1;
+                } else {
+                    scoreDistribution.range85To100 += 1;
+                }
+
+                const lid = att.learnerId.toString();
+                if (!learnerEvaluatedAttempts.has(lid)) {
+                    learnerEvaluatedAttempts.set(lid, []);
+                }
+                learnerEvaluatedAttempts.get(lid).push({
+                    scorePercent: att.scorePercent,
+                    passed,
+                    submittedAt: att.submittedAt,
+                });
             } else {
-                scoreDistribution.range85To100 += 1;
+                unevaluatedAttemptsCount += 1;
             }
         }
 
-        const averageScore = totalAttempts > 0
-            ? Math.round(totalScoreSum / totalAttempts)
+        assessmentLearnerResultsMap.set(aid, learnerEvaluatedAttempts);
+
+        // Average score and pass/fail percentages use strictly evaluatedAttemptsCount denominator
+        const averageScore = evaluatedAttemptsCount > 0
+            ? Math.round(totalEvaluatedScoreSum / evaluatedAttemptsCount)
             : null;
 
-        const passPercentage = totalAttempts > 0
-            ? Math.round((passedCount / totalAttempts) * 100)
+        const passPercentage = evaluatedAttemptsCount > 0
+            ? Math.round((evaluatedPassedCount / evaluatedAttemptsCount) * 100)
             : null;
 
-        const failPercentage = totalAttempts > 0
-            ? Math.round((failedCount / totalAttempts) * 100)
+        const failPercentage = evaluatedAttemptsCount > 0
+            ? Math.round((evaluatedFailedCount / evaluatedAttemptsCount) * 100)
             : null;
 
         // Participation rate = unique learners who attempted / total enrolled learners
@@ -175,43 +220,48 @@ export async function getInstructorAssessmentAnalyticsService(instructorId, cour
             totalPoolQuestions: asm.questionIds ? asm.questionIds.length : 0,
             totalAttempts,
             uniqueLearnersCount,
+            evaluatedAttemptsCount,
+            unevaluatedAttemptsCount,
             inProgressAttemptsCount: inProgressCount,
-            passedCount,
-            failedCount,
+            passedCount: evaluatedPassedCount,
+            failedCount: evaluatedFailedCount,
             passPercentage,
             failPercentage,
             averageScore,
             participationRate,
             completionRate,
             scoreDistribution,
-            hasSufficientData: totalAttempts >= 3,
+            hasEvaluatedData: evaluatedAttemptsCount > 0,
         };
 
         assessmentSummaries.push(summaryItem);
-        assessmentStatsForInsights.push(summaryItem);
     }
 
-    // 7. Fetch Topic Mastery Records for cross-topic insight generation
+    // 7. Fetch Topic Mastery Records for cross-topic insight generation (with learner mapping)
     const masteryRecords = await TopicMastery.find({ courseId: courseObjectId }).lean();
-    const needsImprovementTopicIds = new Set();
+    // Map: topicIdStr -> Map(learnerIdStr -> TopicMastery)
+    const topicLearnerMasteryMap = new Map();
     for (const m of masteryRecords) {
-        if (m.status === MASTERY_STATUS.NEEDS_IMPROVEMENT) {
-            needsImprovementTopicIds.add(m.topicId.toString());
+        const tid = m.topicId.toString();
+        const lid = m.learnerId.toString();
+        if (!topicLearnerMasteryMap.has(tid)) {
+            topicLearnerMasteryMap.set(tid, new Map());
         }
+        topicLearnerMasteryMap.get(tid).set(lid, m);
     }
 
-    // 8. Generate Actionable Instructor Insights
+    // 8. Generate Explainable Actionable Instructor Insights (No unapproved thresholds)
     const insights = [];
 
-    // Rule A: Insufficient Data signals
-    for (const a of assessmentStatsForInsights) {
+    for (const a of assessmentSummaries) {
+        // A. No attempts or unevaluated data notice
         if (a.totalAttempts === 0) {
             insights.push({
-                id: `insufficient-data-${a.assessmentId}`,
+                id: `activity-pending-${a.assessmentId}`,
                 category: "DATA_LIMITATION",
                 title: `Awaiting Activity: "${a.title}"`,
-                observation: `No completed attempts recorded yet for ${a.type} assessment "${a.title}".`,
-                supportingEvidence: `0 submitted attempts out of ${totalEnrolledLearners} enrolled learners.`,
+                observation: `No submitted attempts recorded yet for ${a.type} assessment "${a.title}".`,
+                supportingEvidence: `0 submitted attempts (${totalEnrolledLearners} enrolled learners).`,
                 reference: {
                     type: "ASSESSMENT",
                     id: a.assessmentId,
@@ -219,16 +269,16 @@ export async function getInstructorAssessmentAnalyticsService(instructorId, cour
                     assessmentType: a.type,
                     topicId: a.topicId,
                 },
-                suggestedAction: "Encourage learners to complete this assessment or verify prerequisite topic progression.",
-                dataLimitationNotice: "Performance statistics cannot be calculated until learners submit attempts.",
+                suggestedAction: "Encourage enrolled learners to complete this assessment when they finish prerequisite lessons.",
+                dataLimitationNotice: "Performance statistics remain unavailable until learners submit attempts.",
             });
-        } else if (a.totalAttempts < 3) {
+        } else if (a.evaluatedAttemptsCount === 0 && a.totalAttempts > 0) {
             insights.push({
-                id: `early-data-${a.assessmentId}`,
+                id: `evaluation-pending-${a.assessmentId}`,
                 category: "DATA_LIMITATION",
-                title: `Early Data: "${a.title}"`,
-                observation: `Only ${a.totalAttempts} attempt(s) recorded for "${a.title}".`,
-                supportingEvidence: `${a.totalAttempts} completed attempt(s) from ${a.uniqueLearnersCount} unique learner(s).`,
+                title: `Evaluation Pending: "${a.title}"`,
+                observation: `${a.totalAttempts} attempt(s) submitted but pending evaluation.`,
+                supportingEvidence: `Evaluated attempts: 0 of ${a.totalAttempts} submitted.`,
                 reference: {
                     type: "ASSESSMENT",
                     id: a.assessmentId,
@@ -236,75 +286,87 @@ export async function getInstructorAssessmentAnalyticsService(instructorId, cour
                     assessmentType: a.type,
                     topicId: a.topicId,
                 },
-                suggestedAction: "Allow more learners to complete attempts before making curriculum adjustments.",
-                dataLimitationNotice: "Metrics based on fewer than 3 attempts reflect preliminary trends only.",
+                suggestedAction: "Inspect submission status and scoring pipeline for pending attempts.",
+                dataLimitationNotice: "Performance scores will be calculated once attempt results are recorded.",
             });
-        }
-    }
+        } else {
+            // Observed activity with evaluated attempts
+            if (a.inProgressAttemptsCount > 0) {
+                insights.push({
+                    id: `active-attempts-${a.assessmentId}`,
+                    category: "COMPLETION",
+                    title: `Ongoing Activity on "${a.title}"`,
+                    observation: `${a.inProgressAttemptsCount} in-progress attempt(s) alongside ${a.totalAttempts} submitted attempt(s).`,
+                    supportingEvidence: `Completion rate: ${a.completionRate}%, ${a.uniqueLearnersCount} unique participant(s).`,
+                    reference: {
+                        type: "ASSESSMENT",
+                        id: a.assessmentId,
+                        title: a.title,
+                        assessmentType: a.type,
+                        topicId: a.topicId,
+                    },
+                    suggestedAction: "Monitor attempt completion or review time limits if learners frequently pause.",
+                    dataLimitationNotice: "In-progress attempts are not counted in score or pass/fail distributions.",
+                });
+            }
 
-    // Rule B: Low Completion Rate (drop-off / abandonment)
-    for (const a of assessmentStatsForInsights) {
-        if (a.totalAttempts + a.inProgressAttemptsCount >= 3 && a.completionRate !== null && a.completionRate < 60) {
-            insights.push({
-                id: `low-completion-${a.assessmentId}`,
-                category: "COMPLETION",
-                title: `Low Completion Rate on "${a.title}"`,
-                observation: `${a.inProgressAttemptsCount} attempt(s) remain unsubmitted out of ${a.totalAttempts + a.inProgressAttemptsCount} started attempts.`,
-                supportingEvidence: `Completion rate is currently ${a.completionRate}%.`,
-                reference: {
-                    type: "ASSESSMENT",
-                    id: a.assessmentId,
-                    title: a.title,
-                    assessmentType: a.type,
-                    topicId: a.topicId,
-                },
-                suggestedAction: "Review time limit, question length, or clarity of instructions to determine if learners are encountering fatigue or friction.",
-                dataLimitationNotice: "Unsubmitted attempts may include learners who paused or timed out.",
-            });
+            if (a.evaluatedAttemptsCount > 0 && a.failPercentage !== null) {
+                insights.push({
+                    id: `observed-performance-${a.assessmentId}`,
+                    category: "PERFORMANCE",
+                    title: `Performance Distribution on "${a.title}"`,
+                    observation: `${a.passedCount} passed and ${a.failedCount} did not pass across ${a.evaluatedAttemptsCount} evaluated attempt(s).`,
+                    supportingEvidence: `Pass rate: ${a.passPercentage}%, Average score: ${a.averageScore}%.`,
+                    reference: {
+                        type: "ASSESSMENT",
+                        id: a.assessmentId,
+                        title: a.title,
+                        assessmentType: a.type,
+                        topicId: a.topicId,
+                    },
+                    suggestedAction: "Inspect question-level responses to review specific topics or concepts where learners lost marks.",
+                    dataLimitationNotice: "Calculated strictly from submitted evaluated attempts.",
+                });
+            }
         }
-    }
 
-    // Rule C: High Failure Rate / Low Average Score on Assessments with sufficient data
-    for (const a of assessmentStatsForInsights) {
-        if (a.totalAttempts >= 3 && a.failPercentage !== null && a.failPercentage >= 40) {
-            insights.push({
-                id: `high-fail-rate-${a.assessmentId}`,
-                category: "PERFORMANCE",
-                title: `High Failure Rate Observed on "${a.title}"`,
-                observation: `${a.failedCount} of ${a.totalAttempts} completed attempts (${a.failPercentage}%) did not meet the passing score of ${a.passingScore}%.`,
-                supportingEvidence: `Average score is ${a.averageScore}%. Pass rate is ${a.passPercentage}%.`,
-                reference: {
-                    type: "ASSESSMENT",
-                    id: a.assessmentId,
-                    title: a.title,
-                    assessmentType: a.type,
-                    topicId: a.topicId,
-                },
-                suggestedAction: "Inspect question-level response accuracy to identify specific concepts where learners struggled, or add formative practice questions.",
-                dataLimitationNotice: "Based on submitted attempts to date. Ensure assessment difficulty aligns with course learning objectives.",
-            });
-        }
-    }
+        // B. Topic-Assessment Evidence Correlation (Learner-level match required)
+        if (a.topicId && a.evaluatedAttemptsCount > 0) {
+            const learnerMapForTopic = topicLearnerMasteryMap.get(a.topicId);
+            const learnerResultsForAsm = assessmentLearnerResultsMap.get(a.assessmentId);
 
-    // Rule D: Cross-Topic Alignment (Topic with NEEDS_IMPROVEMENT evidence and low assessment scores)
-    for (const a of assessmentStatsForInsights) {
-        if (a.topicId && needsImprovementTopicIds.has(a.topicId) && a.totalAttempts >= 3 && a.averageScore !== null && a.averageScore < 60) {
-            const topic = topicMap.get(a.topicId);
-            insights.push({
-                id: `topic-assessment-misalignment-${a.assessmentId}`,
-                category: "CURRICULUM_ALIGNMENT",
-                title: `Evidence Convergence: Topic "${topic ? topic.title : 'Topic'}" Needs Remediation`,
-                observation: `Learners exhibit Needs Improvement mastery status on Topic "${topic ? topic.title : 'Topic'}", corroborated by an average assessment score of ${a.averageScore}% on "${a.title}".`,
-                supportingEvidence: `Demonstrated difficulty in topic mastery records matches ${a.failPercentage}% fail rate on formal assessment.`,
-                reference: {
-                    type: "TOPIC",
-                    id: a.topicId,
-                    title: topic ? topic.title : "Topic",
-                    assessmentId: a.assessmentId,
-                },
-                suggestedAction: "Consider offering supplementary explanations, review sessions, or targeted practice variations before the next assessment cycle.",
-                dataLimitationNotice: "Reflects multiple independent evidence sources (topic mastery and assessment attempts).",
-            });
+            if (learnerMapForTopic && learnerResultsForAsm) {
+                // Find learners who have BOTH NEEDS_IMPROVEMENT on this topic AND an evaluated failed attempt on this assessment
+                const correlatedLearnerIds = [];
+                for (const [lid, attemptsList] of learnerResultsForAsm.entries()) {
+                    const mastery = learnerMapForTopic.get(lid);
+                    if (mastery && mastery.status === MASTERY_STATUS.NEEDS_IMPROVEMENT) {
+                        const hasFailedAttempt = attemptsList.some((att) => att.passed === false);
+                        if (hasFailedAttempt) {
+                            correlatedLearnerIds.push(lid);
+                        }
+                    }
+                }
+
+                if (correlatedLearnerIds.length > 0) {
+                    const topic = topicMap.get(a.topicId);
+                    insights.push({
+                        id: `topic-assessment-correlation-${a.assessmentId}`,
+                        category: "CURRICULUM_ALIGNMENT",
+                        title: `Learner Evidence Corroboration: "${topic ? topic.title : 'Topic'}"`,
+                        observation: `${correlatedLearnerIds.length} learner(s) exhibit both Needs Improvement topic mastery and non-passing assessment attempts on "${a.title}".`,
+                        supportingEvidence: `Matched learner IDs show demonstrated learning difficulty across practice/assessment evidence.`,
+                        reference: {
+                            type: "TOPIC",
+                            id: a.topicId,
+                            title: topic ? topic.title : "Topic",
+                            assessmentId: a.assessmentId,
+                        },
+                        suggestedAction: "Provide targeted review materials or formative practice exercises for the affected learners.",
+                        dataLimitationNotice: "Corroborated strictly for matching learners with both topic mastery records and evaluated attempts.",
+                    });
+                }
+            }
         }
     }
 
@@ -313,7 +375,7 @@ export async function getInstructorAssessmentAnalyticsService(instructorId, cour
         courseTitle: course.title,
         totalEnrolledLearners,
         totalAssessmentsCount: assessments.length,
-        totalSubmittedAttempts: attempts.length,
+        totalSubmittedAttempts: submittedAttempts.length,
         assessments: assessmentSummaries,
         insights,
     };
@@ -361,29 +423,8 @@ export async function getInstructorQuestionAnalyticsService(instructorId, assess
     }).lean();
 
     // 4. Aggregate Question Responses
-    // In an attempt:
-    // attempt.questions[] contains questionId, type, questionText, marks
-    // attempt.answers[] contains questionId, answer
-    // Evaluation comparison: answerFor(attempt, questionId) vs question.correctAnswer
-    function normalizeMultiAnswer(ans) {
-        if (!Array.isArray(ans)) return [];
-        return [...ans].sort();
-    }
-
-    function isAnswerCorrect(questionSnapshot, submittedAnswer) {
-        if (submittedAnswer == null) return false;
-        if (questionSnapshot.type === "MCQ_MULTIPLE") {
-            const actual = normalizeMultiAnswer(submittedAnswer);
-            const expected = normalizeMultiAnswer(questionSnapshot.correctAnswer);
-            return actual.length === expected.length && actual.every((val, idx) => val === expected[idx]);
-        }
-        return submittedAnswer === questionSnapshot.correctAnswer;
-    }
-
-    // Question stats map: questionIdStr -> stats
     const questionStatsMap = new Map();
 
-    // Initialize map for all pool questions
     for (const q of questions) {
         const qid = q._id.toString();
         questionStatsMap.set(qid, {
@@ -400,7 +441,7 @@ export async function getInstructorQuestionAnalyticsService(instructorId, assess
         });
     }
 
-    // Aggregate from submitted attempts
+    // Aggregate from submitted attempts using attempt snapshots
     for (const att of attempts) {
         const answersMap = new Map();
         for (const ansItem of (att.answers || [])) {
@@ -434,8 +475,9 @@ export async function getInstructorQuestionAnalyticsService(instructorId, assess
                 stat.unansweredCount += 1;
             } else {
                 stat.eligibleResponsesCount += 1;
-                const correct = isAnswerCorrect(snap, submittedAnswer);
-                if (correct) {
+                // Use authoritative answersEqual logic matching assessmentAttempt.service.js
+                const isCorrect = answersEqual(snap.type, submittedAnswer, snap.correctAnswer);
+                if (isCorrect) {
                     stat.correctCount += 1;
                 } else {
                     stat.incorrectCount += 1;
@@ -444,7 +486,7 @@ export async function getInstructorQuestionAnalyticsService(instructorId, assess
         }
     }
 
-    // Calculate percentages & performance signals
+    // Calculate percentages & performance summaries without arbitrary threshold classifications
     const questionAnalyticsList = [];
     const questionInsights = [];
 
@@ -453,18 +495,6 @@ export async function getInstructorQuestionAnalyticsService(instructorId, assess
         const correctPercentage = total > 0 ? Math.round((stat.correctCount / total) * 100) : null;
         const incorrectPercentage = total > 0 ? Math.round((stat.incorrectCount / total) * 100) : null;
         const unansweredPercentage = total > 0 ? Math.round((stat.unansweredCount / total) * 100) : null;
-
-        // Evidence-based signal (without declaring question defective)
-        let responsePatternSignal = "NORMAL";
-        if (total < 3) {
-            responsePatternSignal = "INSUFFICIENT_DATA";
-        } else if (unansweredPercentage !== null && unansweredPercentage >= 40) {
-            responsePatternSignal = "HIGH_UNANSWERED_RATE";
-        } else if (incorrectPercentage !== null && incorrectPercentage >= 50) {
-            responsePatternSignal = "HIGH_INCORRECT_RATE";
-        } else if (correctPercentage !== null && correctPercentage >= 80) {
-            responsePatternSignal = "HIGH_ACCURACY";
-        }
 
         const item = {
             questionId: stat.questionId,
@@ -480,44 +510,26 @@ export async function getInstructorQuestionAnalyticsService(instructorId, assess
             correctPercentage,
             incorrectPercentage,
             unansweredPercentage,
-            responsePatternSignal,
-            hasSufficientData: total >= 3,
+            hasResponses: total > 0,
         };
 
         questionAnalyticsList.push(item);
 
-        // Actionable Question Insight
-        if (total >= 3 && incorrectPercentage !== null && incorrectPercentage >= 50) {
+        if (total > 0) {
             questionInsights.push({
-                id: `q-high-incorrect-${stat.questionId}`,
+                id: `q-observed-response-${stat.questionId}`,
                 category: "QUESTION_PERFORMANCE",
-                title: `High Incorrect Rate on Question`,
-                observation: `${stat.incorrectCount} of ${total} attempts (${incorrectPercentage}%) answered this question incorrectly.`,
-                supportingEvidence: `Correct: ${stat.correctCount} (${correctPercentage}%), Incorrect: ${stat.incorrectCount} (${incorrectPercentage}%).`,
+                title: `Response Breakdown for Question`,
+                observation: `${stat.correctCount} correct, ${stat.incorrectCount} incorrect, and ${stat.unansweredCount} unanswered out of ${total} attempt exposures.`,
+                supportingEvidence: `Accuracy: ${correctPercentage ?? 'N/A'}%, Incorrect: ${incorrectPercentage ?? 'N/A'}%, Unanswered: ${unansweredPercentage ?? 'N/A'}%.`,
                 reference: {
                     type: "QUESTION",
                     id: stat.questionId,
                     questionText: stat.questionText.slice(0, 100),
                     assessmentId: assessment._id.toString(),
                 },
-                suggestedAction: "Review question phrasing, distractors, or related lesson content to ensure concepts were adequately covered.",
-                dataLimitationNotice: "Reflects student responses. High difficulty does not necessarily indicate question defect.",
-            });
-        } else if (total >= 3 && unansweredPercentage !== null && unansweredPercentage >= 40) {
-            questionInsights.push({
-                id: `q-high-unanswered-${stat.questionId}`,
-                category: "QUESTION_PERFORMANCE",
-                title: `High Unanswered Rate on Question`,
-                observation: `${stat.unansweredCount} of ${total} learners (${unansweredPercentage}%) left this question unanswered.`,
-                supportingEvidence: `Unanswered: ${stat.unansweredCount} (${unansweredPercentage}%).`,
-                reference: {
-                    type: "QUESTION",
-                    id: stat.questionId,
-                    questionText: stat.questionText.slice(0, 100),
-                    assessmentId: assessment._id.toString(),
-                },
-                suggestedAction: "Examine if question complexity or time constraints caused learners to skip this question.",
-                dataLimitationNotice: "Unanswered responses may stem from test-taking pace or unfamiliar concepts.",
+                suggestedAction: "Review question phrasing and answer options against learner performance.",
+                dataLimitationNotice: "Reflects student response distributions without classifying questions as defective.",
             });
         }
     }
@@ -533,4 +545,3 @@ export async function getInstructorQuestionAnalyticsService(instructorId, assess
         questionInsights,
     };
 }
-
