@@ -376,7 +376,7 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         }
     });
 
-    await t.test("4. Secure Revision Acceptance: Missing or direct payload without proposalId is rejected", async () => {
+    await t.test("4. Secure Revision Acceptance: Forged activities are rejected", async () => {
         const fakeCourseId = new mongoose.Types.ObjectId();
         const fakeTopicId = new mongoose.Types.ObjectId();
         const fakeLessonId = new mongoose.Types.ObjectId();
@@ -408,7 +408,7 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
             },
         });
 
-        assert.equal(res.status, 400, "Must reject request missing proposalId");
+        assert.equal(res.status, 400, "Must reject forged non-enrolled course activity");
     });
 
     await t.test("5. Secure Revision Acceptance: Stale / expired proposals cannot be accepted", async () => {
@@ -729,11 +729,10 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         );
 
         // Acceptance of proposal with unsupported activity type (e.g. COURSE_DISCOVERY or FORGED) rejected with 400
-        const activePlan = await StudyPlan.findOne({ learnerId: learner1Id, status: "ACTIVE" }).sort({ version: -1 }).lean();
         const fakeProposal = await StudyPlanProposal.create({
             learnerId: learner1Id,
-            basedOnVersion: activePlan ? activePlan.version : 1,
-            proposedVersion: (activePlan ? activePlan.version : 1) + 1,
+            basedOnVersion: 1,
+            proposedVersion: 2,
             status: "PENDING",
             startDate: "2026-11-01",
             endDate: "2026-11-07",
