@@ -58,99 +58,35 @@ A deferred feature should only be moved into active implementation when:
 
 ## Status**
 
-**\*\*Deferred — Future Enhancement\*\***
+**Implemented in Phase 4 (Activated from Deferred)**
 
-## Current MVP Decision**
+## Phase 4 Implementation Details**
 
-The current MVP collects:
-
+The platform collects and supports:
 - `dailyStudyTime`
-
 - `preferredLearningFormat`
+- `studyDays` (MONDAY through SUNDAY)
+- `preferredSessionDuration` (15, 30, 45, 60, 90, 120 minutes)
+- `preferredTimeOfDay` (MORNING, AFTERNOON, EVENING, NIGHT, ANYTIME)
 
-These are considered useful for initial personalization.
-
-The MVP does NOT implement a time-based study scheduling system.
-
-## Deferred Fields**
-
-The following study preferences are intentionally deferred:
-
-- `preferredTime`
-
-- `preferredSessionDuration`
-
-- `studyDays`
-
-### `preferredTime`**
-
-Represents the time of day during which the learner generally prefers to study.
-
-Examples may eventually include:
-
-- Morning
-
-- Afternoon
-
-- Evening
-
-- Night
-
-The exact representation and allowed values must be finalized when study scheduling is implemented.
-
-### `preferredSessionDuration`**
-
-Represents how long a learner generally prefers an individual learning session to be.
-
-This should eventually help the system divide learning activities into manageable sessions.
-
-The exact representation and allowed values are not finalized.
-
-### `studyDays`**
-
-Represents the days on which the learner generally prefers or expects to study.
-
-This can eventually support weekly study planning.
-
-The exact representation and allowed values are not finalized.
+These fields are integrated directly into `LearnerProfile.studyPreferences` with backward-compatible defaults, validated via dedicated endpoints (`GET /api/v1/study-plans/preferences` and `PATCH /api/v1/study-plans/preferences`).
 
 ---
 
-# 4. Future Study Scheduling System**
+# 4. Study Scheduling System & AI Learning Assistant**
 
 ## Status**
 
-**\*\*Deferred — Future Enhancement\*\***
+**Implemented in Phase 4 (Activated from Deferred)**
 
-The deferred study-preference fields are intended to become useful when the platform introduces scheduled learning.
+## Phase 4 Implementation Details**
 
-Potential future flow:
-
-Learner study preferences
-
-        ↓
-
-Available study capacity
-
-        ↓
-
-Weekly study plan
-
-        ↓
-
-Recommended learning sessions
-
-        ↓
-
-Scheduled activities
-
-        ↓
-
-Notifications / reminders
-
-The future scheduling system should use learner capacity and personalization data rather than simply generating a fixed weekly schedule.
-
-The final scheduling algorithm is not defined yet.
+The study planning and assistant system is now implemented:
+- **Persisted Weekly Study Plans (`StudyPlan` model)**: Versioned plan lifecycle (`ACTIVE`, `SUPERSEDED`, `ARCHIVED`), weekly bounds, target course coverage, and scheduled activity snapshots.
+- **Grounded Plan Generation**: Inspects enrolled courses, unlocked topics via authoritative topic progression (`isTopicUnlockedForLearner`), lessons, practices, and diagnostic/evaluative assessments.
+- **Actual Evidence Grounding**: Day-by-day and activity completion status is dynamically derived from real `LearningEvidence`, `PracticeAttempt`, and `AssessmentAttempt` records.
+- **Contextual AI Learning Assistant**: Grounded in the learner's active plan, enrolled courses, and schedule. Operates strictly under assistive boundaries with offline fallback (zero unauthorized authority over grading, unlocking, or mastery).
+- **Plan Adaptation & Revision**: Proposes and applies structured plan revisions based on pace adjustments and learner goals.
 
 ---
 

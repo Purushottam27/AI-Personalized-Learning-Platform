@@ -2563,3 +2563,33 @@ The finalized principles are:
 > **The platform should not simply tell learners what course to take. It should continuously identify the smallest useful next action that helps them overcome their current learning difficulty and move forward confidently.**
 
 AI makes the experience more adaptive and understandable, while deterministic application logic keeps the learning system reliable, testable, and explainable.
+
+
+---
+
+# 43. AI Learning Assistant & Grounded Study Plan Guidance
+
+Phase 4 activates the learner-facing AI Learning Assistant within the contextual boundaries of personalized study planning:
+
+### 43.1 System Role & Strict Boundaries
+The AI Learning Assistant is purely **assistive, explanatory, and advisory**:
+- **Allowed**:
+  - Explaining concepts from enrolled courses.
+  - Summarizing weekly study progress, today's focus, and pending scheduled activities.
+  - Suggesting study strategies and pacing adjustments.
+  - Providing encouraging feedback and practice motivation.
+- **Strictly Prohibited (Zero Authoritative Power)**:
+  - Cannot award grades, points, or pass/fail determinations.
+  - Cannot unlock locked topics or bypass progression policies.
+  - Cannot directly mutate or recalculate mastery scores or learning evidence.
+  - Cannot fabricate non-existent lessons, questions, or courses.
+
+### 43.2 Context Grounding & Offline Fallback
+- Prompt injections provide the assistant with:
+  1. Learner's active study plan details and weekly goals.
+  2. Today's scheduled activities with real completion states.
+  3. Enrolled courses and currently unlocked topics.
+  4. Identified strengths and topics needing attention.
+- When the external AI provider is unavailable, degraded, or rate-limited:
+  - The backend smoothly defaults to deterministic template-based guidance.
+  - The assistant remains responsive and informative without throwing system exceptions.

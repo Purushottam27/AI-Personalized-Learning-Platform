@@ -1302,3 +1302,32 @@ Not part of v1:
 - real-time adaptive lesson generation
 
 These can be considered after the core platform works reliably.
+
+
+---
+
+## 37. Weekly Study Planning & AI Grounded Learning Loop**
+
+Phase 4 integrates the continuous personalized learning loop into an actionable weekly study plan:
+
+```text
+Evidence & Mastery History
+       ↓
+Recommendations & Priorities
+       ↓
+Weekly Study Plan Generation (Enrolled Courses & Unlocked Content Only)
+       ↓
+Daily Focus & Scheduled Learning Sessions
+       ↓
+Learner Activity Completion (Lessons, Practice, Assessments)
+       ↓
+Authoritative Evidence Ingestion & Mastery Recalculation
+       ↓
+Plan Refresh & AI Assistant Guidance (Assistive, Non-Authoritative)
+```
+
+Key Operational Rules:
+1. **Activity Grounding**: Study plans only schedule genuine lessons, practices, and assessments belonging to active enrollments in published courses where topics are confirmed unlocked.
+2. **Evidence Truth**: Scheduled activity completion is never marked by superficial checkmarks; it is strictly computed from persistent `LearningEvidence`, `PracticeAttempt`, and `AssessmentAttempt` records.
+3. **Pacing & Adaptation**: Plans are versioned (`ACTIVE`, `SUPERSEDED`, `ARCHIVED`). If learner pace changes, proposed revisions are explicitly confirmed before adoption.
+4. **Assistive AI Assistant Boundary**: The contextual chat assistant explains concepts, reviews weekly progress, and suggests focus areas. It has zero authority to award grades, unlock lessons, or mutate mastery scores directly.

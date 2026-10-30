@@ -2988,3 +2988,47 @@ This document intentionally does not yet finalize:
 \- advanced sharding/partitioning
 
 Those decisions belong to later design and implementation documents.
+
+
+---
+
+**## 68. Study Planning & Assistant Collections (Phase 4)**
+
+### 68.1 `LearnerProfile.studyPreferences` Extension
+To support weekly study scheduling, `LearnerProfile` includes extended study preferences:
+- `studyDays`: Array of uppercase weekday strings (`['MONDAY', 'TUESDAY', ...]`)
+- `preferredSessionDuration`: Integer duration in minutes (e.g., 15, 30, 45, 60, 90, 120)
+- `preferredTimeOfDay`: Preference string (`MORNING`, `AFTERNOON`, `EVENING`, `NIGHT`, `ANYTIME`)
+
+### 68.2 `StudyPlan` Collection
+Persists versioned, evidence-grounded study plans for learners.
+- `learnerId`: Reference to `User` (`ObjectId`, indexed)
+- `version`: Sequential integer (`1, 2, ...`)
+- `status`: Enum string (`ACTIVE`, `SUPERSEDED`, `ARCHIVED`)
+- `startDate`: Start date of weekly plan window (UTC)
+- `endDate`: End date of weekly plan window (UTC)
+- `dailyTargetMinutes`: Target daily study time allocated
+- `daysPerWeek`: Number of planned study days
+- `preferredDays`: Array of planned weekday strings
+- `targetCourseIds`: Array of enrolled `Course` ObjectIds in scope
+- `scheduledActivities`: Array of activity snapshots:
+  - `courseId`, `topicId`, `activityType` (`LESSON`, `PRACTICE`, `ASSESSMENT`)
+  - `activityId`: Target ObjectId
+  - `title`: Activity title snapshot
+  - `estimatedMinutes`: Expected session duration
+  - `dayOfWeek`: Planned weekday
+  - `scheduledDate`: Date for the activity
+  - `isCompleted`: Derived or snapshot completion flag
+- `revisionHistory`: Array of audit records for adaptation proposals and adjustments
+- Timestamps (`createdAt`, `updatedAt`)
+
+### 68.3 `AssistantConversation` Collection
+Persists conversational guidance between learner and contextual AI assistant.
+- `learnerId`: Reference to `User` (`ObjectId`, indexed)
+- `role`: Enum string (`user`, `assistant`, `system`)
+- `content`: Message text
+- `context`: Structured metadata snapshot:
+  - `planId`: Reference to `StudyPlan` (optional)
+  - `courseId`: Reference to `Course` (optional)
+  - `source`: String indicator (e.g. `STUDY_PLANNER`, `RECOMMENDATION`)
+- Timestamps (`createdAt`, `updatedAt`)
