@@ -19,7 +19,7 @@ export const LearnerProfilePage: React.FC = () => {
   const { user } = useAuth();
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-16">
+    <div className="max-w-4xl mx-auto space-y-8 pb-16"> 
       {/* Page Header */}
       <div>
         <h1 className="text-3xl font-display font-semibold text-text-primary tracking-tight">

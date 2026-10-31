@@ -37,9 +37,9 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) =>
   };
 
   return (
-    <div className="mt-8">
-      <div className="flex items-center gap-2 mb-6"><History className="w-5 h-5 text-text-secondary" /><h2 className="text-lg font-semibold text-text-primary">Recent Activity</h2></div>
-      <div className="rounded-2xl border border-border bg-surface overflow-hidden">
+    <div className="space-y-5">
+      <div className="border-b border-border-muted pb-3"><p className="mb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-text-tertiary">Your learning history</p><div className="flex items-center gap-2"><History className="h-5 w-5 text-text-secondary" /><h2 className="font-display text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">Recent Activity</h2></div></div>
+      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
         <ul className="divide-y divide-border">
           {activities.map((activity) => {
             const link = getActivityLink(activity);
@@ -50,7 +50,7 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) =>
                 <div className="shrink-0 flex items-center gap-2 text-xs text-text-tertiary whitespace-nowrap"><span>{activity.date}</span>{link && <ArrowUpRight className="h-3.5 w-3.5 text-signal" />}</div>
               </>
             );
-            return <li key={activity.id}>{link ? <Link to={link} className="p-4 sm:px-6 flex items-start sm:items-center gap-4 hover:bg-surface-elevated transition-colors cursor-pointer block">{content}</Link> : <div className="p-4 sm:px-6 flex items-start sm:items-center gap-4">{content}</div>}</li>;
+            return <li key={activity.id}>{link ? <Link to={link} className="group flex cursor-pointer items-start gap-3 p-4 transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus sm:items-center sm:gap-4 sm:px-5">{content}</Link> : <div className="flex items-start gap-3 p-4 sm:items-center sm:gap-4 sm:px-5">{content}</div>}</li>;
           })}
         </ul>
       </div>

@@ -1,91 +1,114 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarCheck2, ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
+import { CalendarCheck2, ArrowRight, Sparkles, CheckCircle2, Circle, Clock3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getActiveStudyPlan } from '../api/studyPlan.api';
-import type { StudyPlan } from '../types/studyPlan.types';
+import type { ScheduledActivity, StudyPlan } from '../types/studyPlan.types';
 
 export const StudyPlannerWidget: React.FC = () => {
   const navigate = useNavigate();
   const [activePlan, setActivePlan] = useState<StudyPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadError, setHasLoadError] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
-    async function fetchPlan() {
+    const fetchPlan = async () => {
       try {
         const plan = await getActiveStudyPlan();
-        if (isMounted && plan) {
-          setActivePlan(plan);
-        }
+        if (isMounted) setActivePlan(plan ?? null);
       } catch {
-        // Silently catch widget fetch errors so dashboard loads cleanly
+        if (isMounted) setHasLoadError(true);
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
-    }
-    fetchPlan();
-    return () => {
-      isMounted = false;
     };
+    void fetchPlan();
+    return () => { isMounted = false; };
   }, []);
 
+  const openPlanner = () => navigate('/learner/study-planner');
+
   if (isLoading) {
-    return null;
-  }
-
-  const todayActivities = activePlan?.scheduledActivities?.filter((a) => a.isToday) || [];
-  const completedToday = todayActivities.filter((a) => a.isCompleted).length;
-  const daysPlanned = activePlan?.preferencesSnapshot?.studyDays?.length || 5;
-
-  return (
-    <div
-      className="rounded-2xl border border-border bg-surface-elevated p-6 relative overflow-hidden transition-all duration-200"
-      style={{ boxShadow: 'var(--shadow-premium-card)' }}
-    >
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-signal-soft/30 border border-signal/20 flex items-center justify-center shrink-0 text-signal">
-            <CalendarCheck2 className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold text-text-primary text-base">Weekly Study Plan</h3>
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-signal-soft/50 text-signal border border-signal/20 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> AI Grounded
-              </span>
-            </div>
-            {activePlan ? (
-              <p className="text-sm text-text-secondary">
-                {todayActivities.length > 0
-                  ? `Today's schedule: ${completedToday} of ${todayActivities.length} activities completed.`
-                  : `Active schedule for ${daysPlanned} days/week. No activities scheduled for today.`}
-              </p>
-            ) : (
-              <p className="text-sm text-text-secondary">
-                You have no active study plan. Generate an AI-grounded weekly schedule tailored to your pace and enrolled courses.
-              </p>
-            )}
-          </div>
-        </div>
-
+    return (
+      <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6" role="status" aria-live="polite">
         <div className="flex items-center gap-3">
-          {activePlan && todayActivities.length > 0 && completedToday === todayActivities.length && (
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-success font-medium bg-success-soft/30 px-3 py-1.5 rounded-lg border border-success/20">
-              <CheckCircle2 className="w-4 h-4" /> All caught up for today!
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => navigate('/learner/study-planner')}
-            className="inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200 px-4 py-2.5 text-sm rounded-xl bg-surface hover:bg-surface-elevated text-text-primary border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus cursor-pointer"
-          >
-            {activePlan ? 'Open Planner & Assistant' : 'Set Up Study Plan'}
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          <div className="h-10 w-10 rounded-xl bg-surface-elevated animate-pulse" />
+          <div className="flex-1 space-y-2"><div className="h-4 w-40 rounded bg-surface-elevated animate-pulse" /><div className="h-3 w-56 max-w-full rounded bg-surface-elevated animate-pulse" /></div>
         </div>
       </div>
+    );
+  }
+
+  const todayActivities = activePlan?.scheduledActivities?.filter((activity) => activity.isToday) ?? [];
+  const completedToday = todayActivities.filter((activity) => activity.isCompleted).length;
+  const progress = todayActivities.length > 0 ? Math.round((completedToday / todayActivities.length) * 100) : 0;
+  const previewActivities = todayActivities.slice(0, 3);
+
+  const renderActivityStatus = (activity: ScheduledActivity) => activity.isCompleted
+    ? <CheckCircle2 className="h-4 w-4 shrink-0 text-sage" aria-label="Completed" />
+    : <Circle className="h-4 w-4 shrink-0 text-text-tertiary" aria-label="Not completed" />;
+
+  return (
+    <div className="rounded-2xl border border-sage/20 bg-linear-to-br from-surface-elevated to-surface p-5 shadow-sm transition-all duration-200 hover:border-sage/35 sm:p-6">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-sage/20 bg-sage-soft text-sage">
+            <CalendarCheck2 className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <h3 className="font-display text-lg font-semibold tracking-tight text-text-primary sm:text-xl">Your study schedule</h3>
+              {activePlan && <span className="inline-flex items-center gap-1 rounded-full bg-surface-elevated px-2 py-0.5 text-[11px] font-semibold text-text-secondary"><Sparkles className="h-3 w-3 text-signal" /> Today's plan</span>}
+            </div>
+            <p className="text-sm text-text-secondary">
+              {hasLoadError
+                ? 'Your study schedule could not be loaded right now.'
+                : activePlan
+                  ? todayActivities.length > 0
+                    ? `${completedToday} of ${todayActivities.length} activities completed today.`
+                    : 'No activities are scheduled for today.'
+                  : 'You do not have an active study plan yet.'}
+            </p>
+          </div>
+        </div>
+        <button type="button" onClick={openPlanner} className="inline-flex w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-surface-elevated px-4 py-3 text-sm font-semibold text-text-primary transition-all hover:-translate-y-0.5 hover:border-sage/40 hover:bg-sage-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:w-auto">
+          {hasLoadError ? 'Open Study Planner' : activePlan ? 'Open Study Planner' : 'Set Up Study Plan'}
+          <ArrowRight className="h-4 w-4 text-signal" />
+        </button>
+      </div>
+
+      {activePlan && todayActivities.length > 0 && (
+        <div className="mt-5 border-t border-border pt-4">
+          <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+            <span className="font-medium text-text-primary">{completedToday} of {todayActivities.length} activities completed</span>
+            <span className="text-xs font-medium tabular-nums text-text-secondary">{progress}%</span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full border border-border bg-border/80 shadow-inner" role="progressbar" aria-label="Today's study plan progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+            <div className="h-full rounded-full bg-sage shadow-[0_0_10px_rgba(113,137,109,0.35)] transition-all duration-500" style={{ width: `${progress}%` }} />
+          </div>
+          <ul className="mt-4 divide-y divide-border">
+            {previewActivities.map((activity) => (
+              <li key={activity.activityId} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                {renderActivityStatus(activity)}
+                <span className={`min-w-0 flex-1 truncate text-sm ${activity.isCompleted ? 'text-text-tertiary line-through' : 'font-medium text-text-primary'}`}>{activity.title}</span>
+                <span className="inline-flex shrink-0 items-center gap-1 text-xs text-text-tertiary"><Clock3 className="h-3 w-3" />{activity.estimatedDurationMinutes} min</span>
+              </li>
+            ))}
+          </ul>
+          {todayActivities.length > previewActivities.length && (
+            <p className="mt-3 text-xs text-text-tertiary">+{todayActivities.length - previewActivities.length} more {todayActivities.length - previewActivities.length === 1 ? 'activity' : 'activities'} in your schedule</p>
+          )}
+          {completedToday === todayActivities.length && (
+            <p className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-sage"><CheckCircle2 className="h-4 w-4" /> All scheduled activities completed for today</p>
+          )}
+        </div>
+      )}
+
+      {!activePlan && !hasLoadError && (
+        <div className="mt-4 rounded-xl bg-surface-elevated px-4 py-3 text-sm text-text-secondary">
+          Create a study plan to organize learning activities around your enrolled courses and preferred study days.
+        </div>
+      )}
     </div>
   );
 };

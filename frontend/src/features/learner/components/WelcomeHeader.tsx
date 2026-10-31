@@ -15,12 +15,12 @@ export const WelcomeHeader: React.FC = () => {
   const firstName = user?.name ? user.name.split(' ')[0] : 'Learner';
 
   return (
-    <div className="mb-10">
-      <h1 className="font-display text-3xl sm:text-4xl font-semibold text-text-primary tracking-tight">
+    <div className="mb-7">
+      <h1 className="font-display text-2xl sm:text-3xl font-semibold text-text-primary tracking-tight">
         {getGreeting()}, <span className="text-signal">{firstName}</span>
       </h1>
-      <p className="mt-2 text-lg text-text-secondary">
-        Here's what your learning needs today.
+      <p className="mt-2 text-sm sm:text-base text-text-secondary">
+        Ready to make progress on your learning today?
       </p>
     </div>
   );

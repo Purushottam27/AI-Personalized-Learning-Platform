@@ -7,40 +7,30 @@ interface LearningSummaryProps {
 }
 
 export const LearningSummary: React.FC<LearningSummaryProps> = ({ summary }) => {
-  if (!summary) {
-    return null;
-  }
+  if (!summary) return null;
 
   const formatHours = (minutes: number) => {
     if (minutes < 60) return `${minutes}m`;
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
   };
 
+  const stats = [
+    { label: 'Study time', value: formatHours(summary.weeklyStudyMinutes), icon: Clock, tone: 'text-text-secondary', tile: 'bg-surface-disabled' },
+    { label: 'Topics completed', value: String(summary.topicsCompletedThisWeek), icon: CheckCircle2, tone: 'text-sage', tile: 'bg-sage-soft' },
+    { label: 'Current streak', value: `${summary.currentStreakDays} ${summary.currentStreakDays === 1 ? 'day' : 'days'}`, icon: Flame, tone: 'text-signal', tile: 'bg-signal-soft' },
+  ];
+
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5 md:p-6">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-text-tertiary mb-5">This Week</h3>
-      
-      <div className="grid grid-cols-3 gap-4">
-        <div className="flex flex-col items-center justify-center text-center p-3 rounded-xl bg-surface-elevated border border-border-muted">
-          <Clock className="w-5 h-5 text-text-secondary mb-2" />
-          <span className="text-xl font-semibold text-text-primary">{formatHours(summary.weeklyStudyMinutes)}</span>
-          <span className="text-xs text-text-tertiary mt-1">Study time</span>
+    <div className="grid grid-cols-3 gap-2 sm:gap-4" aria-label="Weekly learning statistics">
+      {stats.map(({ label, value, icon: Icon, tone, tile }) => (
+        <div key={label} className="group min-w-0 rounded-2xl border border-border bg-linear-to-br from-surface-elevated to-surface p-3.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-signal/25 hover:shadow-md sm:p-5">
+          <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl ${tile}`}><Icon className={`h-[18px] w-[18px] ${tone}`} aria-hidden="true" /></div>
+          <p className="text-xl font-bold tracking-tight text-text-primary tabular-nums sm:text-2xl">{value}</p>
+          <p className="mt-1 text-xs font-medium leading-tight text-text-secondary sm:text-sm">{label}</p>
         </div>
-        
-        <div className="flex flex-col items-center justify-center text-center p-3 rounded-xl bg-surface-elevated border border-border-muted">
-          <CheckCircle2 className="w-5 h-5 text-sage mb-2" />
-          <span className="text-xl font-semibold text-text-primary">{summary.topicsCompletedThisWeek}</span>
-          <span className="text-xs text-text-tertiary mt-1">Topics done</span>
-        </div>
-        
-        <div className="flex flex-col items-center justify-center text-center p-3 rounded-xl bg-surface-elevated border border-border-muted">
-          <Flame className="w-5 h-5 text-signal mb-2" />
-          <span className="text-xl font-semibold text-text-primary">{summary.currentStreakDays}</span>
-          <span className="text-xs text-text-tertiary mt-1">Day streak</span>
-        </div>
-      </div>
+      ))}
     </div>
   );
 };
