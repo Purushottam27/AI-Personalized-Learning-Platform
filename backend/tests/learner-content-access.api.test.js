@@ -13,6 +13,8 @@ import { Course } from "../src/modules/course/models/course.model.js";
 import { Topic } from "../src/modules/topic/models/topic.model.js";
 import { Lesson } from "../src/modules/lesson/models/lesson.model.js";
 import { Resource } from "../src/modules/resource/models/resource.model.js";
+import { Practice } from "../src/modules/practice/models/practice.model.js";
+import { PracticeAttempt } from "../src/modules/practice/models/practiceAttempt.model.js";
 import { Enrollment } from "../src/modules/enrollment/models/enrollment.model.js";
 import { QuestionBank } from "../src/modules/questionBank/models/questionBank.model.js";
 import { Question } from "../src/modules/question/models/question.model.js";
@@ -75,6 +77,8 @@ test("Learner Course Content Access Audit & Implementation Integration Suite", a
         if (!connected) return;
         try {
             await AssessmentAttempt.deleteMany({ learnerId: { $in: createdUserIds } });
+            await PracticeAttempt.deleteMany({ learnerId: { $in: createdUserIds } });
+            await Practice.deleteMany({ courseId: { $in: createdCourseIds } });
             await Enrollment.deleteMany({ learnerId: { $in: createdUserIds } });
             await Assessment.deleteMany({ courseId: { $in: createdCourseIds } });
             await Resource.deleteMany({ topicId: { $in: [publishedTopicId, draftTopicId, archivedTopicId, instructor2TopicId].filter(Boolean) } });
@@ -104,6 +108,8 @@ test("Learner Course Content Access Audit & Implementation Integration Suite", a
         Question.init(),
         Assessment.init(),
         AssessmentAttempt.init(),
+        Practice.init(),
+        PracticeAttempt.init(),
     ]);
 
     // Create Users
@@ -330,6 +336,51 @@ test("Learner Course Content Access Audit & Implementation Integration Suite", a
     );
     const questionIds = questions.map((q) => q._id);
 
+    // Seed a completed practice attempt: TOPIC assessment access requires
+    // evidence that the learner has completed at least one practice attempt.
+    const readinessPractice = await Practice.create({
+        courseId: publishedCourseId,
+        topicId: publishedTopicId,
+        questionBankId: qb._id,
+        createdBy: instructor1Id,
+        title: "Architecture Readiness Practice",
+        questionIds,
+        contributeToLearningEvidence: false,
+        status: "PUBLISHED",
+    });
+
+    await PracticeAttempt.create({
+        practiceId: readinessPractice._id,
+        learnerId: enrolledLearnerId,
+        courseId: publishedCourseId,
+        topicId: publishedTopicId,
+        attemptNumber: 1,
+        status: "SUBMITTED",
+        startedAt: new Date(Date.now() - 60_000),
+        submittedAt: new Date(),
+        submissionReason: "MANUAL",
+        questions: questions.map((question) => ({
+            questionId: question._id,
+            questionText: question.questionText,
+            type: question.type,
+            options: question.options,
+            correctAnswer: question.correctAnswer,
+            explanation: question.explanation,
+            marks: question.marks,
+            difficulty: question.difficulty,
+        })),
+        answers: questions.map((question) => ({
+            questionId: question._id,
+            answer: question.correctAnswer,
+        })),
+        totalQuestions: questions.length,
+        totalMarks: questions.reduce((sum, question) => sum + question.marks, 0),
+        marksAwarded: questions.reduce((sum, question) => sum + question.marks, 0),
+        scorePercent: 100,
+        correctCount: questions.length,
+        contributeToLearningEvidence: false,
+    });
+
     // Create Diagnostic Assessment (PUBLISHED)
     const diag = await Assessment.create({
         courseId: publishedCourseId,
@@ -457,6 +508,14 @@ test("Learner Course Content Access Audit & Implementation Integration Suite", a
         assert.equal(resSingleResource.status, 200);
         const dataSingleResource = await resSingleResource.json();
         assert.equal(dataSingleResource.data._id, publishedResourceId.toString());
+
+        // Explicitly record that the learner accessed the resource. Reading
+        // resource metadata alone does not create the ResourceAccess record.
+        const resRecordResourceAccess = await request(`/api/v1/resources/${publishedResourceId}/access`, {
+            method: "POST",
+            token: tokens.enrolledLearner,
+        });
+        assert.equal(resRecordResourceAccess.status, 200);
 
         // Assessments for Course
         const resCourseAssessments = await request(`/api/v1/courses/${publishedCourseId}/assessments`, { token: tokens.enrolledLearner });

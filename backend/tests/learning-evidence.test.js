@@ -28,6 +28,8 @@ import { PracticeAttempt } from "../src/modules/practice/models/practiceAttempt.
 import { Assessment } from "../src/modules/assessment/models/assessment.model.js";
 import { AssessmentAttempt } from "../src/modules/assessmentAttempt/models/assessmentAttempt.model.js";
 import { LearningEvidence } from "../src/modules/learningEvidence/models/learningEvidence.model.js";
+import { Resource } from "../src/modules/resource/models/resource.model.js";
+import { ResourceAccess } from "../src/modules/resource/models/resourceAccess.model.js";
 import {
     recordPracticeEvidenceService,
     recordAssessmentEvidenceService,
@@ -71,6 +73,8 @@ test("Learning Evidence Foundation", async (t) => {
         if (!connected) return;
         try {
             await LearningEvidence.deleteMany({ courseId: { $in: [courseId, otherCourseId] } });
+            await ResourceAccess.deleteMany({ courseId: { $in: [courseId, otherCourseId] } });
+            await Resource.deleteMany({ topicId });
             await PracticeAttempt.deleteMany({ courseId: { $in: [courseId, otherCourseId] } });
             await AssessmentAttempt.deleteMany({ courseId: { $in: [courseId, otherCourseId] } });
             await Practice.deleteMany({ createdBy: { $in: [instructorId, otherInstructorId] } });
@@ -102,6 +106,8 @@ test("Learning Evidence Foundation", async (t) => {
         Assessment.init(),
         AssessmentAttempt.init(),
         LearningEvidence.init(),
+        Resource.init(),
+        ResourceAccess.init(),
     ]);
 
     await User.create([
@@ -141,6 +147,18 @@ test("Learning Evidence Foundation", async (t) => {
         title: "Relational Modeling",
         description: "Understanding relational schema design",
         order: 1,
+    });
+
+    const learningResource = await Resource.create({
+        topicId,
+        title: "Relational Modeling Reading",
+        description: "Test resource used to satisfy topic learning readiness",
+        type: "LINK",
+        source: "EXTERNAL_URL",
+        provider: "OTHER",
+        url: "https://example.test/relational-modeling",
+        order: 1,
+        status: "ACTIVE",
     });
 
     await Enrollment.create([
@@ -439,6 +457,9 @@ test("Learning Evidence Foundation", async (t) => {
     // 5. Completed eligible assessment produces expected evidence
     // -------------------------------------------------------------------------
     await t.test("5. Completed eligible assessment produces expected evidence", async () => {
+        const resourceAccessRes = await api(`/api/v1/resources/${learningResource._id}/access`, { method: "POST" });
+        assert.equal(resourceAccessRes.status, 200, "Learner must record access to an active topic resource before starting a TOPIC assessment");
+
         const startRes = await api(`/api/v1/assessments/${topicAssessmentId}/attempts`, { method: "POST" });
         assert.equal(startRes.status, 201);
         const startBody = await startRes.json();
