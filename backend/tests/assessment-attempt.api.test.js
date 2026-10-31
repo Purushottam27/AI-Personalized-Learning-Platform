@@ -15,6 +15,10 @@ import { QuestionBank } from "../src/modules/questionBank/models/questionBank.mo
 import { Question } from "../src/modules/question/models/question.model.js";
 import { Assessment } from "../src/modules/assessment/models/assessment.model.js";
 import { AssessmentAttempt } from "../src/modules/assessmentAttempt/models/assessmentAttempt.model.js";
+import { Resource } from "../src/modules/resource/models/resource.model.js";
+import { ResourceAccess } from "../src/modules/resource/models/resourceAccess.model.js";
+import { Practice } from "../src/modules/practice/models/practice.model.js";
+import { PracticeAttempt } from "../src/modules/practice/models/practiceAttempt.model.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -41,8 +45,12 @@ test("Assessment Attempt HTTP API", async (t) => {
         if (!connected) return;
         try {
             await AssessmentAttempt.deleteMany({ courseId });
+            await PracticeAttempt.deleteMany({ courseId });
+            await ResourceAccess.deleteMany({ courseId });
             await Enrollment.deleteMany({ courseId });
             await Assessment.deleteMany({ createdBy: instructorId });
+            await Practice.deleteMany({ createdBy: instructorId });
+            await Resource.deleteMany({ topicId: { $in: await Topic.find({ courseId }).distinct("_id") } });
             await Question.deleteMany({ createdBy: instructorId });
             await QuestionBank.deleteMany({ createdBy: instructorId });
             await Topic.deleteMany({ courseId });
@@ -54,7 +62,11 @@ test("Assessment Attempt HTTP API", async (t) => {
     await mongoose.connect(MONGODB_URI, { dbName: TEST_DB_NAME });
     connected = true;
     assert.equal(mongoose.connection.name, TEST_DB_NAME);
-    await Promise.all([User.init(), Course.init(), Topic.init(), Enrollment.init(), QuestionBank.init(), Question.init(), Assessment.init(), AssessmentAttempt.init()]);
+    await Promise.all([
+        User.init(), Course.init(), Topic.init(), Enrollment.init(),
+        QuestionBank.init(), Question.init(), Assessment.init(), AssessmentAttempt.init(),
+        Resource.init(), ResourceAccess.init(), Practice.init(), PracticeAttempt.init(),
+    ]);
 
     await User.create([
         { _id: instructorId, name: "Attempt Test Instructor", email: `attempt-instructor-${instructorId}@example.test`, role: "INSTRUCTOR", status: "ACTIVE" },
@@ -72,6 +84,29 @@ test("Assessment Attempt HTTP API", async (t) => {
         type: "MCQ_SINGLE", options: [{ key: "A", text: "Correct" }, { key: "B", text: "Incorrect" }],
         correctAnswer: "A", explanation: "A is the correct option.", marks: 2, difficulty: "EASY", status: "ACTIVE",
     })));
+    const resource = await Resource.create({
+        topicId: topic._id,
+        title: "Attempt Test Learning Resource",
+        description: "A published learning resource used by the assessment attempt test fixture.",
+        type: "LINK",
+        source: "EXTERNAL_URL",
+        provider: "OTHER",
+        url: "https://example.test/attempt-test-resource",
+        order: 1,
+        status: "ACTIVE",
+    });
+    const practice = await Practice.create({
+        courseId: course._id,
+        topicId: topic._id,
+        questionBankId: bank._id,
+        createdBy: instructorId,
+        title: "Attempt Test Practice",
+        description: "Published practice used to seed the learner readiness prerequisite.",
+        questionIds: questions.map((question) => question._id),
+        contributeToLearningEvidence: false,
+        status: "PUBLISHED",
+    });
+
     const assessment = await Assessment.create({
         courseId: course._id, topicId: topic._id, createdBy: instructorId, type: "TOPIC", title: "Attempt API Assessment",
         questionIds: questions.map((q) => q._id), questionsPerAttempt: 5, passingScore: 60, maxAttempts: 2,
@@ -79,6 +114,7 @@ test("Assessment Attempt HTTP API", async (t) => {
     });
     assessmentId = assessment._id.toString();
     await Enrollment.create({ learnerId, courseId, status: "ACTIVE" });
+    await seedTopicLearningReadiness(learnerId);
 
     const token = jwt.sign({ sub: learnerId.toString(), role: "LEARNER" }, JWT_ACCESS_SECRET, { expiresIn: "5m" });
     server = http.createServer(app);
@@ -152,6 +188,50 @@ test("Assessment Attempt HTTP API", async (t) => {
         assert.equal(response.status, 403);
     });
 
+    // TOPIC assessments require resource access and a submitted practice attempt.
+    // Seed real persisted records; do not bypass the production readiness gate.
+    async function seedTopicLearningReadiness(targetLearnerId) {
+        const question = questions[0];
+        const submittedAt = new Date();
+
+        await ResourceAccess.create({
+            learnerId: targetLearnerId,
+            courseId,
+            topicId: topic._id,
+            resourceId: resource._id,
+            accessedAt: submittedAt,
+        });
+
+        await PracticeAttempt.create({
+            practiceId: practice._id,
+            learnerId: targetLearnerId,
+            courseId,
+            topicId: topic._id,
+            attemptNumber: 1,
+            status: "SUBMITTED",
+            startedAt: new Date(submittedAt.getTime() - 60_000),
+            submittedAt,
+            submissionReason: "MANUAL",
+            questions: [{
+                questionId: question._id,
+                questionText: question.questionText,
+                type: question.type,
+                options: question.options,
+                correctAnswer: question.correctAnswer,
+                explanation: question.explanation,
+                marks: question.marks,
+                difficulty: question.difficulty,
+            }],
+            answers: [{ questionId: question._id, answer: "A" }],
+            totalQuestions: 1,
+            totalMarks: question.marks,
+            marksAwarded: question.marks,
+            scorePercent: 100,
+            correctCount: 1,
+            contributeToLearningEvidence: false,
+        });
+    }
+
     async function createTestLearner(name) {
         const id = new mongoose.Types.ObjectId();
         createdUserIds.push(id);
@@ -163,6 +243,7 @@ test("Assessment Attempt HTTP API", async (t) => {
             status: "ACTIVE",
         });
         await Enrollment.create({ learnerId: id, courseId, status: "ACTIVE" });
+        await seedTopicLearningReadiness(id);
         const learnerToken = jwt.sign({ sub: id.toString(), role: "LEARNER" }, JWT_ACCESS_SECRET, { expiresIn: "10m" });
         return {
             id,
