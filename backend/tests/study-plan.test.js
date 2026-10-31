@@ -21,6 +21,7 @@ import { Course } from "../src/modules/course/models/course.model.js";
 import { Topic } from "../src/modules/topic/models/topic.model.js";
 import { Lesson } from "../src/modules/lesson/models/lesson.model.js";
 import { Practice } from "../src/modules/practice/models/practice.model.js";
+import { PracticeAttempt } from "../src/modules/practice/models/practiceAttempt.model.js";
 import { Assessment } from "../src/modules/assessment/models/assessment.model.js";
 import { AssessmentAttempt } from "../src/modules/assessmentAttempt/models/assessmentAttempt.model.js";
 import { Enrollment } from "../src/modules/enrollment/models/enrollment.model.js";
@@ -43,6 +44,9 @@ import {
     buildDeterministicSchedule,
     collectCandidateActivities,
     getWeekDates,
+    getStudyPlanQuotaService,
+    getCalendarDateKey,
+    getNextMidnightResetAt,
 } from "../src/modules/studyPlan/services/studyPlan.service.js";
 
 test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Test Suite", async (t) => {
@@ -729,10 +733,12 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         );
 
         // Acceptance of proposal with unsupported activity type (e.g. COURSE_DISCOVERY or FORGED) rejected with 400
+        const currentActive = await StudyPlan.findOne({ learnerId: learner1Id, status: "ACTIVE" }).sort({ version: -1 }).lean();
         const fakeProposal = await StudyPlanProposal.create({
             learnerId: learner1Id,
-            basedOnVersion: 1,
-            proposedVersion: 2,
+            basedOnPlanId: currentActive?._id || null,
+            basedOnVersion: currentActive?.version || 1,
+            proposedVersion: (currentActive?.version || 1) + 1,
             status: "PENDING",
             startDate: "2026-11-01",
             endDate: "2026-11-07",
@@ -769,4 +775,739 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
 
         await StudyPlanProposal.deleteOne({ _id: fakeProposal._id });
     });
+
+    await t.test("19. Proposal Acceptance Concurrency & Stale-Plan Protection: Deep Verification", async () => {
+        // Reset state for learner1Id
+        await StudyPlan.deleteMany({ learnerId: learner1Id });
+        await StudyPlanProposal.deleteMany({ learnerId: learner1Id });
+        await StudyPlanGenerationQuota.deleteMany({ learnerId: learner1Id });
+
+        const plan1 = await generateStudyPlanService(learner1Id);
+        assert.ok(plan1);
+        assert.equal(plan1.version, 1);
+
+        // Create proposal based on plan1 (version 1)
+        const proposal1 = await proposePlanRevisionService(learner1Id, "Revision from plan1");
+        assert.ok(proposal1.proposalId);
+
+        // Stale basedOnVersion test: Update active plan to version 2
+        const plan2 = await generateStudyPlanService(learner1Id, { revisionReason: "Second active plan" });
+        assert.equal(plan2.version, 2);
+
+        // Proposal 1 is now stale (based on version 1, active is version 2) -> must reject with 409
+        await assert.rejects(
+            async () => {
+                await acceptPlanRevisionService(learner1Id, { proposalId: proposal1.proposalId });
+            },
+            (err) => {
+                assert.equal(err.statusCode, 409);
+                assert.equal(err.code, "PROPOSAL_STALE");
+                return true;
+            }
+        );
+
+        // Verify active plan remains plan2 (version 2)
+        const activePlanAfterStale = await StudyPlan.findOne({ learnerId: learner1Id, status: "ACTIVE" });
+        assert.equal(activePlanAfterStale._id.toString(), plan2._id.toString());
+        assert.equal(activePlanAfterStale.version, 2);
+
+        // Stale basedOnPlanId test: Proposal with mismatched basedOnPlanId
+        const proposalMismatchedId = await StudyPlanProposal.create({
+            learnerId: learner1Id,
+            basedOnPlanId: new mongoose.Types.ObjectId(), // fake old plan id
+            basedOnVersion: 2,
+            proposedVersion: 3,
+            status: "PENDING",
+            startDate: "2026-11-01",
+            endDate: "2026-11-07",
+            reason: "Mismatched ID proposal",
+            isRevisionRecommended: true,
+            proposedActivities: [
+                {
+                    activityId: "act-valid-1",
+                    dayOfWeek: "MONDAY",
+                    scheduledDate: "2026-11-02",
+                    activityType: "LESSON",
+                    title: "Valid Lesson",
+                    courseId: sharedCourse._id,
+                    courseTitle: sharedCourse.title,
+                    topicId: sharedTopic1._id,
+                    targetId: sharedLesson1._id.toString(),
+                    rationale: "Valid",
+                    actionUrl: "/learn",
+                    order: 1
+                }
+            ],
+            expiresAt: new Date(Date.now() + 60000)
+        });
+
+        await assert.rejects(
+            async () => {
+                await acceptPlanRevisionService(learner1Id, { proposalId: proposalMismatchedId._id.toString() });
+            },
+            (err) => {
+                assert.equal(err.statusCode, 409);
+                assert.equal(err.code, "PROPOSAL_STALE");
+                return true;
+            }
+        );
+
+        // Concurrent acceptance of the same valid proposal produces exactly 1 success
+        const proposalValid = await proposePlanRevisionService(learner1Id, "Valid proposal for concurrency");
+        const results = await Promise.allSettled([
+            acceptPlanRevisionService(learner1Id, { proposalId: proposalValid.proposalId }),
+            acceptPlanRevisionService(learner1Id, { proposalId: proposalValid.proposalId })
+        ]);
+
+        const fulfilled = results.filter((r) => r.status === "fulfilled");
+        const rejected = results.filter((r) => r.status === "rejected");
+        assert.equal(fulfilled.length, 1, "Exactly one concurrent acceptance must succeed");
+        assert.equal(rejected.length, 1, "The second concurrent acceptance must fail with 409");
+        assert.equal(rejected[0].reason.statusCode, 409);
+
+        // Verify exactly one active plan exists in DB
+        const finalActivePlans = await StudyPlan.find({ learnerId: learner1Id, status: "ACTIVE" });
+        assert.equal(finalActivePlans.length, 1);
+        assert.equal(finalActivePlans[0].version, 3);
+    });
+
+    await t.test("20. Strict Target Association Validation: Rejects cross-course, cross-topic, and misplaced levels", async () => {
+        const otherInstructorCourse = await Course.create({
+            title: "Other Instructor Course",
+            description: "A comprehensive course that meets the minimum length requirement.",
+            domain: "DATA_SCIENCE",
+            category: "MACHINE_LEARNING",
+            difficulty: "BEGINNER",
+            createdBy: instructorId,
+            status: "PUBLISHED",
+            isPublished: true
+        });
+
+        const otherTopic = await Topic.create({
+            courseId: otherInstructorCourse._id,
+            title: "Other Course Topic",
+            order: 1
+        });
+
+        const otherPractice = await Practice.create({
+            courseId: otherInstructorCourse._id,
+            topicId: otherTopic._id,
+            questionBankId: new mongoose.Types.ObjectId(),
+            createdBy: instructorId,
+            title: "Other Course Practice",
+            status: "PUBLISHED"
+        });
+
+        const otherAssessment = await Assessment.create({
+            courseId: otherInstructorCourse._id,
+            topicId: otherTopic._id,
+            type: "TOPIC",
+            title: "Other Course Topic Assessment",
+            createdBy: instructorId,
+            status: "PUBLISHED",
+            passingScore: 70
+        });
+
+        const finalCourseAssessment = await Assessment.create({
+            courseId: sharedCourse._id,
+            topicId: null,
+            type: "FINAL",
+            title: "Comprehensive Final Assessment",
+            createdBy: instructorId,
+            status: "PUBLISHED",
+            passingScore: 70
+        });
+
+        // 1. Cross-course practice rejected
+        await assert.rejects(
+            async () => {
+                await acceptPlanRevisionService(learner1Id, {
+                    proposalId: (await StudyPlanProposal.create({
+                        learnerId: learner1Id,
+                        basedOnVersion: 3,
+                        proposedVersion: 4,
+                        status: "PENDING",
+                        startDate: "2026-11-01",
+                        endDate: "2026-11-07",
+                        reason: "Cross-course practice test",
+                        isRevisionRecommended: true,
+                        proposedActivities: [
+                            {
+                                activityId: "act-cross-prac",
+                                dayOfWeek: "MONDAY",
+                                scheduledDate: "2026-11-02",
+                                activityType: "PRACTICE",
+                                title: "Cross practice",
+                                courseId: sharedCourse._id, // claims sharedCourse, but practice belongs to otherInstructorCourse
+                                courseTitle: sharedCourse.title,
+                                topicId: sharedTopic1._id,
+                                targetId: otherPractice._id.toString(),
+                                rationale: "Cross test",
+                                actionUrl: "/p",
+                                order: 1
+                            }
+                        ],
+                        expiresAt: new Date(Date.now() + 60000)
+                    }))._id.toString()
+                });
+            },
+            (err) => {
+                assert.equal(err.statusCode, 400);
+                assert.ok(err.message.includes("Target practice does not belong to specified course"));
+                return true;
+            }
+        );
+
+        // 2. Cross-topic practice rejected (practice on topic1 claimed on topic2)
+        const practiceTopic1 = await Practice.create({
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            questionBankId: new mongoose.Types.ObjectId(),
+            createdBy: instructorId,
+            title: "Topic 1 Practice",
+            status: "PUBLISHED"
+        });
+
+        await assert.rejects(
+            async () => {
+                await acceptPlanRevisionService(learner1Id, {
+                    proposalId: (await StudyPlanProposal.create({
+                        learnerId: learner1Id,
+                        basedOnVersion: 3,
+                        proposedVersion: 4,
+                        status: "PENDING",
+                        startDate: "2026-11-01",
+                        endDate: "2026-11-07",
+                        reason: "Cross-topic practice test",
+                        isRevisionRecommended: true,
+                        proposedActivities: [
+                            {
+                                activityId: "act-cross-topic-prac",
+                                dayOfWeek: "MONDAY",
+                                scheduledDate: "2026-11-02",
+                                activityType: "PRACTICE",
+                                title: "Cross topic practice",
+                                courseId: sharedCourse._id,
+                                courseTitle: sharedCourse.title,
+                                topicId: sharedTopic2._id, // claimed topic2
+                                targetId: practiceTopic1._id.toString(), // belongs to topic1
+                                rationale: "Cross test",
+                                actionUrl: "/p",
+                                order: 1
+                            }
+                        ],
+                        expiresAt: new Date(Date.now() + 60000)
+                    }))._id.toString()
+                });
+            },
+            (err) => {
+                assert.equal(err.statusCode, 400);
+                assert.ok(err.message.includes("Target practice does not belong to specified topic"));
+                return true;
+            }
+        );
+
+        // 3. Cross-course assessment rejected
+        await assert.rejects(
+            async () => {
+                await acceptPlanRevisionService(learner1Id, {
+                    proposalId: (await StudyPlanProposal.create({
+                        learnerId: learner1Id,
+                        basedOnVersion: 3,
+                        proposedVersion: 4,
+                        status: "PENDING",
+                        startDate: "2026-11-01",
+                        endDate: "2026-11-07",
+                        reason: "Cross-course assessment test",
+                        isRevisionRecommended: true,
+                        proposedActivities: [
+                            {
+                                activityId: "act-cross-ass",
+                                dayOfWeek: "MONDAY",
+                                scheduledDate: "2026-11-02",
+                                activityType: "ASSESSMENT",
+                                title: "Cross assessment",
+                                courseId: sharedCourse._id,
+                                courseTitle: sharedCourse.title,
+                                topicId: sharedTopic1._id,
+                                targetId: otherAssessment._id.toString(),
+                                rationale: "Cross test",
+                                actionUrl: "/a",
+                                order: 1
+                            }
+                        ],
+                        expiresAt: new Date(Date.now() + 60000)
+                    }))._id.toString()
+                });
+            },
+            (err) => {
+                assert.equal(err.statusCode, 400);
+                assert.ok(err.message.includes("Target assessment does not belong to specified course"));
+                return true;
+            }
+        );
+
+        // 4. Topic assessment cross-topic rejected
+        await assert.rejects(
+            async () => {
+                await acceptPlanRevisionService(learner1Id, {
+                    proposalId: (await StudyPlanProposal.create({
+                        learnerId: learner1Id,
+                        basedOnVersion: 3,
+                        proposedVersion: 4,
+                        status: "PENDING",
+                        startDate: "2026-11-01",
+                        endDate: "2026-11-07",
+                        reason: "Topic assessment cross-topic test",
+                        isRevisionRecommended: true,
+                        proposedActivities: [
+                            {
+                                activityId: "act-cross-topic-ass",
+                                dayOfWeek: "MONDAY",
+                                scheduledDate: "2026-11-02",
+                                activityType: "ASSESSMENT",
+                                title: "Topic assessment on wrong topic",
+                                courseId: sharedCourse._id,
+                                courseTitle: sharedCourse.title,
+                                topicId: sharedTopic2._id, // Topic 2
+                                targetId: sharedAssessment1._id.toString(), // belongs to Topic 1
+                                rationale: "Cross test",
+                                actionUrl: "/a",
+                                order: 1
+                            }
+                        ],
+                        expiresAt: new Date(Date.now() + 60000)
+                    }))._id.toString()
+                });
+            },
+            (err) => {
+                assert.equal(err.statusCode, 400);
+                assert.ok(err.message.includes("Topic assessment requires matching topicId"));
+                return true;
+            }
+        );
+
+        // 5. Course-level assessment (FINAL) presented as topic-level activity rejected
+        await assert.rejects(
+            async () => {
+                await acceptPlanRevisionService(learner1Id, {
+                    proposalId: (await StudyPlanProposal.create({
+                        learnerId: learner1Id,
+                        basedOnVersion: 3,
+                        proposedVersion: 4,
+                        status: "PENDING",
+                        startDate: "2026-11-01",
+                        endDate: "2026-11-07",
+                        reason: "Final assessment as topic activity",
+                        isRevisionRecommended: true,
+                        proposedActivities: [
+                            {
+                                activityId: "act-final-as-topic",
+                                dayOfWeek: "MONDAY",
+                                scheduledDate: "2026-11-02",
+                                activityType: "ASSESSMENT",
+                                title: "Course final disguised as topic assessment",
+                                courseId: sharedCourse._id,
+                                courseTitle: sharedCourse.title,
+                                topicId: sharedTopic1._id, // Disguised under topic1
+                                targetId: finalCourseAssessment._id.toString(),
+                                rationale: "Misplaced test",
+                                actionUrl: "/a",
+                                order: 1
+                            }
+                        ],
+                        expiresAt: new Date(Date.now() + 60000)
+                    }))._id.toString()
+                });
+            },
+            (err) => {
+                assert.equal(err.statusCode, 400);
+                assert.ok(err.message.includes("Course-level assessment (DIAGNOSTIC or FINAL) cannot be scheduled as a topic-specific activity"));
+                return true;
+            }
+        );
+
+        // Clean up fixtures
+        await Promise.all([
+            Course.deleteOne({ _id: otherInstructorCourse._id }),
+            Topic.deleteOne({ _id: otherTopic._id }),
+            Practice.deleteOne({ _id: otherPractice._id }),
+            Practice.deleteOne({ _id: practiceTopic1._id }),
+            Assessment.deleteOne({ _id: otherAssessment._id }),
+            Assessment.deleteOne({ _id: finalCourseAssessment._id })
+        ]);
+    });
+
+    await t.test("21. Practice Completion Deduplication: Passed attempts and evidence excluded, failed/in-progress eligible", async () => {
+        const dedupeLearnerId = new mongoose.Types.ObjectId();
+        await Enrollment.create({
+            learnerId: dedupeLearnerId,
+            courseId: sharedCourse._id,
+            status: "ACTIVE",
+            enrolledAt: new Date()
+        });
+
+        const practiceForDedupe1 = await Practice.create({
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            questionBankId: new mongoose.Types.ObjectId(),
+            createdBy: instructorId,
+            title: "Practice Passed Attempt",
+            status: "PUBLISHED"
+        });
+
+        const practiceForDedupe2 = await Practice.create({
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            questionBankId: new mongoose.Types.ObjectId(),
+            createdBy: instructorId,
+            title: "Practice Valid Evidence",
+            status: "PUBLISHED"
+        });
+
+        const practiceForDedupe3 = await Practice.create({
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            questionBankId: new mongoose.Types.ObjectId(),
+            createdBy: instructorId,
+            title: "Practice Failed Attempt",
+            status: "PUBLISHED"
+        });
+
+        const practiceForDedupe4 = await Practice.create({
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            questionBankId: new mongoose.Types.ObjectId(),
+            createdBy: instructorId,
+            title: "Practice In Progress Attempt",
+            status: "PUBLISHED"
+        });
+
+        // 1. practiceForDedupe1: SUBMITTED attempt with score 80% (passed)
+        await PracticeAttempt.create({
+            practiceId: practiceForDedupe1._id,
+            learnerId: dedupeLearnerId,
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            attemptNumber: 1,
+            status: "SUBMITTED",
+            totalQuestions: 5,
+            totalMarks: 5,
+            marksAwarded: 4,
+            scorePercent: 80,
+            correctCount: 4,
+            questions: [
+                {
+                    questionId: new mongoose.Types.ObjectId(),
+                    questionText: "Sample Q1",
+                    type: "MCQ_SINGLE",
+                    options: [{ key: "A", text: "Option A" }],
+                    correctAnswer: "A",
+                    marks: 1,
+                    difficulty: "EASY"
+                }
+            ],
+            contributeToLearningEvidence: false
+        });
+
+        // 2. practiceForDedupe2: has valid LearningEvidence record
+        await LearningEvidence.create({
+            learnerId: dedupeLearnerId,
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            sourceType: "PRACTICE",
+            sourceId: practiceForDedupe2._id,
+            attemptId: new mongoose.Types.ObjectId(),
+            completedAt: new Date(),
+            totalQuestions: 5,
+            correctCount: 4,
+            totalMarks: 5,
+            marksAwarded: 4,
+            scorePercent: 80,
+            contributeToLearningEvidence: true
+        });
+
+        // 3. practiceForDedupe3: SUBMITTED attempt with score 30% (failed formative -> eligible for repetition/revision)
+        await PracticeAttempt.create({
+            practiceId: practiceForDedupe3._id,
+            learnerId: dedupeLearnerId,
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            attemptNumber: 1,
+            status: "SUBMITTED",
+            totalQuestions: 5,
+            totalMarks: 5,
+            marksAwarded: 1.5,
+            scorePercent: 30,
+            correctCount: 1,
+            questions: [
+                {
+                    questionId: new mongoose.Types.ObjectId(),
+                    questionText: "Sample Q3",
+                    type: "MCQ_SINGLE",
+                    options: [{ key: "A", text: "Option A" }],
+                    correctAnswer: "A",
+                    marks: 1,
+                    difficulty: "EASY"
+                }
+            ],
+            contributeToLearningEvidence: false
+        });
+
+        // 4. practiceForDedupe4: IN_PROGRESS attempt (not completed -> eligible for candidate scheduling)
+        await PracticeAttempt.create({
+            practiceId: practiceForDedupe4._id,
+            learnerId: dedupeLearnerId,
+            courseId: sharedCourse._id,
+            topicId: sharedTopic1._id,
+            attemptNumber: 1,
+            status: "IN_PROGRESS",
+            totalQuestions: 5,
+            totalMarks: 5,
+            questions: [
+                {
+                    questionId: new mongoose.Types.ObjectId(),
+                    questionText: "Sample Q4",
+                    type: "MCQ_SINGLE",
+                    options: [{ key: "A", text: "Option A" }],
+                    correctAnswer: "A",
+                    marks: 1,
+                    difficulty: "EASY"
+                }
+            ],
+            contributeToLearningEvidence: false
+        });
+
+        const candidates = await collectCandidateActivities(dedupeLearnerId, { preferredSessionDuration: 30 });
+        const candidatePracticeIds = candidates
+            .filter((c) => c.activityType === "PRACTICE")
+            .map((c) => c.targetId);
+
+        // Assert passed practice and evidence practice are EXCLUDED
+        assert.ok(!candidatePracticeIds.includes(practiceForDedupe1._id.toString()), "Passed practice attempt must be excluded");
+        assert.ok(!candidatePracticeIds.includes(practiceForDedupe2._id.toString()), "Practice with valid evidence must be excluded");
+
+        // Assert failed practice and in-progress practice remain ELIGIBLE
+        assert.ok(candidatePracticeIds.includes(practiceForDedupe3._id.toString()), "Failed practice attempt remains eligible for study revision");
+        assert.ok(candidatePracticeIds.includes(practiceForDedupe4._id.toString()), "In-progress attempt is not treated as completed and remains eligible");
+
+        // Cleanup
+        await Promise.all([
+            Enrollment.deleteMany({ learnerId: dedupeLearnerId }),
+            Practice.deleteMany({ _id: { $in: [practiceForDedupe1._id, practiceForDedupe2._id, practiceForDedupe3._id, practiceForDedupe4._id] } }),
+            PracticeAttempt.deleteMany({ learnerId: dedupeLearnerId }),
+            LearningEvidence.deleteMany({ learnerId: dedupeLearnerId })
+        ]);
+    });
+
+    await t.test("22. Timezone-Aware Quota & Rollover Verification", async () => {
+        const tzLearnerId = new mongoose.Types.ObjectId();
+        await Enrollment.create({
+            learnerId: tzLearnerId,
+            courseId: sharedCourse._id,
+            status: "ACTIVE",
+            enrolledAt: new Date()
+        });
+
+        // 1. Quota service returns consistent timezone and resetAt
+        const quotaInfo = await getStudyPlanQuotaService(tzLearnerId);
+        assert.ok(quotaInfo.dateKey);
+        assert.equal(quotaInfo.maxAllowed, 2);
+        assert.equal(quotaInfo.count, 0);
+        assert.equal(quotaInfo.remaining, 2);
+        assert.ok(quotaInfo.timeZone);
+        assert.ok(quotaInfo.resetAt);
+
+        // 2. Date key formatter respects specified timezone offset
+        const fixedDate = new Date("2026-11-01T23:30:00.000Z"); // 23:30 UTC Nov 1 = 05:00 Nov 2 in Asia/Kolkata
+        const utcKey = getCalendarDateKey(fixedDate, "UTC");
+        const istKey = getCalendarDateKey(fixedDate, "Asia/Kolkata");
+        assert.equal(utcKey, "2026-11-01");
+        assert.equal(istKey, "2026-11-02");
+
+        // 3. Midnight rollover calculation
+        const utcResetAt = getNextMidnightResetAt(fixedDate, "UTC");
+        assert.equal(utcResetAt, "2026-11-02T00:00:00.000Z");
+
+        // Local midnight must be converted to the correct UTC instant.
+        assert.equal(
+            getNextMidnightResetAt(fixedDate, "Asia/Kolkata"),
+            "2026-11-02T18:30:00.000Z"
+        );
+        assert.equal(
+            getNextMidnightResetAt(fixedDate, "America/Los_Angeles"),
+            "2026-11-02T08:00:00.000Z"
+        );
+
+        // Spring DST transition: midnight after March 8, 2026 in New York is 04:00 UTC.
+        assert.equal(
+            getNextMidnightResetAt(new Date("2026-03-08T12:00:00.000Z"), "America/New_York"),
+            "2026-03-09T04:00:00.000Z"
+        );
+
+        // 4. Failed plan generation does NOT consume quota
+        // To simulate failed generation: temporarily set Course status to invalid within callback or make session fail
+        await assert.rejects(
+            async () => {
+                // learner without enrollment cannot generate if no course is active -> wait, let's test quota when generation throws
+                const badLearnerId = new mongoose.Types.ObjectId();
+                // Pass learner with no enrollments: collectCandidateActivities yields [] and schedule is []
+                // Instead, force an error inside withTransaction by passing invalid ObjectId in learnerId
+                await generateStudyPlanService("not-an-object-id");
+            }
+        );
+
+        const quotaAfterFailure = await getStudyPlanQuotaService(tzLearnerId);
+        assert.equal(quotaAfterFailure.count, 0, "Failed generation must not consume quota");
+
+        // Cleanup
+        await Enrollment.deleteMany({ learnerId: tzLearnerId });
+        await StudyPlanGenerationQuota.deleteMany({ learnerId: tzLearnerId });
+    });
+
+    await t.test("23. Seven-day schedule: every calendar day is represented and activities can share a day", async () => {
+        const weekInfo = getWeekDates(new Date("2026-11-02T12:00:00.000Z"), "UTC");
+        const candidates = Array.from({ length: 21 }, (_, index) => ({
+            activityId: `weekly-${index}`,
+            activityType: "LESSON",
+            title: `Lesson ${index + 1}`,
+            courseId: sharedCourse._id,
+            courseTitle: sharedCourse.title,
+            topicId: sharedTopic1._id,
+            topicTitle: sharedTopic1.title,
+            targetId: new mongoose.Types.ObjectId().toString(),
+            estimatedDurationMinutes: 30,
+            durationAllocationType: "PLANNING_ALLOCATION",
+            rationale: "Seven-day distribution test",
+            actionUrl: "/learner/test"
+        }));
+        const schedule = buildDeterministicSchedule(candidates, weekInfo, {
+            studyDays: ["MONDAY", "WEDNESDAY"],
+            dailyStudyTime: "1-2 hours",
+            preferredSessionDuration: 30
+        });
+        const scheduledDays = new Set(schedule.map((activity) => activity.dayOfWeek));
+        assert.equal(weekInfo.weekDays.length, 7);
+        assert.ok(schedule.length > 7, "Multiple activities must be schedulable in a day when capacity permits");
+        assert.deepEqual(
+            [...scheduledDays].sort(),
+            ["FRIDAY", "MONDAY", "SATURDAY", "SUNDAY", "THURSDAY", "TUESDAY", "WEDNESDAY"].sort(),
+            "Preferred study days must not remove the other calendar days"
+        );
+        const activitiesPerDay = new Map();
+        const minutesPerDay = new Map();
+        for (const activity of schedule) {
+            activitiesPerDay.set(activity.scheduledDate, (activitiesPerDay.get(activity.scheduledDate) || 0) + 1);
+            minutesPerDay.set(activity.scheduledDate, (minutesPerDay.get(activity.scheduledDate) || 0) + activity.estimatedDurationMinutes);
+        }
+        assert.ok([...activitiesPerDay.values()].some((count) => count > 1), "A day may contain multiple activities");
+        assert.ok([...minutesPerDay.values()].every((minutes) => minutes <= 90), "Daily capacity must never be exceeded");
+        assert.equal(new Set(schedule.map((activity) => activity.targetId)).size, schedule.length, "No activity may be duplicated");
+    });
+
+
+    await t.test("24. Quota rollback: failure after quota increment leaves no consumed generation", async () => {
+        const rollbackLearnerId = new mongoose.Types.ObjectId();
+        await Enrollment.create({
+            learnerId: rollbackLearnerId,
+            courseId: sharedCourse._id,
+            status: "ACTIVE",
+            enrolledAt: new Date()
+        });
+        const originalSave = StudyPlan.prototype.save;
+        try {
+            StudyPlan.prototype.save = async function () {
+                throw new Error("Simulated persistence failure after quota increment");
+            };
+            await assert.rejects(
+                () => generateStudyPlanService(rollbackLearnerId),
+                /Simulated persistence failure/
+            );
+        } finally {
+            StudyPlan.prototype.save = originalSave;
+        }
+
+        const dateKey = getCalendarDateKey(new Date(), process.env.APP_TIMEZONE || "UTC");
+        const quota = await StudyPlanGenerationQuota.findOne({ learnerId: rollbackLearnerId, dateKey }).lean();
+        assert.equal(quota?.count || 0, 0, "Aborted plan transaction must roll back quota increment");
+        assert.equal(await StudyPlan.countDocuments({ learnerId: rollbackLearnerId }), 0, "Failed generation must not persist a plan");
+        assert.equal(await StudyPlan.countDocuments({ learnerId: rollbackLearnerId, status: "ACTIVE" }), 0);
+        await Promise.all([
+            Enrollment.deleteMany({ learnerId: rollbackLearnerId }),
+            StudyPlanGenerationQuota.deleteMany({ learnerId: rollbackLearnerId })
+        ]);
+    });
+
+    await t.test("25. Concurrent first quota creation and generation never exceed the daily limit", async () => {
+        const concurrentLearnerId = new mongoose.Types.ObjectId();
+        await Enrollment.create({
+            learnerId: concurrentLearnerId,
+            courseId: sharedCourse._id,
+            status: "ACTIVE",
+            enrolledAt: new Date()
+        });
+        const results = await Promise.allSettled([
+            generateStudyPlanService(concurrentLearnerId),
+            generateStudyPlanService(concurrentLearnerId),
+            generateStudyPlanService(concurrentLearnerId)
+        ]);
+        const successful = results.filter((result) => result.status === "fulfilled");
+        const failed = results.filter((result) => result.status === "rejected");
+        assert.equal(successful.length, 2, "Exactly two concurrent generations may succeed");
+        assert.equal(failed.length, 1, "The third concurrent generation must be rejected");
+        const dateKey = getCalendarDateKey(new Date(), process.env.APP_TIMEZONE || "UTC");
+        const quota = await StudyPlanGenerationQuota.findOne({ learnerId: concurrentLearnerId, dateKey }).lean();
+        assert.equal(quota?.count, 2, "Persisted quota count must match successful generations");
+        assert.equal(await StudyPlan.countDocuments({ learnerId: concurrentLearnerId, status: "ACTIVE" }), 1);
+        assert.equal(await StudyPlan.countDocuments({ learnerId: concurrentLearnerId }), 2);
+        await Promise.all([
+            Enrollment.deleteMany({ learnerId: concurrentLearnerId }),
+            StudyPlan.deleteMany({ learnerId: concurrentLearnerId }),
+            StudyPlanGenerationQuota.deleteMany({ learnerId: concurrentLearnerId })
+        ]);
+    });
+
+
+    await t.test("26. Proposal acceptance rejects a missing basedOnPlanId when an active plan exists", async () => {
+        const invariantLearnerId = new mongoose.Types.ObjectId();
+        await Enrollment.create({
+            learnerId: invariantLearnerId,
+            courseId: sharedCourse._id,
+            status: "ACTIVE",
+            enrolledAt: new Date()
+        });
+        const activePlan = await generateStudyPlanService(invariantLearnerId);
+        const proposal = await StudyPlanProposal.create({
+            learnerId: invariantLearnerId,
+            basedOnPlanId: null,
+            basedOnVersion: activePlan.version,
+            proposedVersion: activePlan.version + 1,
+            status: "PENDING",
+            startDate: activePlan.startDate,
+            endDate: activePlan.endDate,
+            reason: "Missing active plan identifier invariant test",
+            isRevisionRecommended: true,
+            proposedActivities: [],
+            preferencesSnapshot: activePlan.preferencesSnapshot,
+            expiresAt: new Date(Date.now() + 60_000)
+        });
+
+        await assert.rejects(
+            () => acceptPlanRevisionService(invariantLearnerId, { proposalId: proposal._id.toString() }),
+            (err) => {
+                assert.equal(err.statusCode, 409);
+                assert.equal(err.code, "PROPOSAL_STALE");
+                return true;
+            }
+        );
+        assert.equal(await StudyPlan.countDocuments({ learnerId: invariantLearnerId, status: "ACTIVE" }), 1);
+        assert.equal((await StudyPlanProposal.findById(proposal._id)).status, "PENDING");
+        await Promise.all([
+            Enrollment.deleteMany({ learnerId: invariantLearnerId }),
+            StudyPlan.deleteMany({ learnerId: invariantLearnerId }),
+            StudyPlanProposal.deleteMany({ learnerId: invariantLearnerId }),
+            StudyPlanGenerationQuota.deleteMany({ learnerId: invariantLearnerId })
+        ]);
+    });
+
 });

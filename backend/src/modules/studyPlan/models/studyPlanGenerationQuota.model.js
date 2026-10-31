@@ -8,7 +8,7 @@ const studyPlanGenerationQuotaSchema = new mongoose.Schema({
         index: true
     },
     dateKey: {
-        type: String, // UTC Calendar date "YYYY-MM-DD"
+        type: String, // Application-timezone calendar date "YYYY-MM-DD"
         required: true,
         index: true
     },
@@ -28,4 +28,3 @@ export const StudyPlanGenerationQuota = mongoose.model(
     "StudyPlanGenerationQuota",
     studyPlanGenerationQuotaSchema
 );
-

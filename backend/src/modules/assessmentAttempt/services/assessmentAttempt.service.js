@@ -4,6 +4,7 @@ import { AssessmentAttempt } from "../models/assessmentAttempt.model.js";
 import { Course } from "../../course/models/course.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
 import { assertTopicUnlockedForLearner, assertAllTopicsCompletedForCourse } from "../../topic/services/topicProgression.service.js";
+import { assertTopicLearningReady } from "../../topic/services/topicLearningReadiness.service.js";
 import { Question } from "../../question/models/question.model.js";
 import { recordAssessmentEvidenceService } from "../../learningEvidence/services/learningEvidence.service.js";
 import { withTransaction } from "../../../shared/utils/withTransaction.js";
@@ -209,6 +210,7 @@ export async function startAssessmentAttemptService(learnerId, assessmentId) {
 
                 if (assessment.type === "TOPIC" && assessment.topicId) {
                     await assertTopicUnlockedForLearner(learnerId, course, assessment.topicId, session);
+                    await assertTopicLearningReady(learnerId, assessment.topicId, session);
                 } else if (assessment.type === "FINAL") {
                     await assertAllTopicsCompletedForCourse(learnerId, course, session);
                 }

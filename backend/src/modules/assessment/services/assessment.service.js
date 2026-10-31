@@ -6,6 +6,7 @@ import { QuestionBank } from "../../questionBank/models/questionBank.model.js";
 import { Question } from "../../question/models/question.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
 import { assertTopicUnlockedForLearner } from "../../topic/services/topicProgression.service.js";
+import { assertTopicLearningReady } from "../../topic/services/topicLearningReadiness.service.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 const TYPES = new Set(["TOPIC", "DIAGNOSTIC", "FINAL"]);
@@ -289,6 +290,10 @@ export async function getAssessmentByIdService(userId, assessmentId, userRole = 
             if (!enrollment) {
                 error(403, "ACTIVE_ENROLLMENT_REQUIRED", "An active course enrollment is required for this assessment");
             }
+        }
+        if (assessment.type === "TOPIC" && assessment.topicId) {
+            await assertTopicUnlockedForLearner(userId, course, assessment.topicId);
+            await assertTopicLearningReady(userId, assessment.topicId);
         }
         return serializeLearnerAssessment(assessment);
     }
@@ -578,3 +583,24 @@ export async function getCourseDiagnosticAssessmentService(courseId) {
     return serializeDiagnosticAssessment(assessment);
 }
 
+
+/**
+ * Returns authoritative learner eligibility for the published course FINAL assessment.
+ * Uses the same progression guard as attempt creation; this is presentation guidance only.
+ */
+export async function getCourseFinalAssessmentEligibilityService(userId, courseId, userRole = "LEARNER") {
+    const assessments = await getAssessmentsByCourseService(userId, courseId, userRole);
+    const finalAssessment = assessments.find((item) => item.type === "FINAL" && item.status === "PUBLISHED");
+    if (!finalAssessment) {
+        return { available: false, eligible: false, reason: "FINAL_ASSESSMENT_UNAVAILABLE" };
+    }
+    try {
+        await assertAllTopicsCompletedForCourse(userId, courseId);
+        return { available: true, eligible: true, finalAssessmentId: finalAssessment._id };
+    } catch (err) {
+        if (err?.code === "TOPICS_NOT_COMPLETED") {
+            return { available: true, eligible: false, reason: err.code, message: err.message, details: err.details };
+        }
+        throw err;
+    }
+}

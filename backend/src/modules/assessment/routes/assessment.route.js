@@ -18,11 +18,13 @@ import {
     archiveAssessment,
     restoreAssessment,
     getCourseDiagnosticAssessment,
+    getCourseFinalAssessmentEligibility,
 } from "../controllers/assessment.controller.js";
 
 const assessmentRouter = Router();
 
-// Learner diagnostic discovery
+// Learner diagnostic and final-assessment discovery
+assessmentRouter.get("/courses/:courseId/final-assessment/eligibility", authMiddleware, roleMiddleware("LEARNER"), validateAssessmentCourseId, getCourseFinalAssessmentEligibility);
 assessmentRouter.get("/courses/:courseId/diagnostic", authMiddleware, roleMiddleware("LEARNER"), validateAssessmentCourseId, getCourseDiagnosticAssessment);
 assessmentRouter.get("/courses/:courseId/assessments/diagnostic", authMiddleware, roleMiddleware("LEARNER"), validateAssessmentCourseId, getCourseDiagnosticAssessment);
 

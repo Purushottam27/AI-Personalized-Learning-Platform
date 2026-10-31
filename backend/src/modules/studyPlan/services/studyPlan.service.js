@@ -30,33 +30,22 @@ function requireObjectId(value, field = "id") {
 /**
  * Returns Monday and Sunday for the current (or offset) week in YYYY-MM-DD.
  */
-export function getWeekDates(referenceDate = new Date()) {
-    const d = new Date(referenceDate);
-    const day = d.getDay(); // 0 is Sunday, 1 is Monday
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-    
-    const monday = new Date(d);
-    monday.setDate(d.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
+export function getWeekDates(referenceDate = new Date(), timeZone = getApplicationTimezone()) {
+    const dateKey = getCalendarDateKey(referenceDate, timeZone);
+    const [year, month, day] = dateKey.split("-").map(Number);
+    const calendarDate = new Date(Date.UTC(year, month - 1, day));
+    const weekday = calendarDate.getUTCDay(); // 0 Sunday
+    const diffToMonday = weekday === 0 ? -6 : 1 - weekday;
+    calendarDate.setUTCDate(calendarDate.getUTCDate() + diffToMonday);
 
-    const weekDays = [];
     const dayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+    const weekDays = dayNames.map((dayOfWeek, index) => {
+        const current = new Date(calendarDate);
+        current.setUTCDate(calendarDate.getUTCDate() + index);
+        return { dayOfWeek, date: current.toISOString().slice(0, 10) };
+    });
 
-    for (let i = 0; i < 7; i++) {
-        const current = new Date(monday);
-        current.setDate(monday.getDate() + i);
-        const isoDate = current.toISOString().split("T")[0];
-        weekDays.push({
-            dayOfWeek: dayNames[i],
-            date: isoDate
-        });
-    }
-
-    return {
-        startDate: weekDays[0].date,
-        endDate: weekDays[6].date,
-        weekDays
-    };
+    return { startDate: weekDays[0].date, endDate: weekDays[6].date, weekDays };
 }
 
 /**
@@ -98,79 +87,136 @@ export async function getLearnerStudyPreferences(learnerId) {
 }
 
 /**
- * Returns UTC calendar date string "YYYY-MM-DD".
+ * Authoritative timezone resolution.
+ * If learner profile or application specifies a timezone in the future, it is resolved here.
+ * Currently uses APP_TIMEZONE from environment or defaults to UTC, adhering to ISO 8601 calendar days.
  */
-export function getUtcDateKey(date = new Date()) {
-    return date.toISOString().split("T")[0];
+export function getApplicationTimezone() {
+    return process.env.APP_TIMEZONE || "UTC";
 }
 
 /**
- * Gets study plan generation quota status for a learner for the current UTC calendar day.
+ * Returns calendar date string "YYYY-MM-DD" in the application's established timezone.
+ */
+export function getCalendarDateKey(date = new Date(), timeZone = getApplicationTimezone()) {
+    try {
+        const parts = new Intl.DateTimeFormat("en-US", {
+            timeZone,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit"
+        }).formatToParts(date);
+        const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+        return `${values.year}-${values.month}-${values.day}`;
+    } catch {
+        return date.toISOString().split("T")[0];
+    }
+}
+
+/**
+ * Computes next calendar day midnight reset timestamp in the specified timezone.
+ */
+function getZonedDateTimeParts(date, timeZone) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23"
+    }).formatToParts(date);
+    return Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)]));
+}
+
+/** Convert a wall-clock date/time in an IANA timezone to its UTC instant. */
+function zonedDateTimeToUtc({ year, month, day, hour = 0, minute = 0, second = 0 }, timeZone) {
+    const targetAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+    let candidate = targetAsUtc;
+    // Iteratively correct the offset; this handles non-hour offsets and DST.
+    for (let i = 0; i < 4; i += 1) {
+        const actual = getZonedDateTimeParts(new Date(candidate), timeZone);
+        const actualAsUtc = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute, actual.second);
+        const delta = targetAsUtc - actualAsUtc;
+        if (delta === 0) break;
+        candidate += delta;
+    }
+    return new Date(candidate);
+}
+
+export function getNextMidnightResetAt(date = new Date(), timeZone = getApplicationTimezone()) {
+    const todayDateKey = getCalendarDateKey(date, timeZone);
+    const [year, month, day] = todayDateKey.split("-").map(Number);
+    const nextCalendarDay = new Date(Date.UTC(year, month - 1, day + 1));
+    const nextLocalMidnight = {
+        year: nextCalendarDay.getUTCFullYear(),
+        month: nextCalendarDay.getUTCMonth() + 1,
+        day: nextCalendarDay.getUTCDate(),
+        hour: 0, minute: 0, second: 0
+    };
+    return zonedDateTimeToUtc(nextLocalMidnight, timeZone).toISOString();
+}
+
+/**
+ * Gets study plan generation quota status for a learner for the current calendar day.
  */
 export async function getStudyPlanQuotaService(learnerId) {
     requireObjectId(learnerId, "learnerId");
-    const dateKey = getUtcDateKey();
+    const timeZone = getApplicationTimezone();
+    const dateKey = getCalendarDateKey(new Date(), timeZone);
     const quotaDoc = await StudyPlanGenerationQuota.findOne({ learnerId, dateKey }).lean();
     const count = quotaDoc?.count || 0;
     const maxAllowed = 2;
     const remaining = Math.max(0, maxAllowed - count);
-
-    // Calculate resetAt (next UTC midnight)
-    const resetAt = new Date();
-    resetAt.setUTCHours(24, 0, 0, 0);
+    const resetAt = getNextMidnightResetAt(new Date(), timeZone);
 
     return {
         dateKey,
         count,
         remaining,
         maxAllowed,
-        resetAt: resetAt.toISOString()
+        timeZone,
+        resetAt
     };
 }
 
 /**
  * Atomically checks and increments the daily generation quota within a transaction session.
- * Enforces a strict limit of 2 generations per UTC calendar day.
+ * Enforces a strict limit of 2 generations per calendar day.
  */
-export async function checkAndConsumeGenerationQuota(learnerId, session) {
-    const dateKey = getUtcDateKey();
-    const maxAllowed = 2;
+export async function ensureGenerationQuotaDocument(learnerId, date = new Date()) {
+    const timeZone = getApplicationTimezone();
+    const dateKey = getCalendarDateKey(date, timeZone);
+    try {
+        await StudyPlanGenerationQuota.findOneAndUpdate(
+            { learnerId, dateKey },
+            { $setOnInsert: { learnerId, dateKey, count: 0 } },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+    } catch (error) {
+        // Concurrent upserts may race on the unique (learnerId, dateKey) index.
+        // The winning insert is authoritative; read it outside a transaction.
+        if (error?.code !== 11000) throw error;
+        const existing = await StudyPlanGenerationQuota.findOne({ learnerId, dateKey }).lean();
+        if (!existing) throw error;
+    }
+    return dateKey;
+}
 
-    const quotaDoc = await StudyPlanGenerationQuota.findOneAndUpdate(
+export async function checkAndConsumeGenerationQuota(learnerId, session, date = new Date(), dateKeyOverride = null) {
+    const timeZone = getApplicationTimezone();
+    const dateKey = dateKeyOverride || getCalendarDateKey(date, timeZone);
+    const maxAllowed = 2;
+    const updated = await StudyPlanGenerationQuota.findOneAndUpdate(
         { learnerId, dateKey, count: { $lt: maxAllowed } },
         { $inc: { count: 1 } },
         { session, new: true, upsert: false }
     );
-
-    if (!quotaDoc) {
-        // Either document doesn't exist yet, or count has reached maxAllowed
-        const existing = await StudyPlanGenerationQuota.findOne({ learnerId, dateKey }).session(session);
-        if (existing && existing.count >= maxAllowed) {
-            throw new ApiError(429, "QUOTA_EXCEEDED", "Daily study plan generation limit reached (maximum 2 per calendar day)");
-        }
-
-        // Try upserting initial doc with count 1
-        try {
-            await StudyPlanGenerationQuota.create(
-                [{ learnerId, dateKey, count: 1 }],
-                { session }
-            );
-        } catch (err) {
-            if (err.code === 11000) {
-                // Concurrency retry
-                const retryDoc = await StudyPlanGenerationQuota.findOneAndUpdate(
-                    { learnerId, dateKey, count: { $lt: maxAllowed } },
-                    { $inc: { count: 1 } },
-                    { session, new: true }
-                );
-                if (!retryDoc) {
-                    throw new ApiError(429, "QUOTA_EXCEEDED", "Daily study plan generation limit reached (maximum 2 per calendar day)");
-                }
-            } else {
-                throw err;
-            }
-        }
+    if (!updated) {
+        throw new ApiError(429, "QUOTA_EXCEEDED", "Daily study plan generation limit reached (maximum 2 per calendar day)");
     }
+    return updated;
 }
 export async function updateLearnerStudyPreferencesService(learnerId, updates) {
     requireObjectId(learnerId, "learnerId");
@@ -302,6 +348,15 @@ export async function collectCandidateActivities(learnerId, preferences) {
                             });
                             if (hasEvidence) continue;
 
+                            // Exclude if learner has a submitted practice attempt with passing score (>= 60%) or 100% completion
+                            const passedAttempt = await PracticeAttempt.exists({
+                                practiceId: practice._id,
+                                learnerId,
+                                status: "SUBMITTED",
+                                scorePercent: { $gte: 60 }
+                            });
+                            if (passedAttempt) continue;
+
                             candidates.push({
                                 activityId: `cand-remed-prac-${practice._id}`,
                                 activityType: "PRACTICE",
@@ -374,6 +429,15 @@ export async function collectCandidateActivities(learnerId, preferences) {
                     });
                     if (hasEvidence) continue;
 
+                    // Exclude if learner has a submitted practice attempt with passing score (>= 60%)
+                    const passedAttempt = await PracticeAttempt.exists({
+                        practiceId: practice._id,
+                        learnerId,
+                        status: "SUBMITTED",
+                        scorePercent: { $gte: 60 }
+                    });
+                    if (passedAttempt) continue;
+
                     candidates.push({
                         activityId: `cand-practice-${practice._id}`,
                         activityType: "PRACTICE",
@@ -434,97 +498,97 @@ export async function collectCandidateActivities(learnerId, preferences) {
 }
 
 /**
- * Distributes candidates across weekly study days strictly respecting:
- * 1. Selected studyDays
+ * Distributes candidates across all seven calendar days strictly respecting:
+ * 1. Preferred studyDays as ordering preference
  * 2. dailyStudyTime capacity (minutes per day)
  * 3. preferredSessionDuration
  * 4. NEVER duplicating an activity via wrap-around once the candidate list is exhausted
  * 5. Balanced round-robin distribution across selected study days so activities do not cluster exclusively on Monday
  * 6. Daily capacity constraint is strictly enforced on every activity including the very first
+ * 7. Every day is represented in the returned plan; days without eligible candidates are rest days
  */
-export function buildDeterministicSchedule(candidates, weekInfo, preferences) {
-    const studyDaysSet = new Set(preferences.studyDays || ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]);
+export function buildDeterministicSchedule(candidates, weekInfo, preferences = {}) {
+    const calendarDays = Array.isArray(weekInfo?.weekDays) ? weekInfo.weekDays : [];
     const dailyCapacityMinutes = parseDailyCapacityMinutes(preferences.dailyStudyTime);
-    
-    // Filter active weekDays based on learner's selected study days
-    const activeStudyDays = weekInfo.weekDays.filter((d) => studyDaysSet.has(d.dayOfWeek));
-    if (activeStudyDays.length === 0 || !candidates || candidates.length === 0) {
+
+    if (calendarDays.length === 0 || !Array.isArray(candidates) || candidates.length === 0) {
         return [];
     }
 
-    const scheduled = [];
-    const dayAllocations = new Map(); // date -> { totalMinutes, order }
-    activeStudyDays.forEach((d) => {
-        dayAllocations.set(d.date, { totalMinutes: 0, order: 1 });
+    // Keep the complete calendar week available. studyDays expresses preference,
+    // not permission to remove the other days from the learner's weekly plan.
+    const preferredDays = new Set(preferences.studyDays || []);
+    const orderedDays = [
+        ...calendarDays.filter((day) => preferredDays.has(day.dayOfWeek)),
+        ...calendarDays.filter((day) => !preferredDays.has(day.dayOfWeek))
+    ];
+
+    const dayAllocations = new Map();
+    orderedDays.forEach((day) => {
+        dayAllocations.set(day.date, { totalMinutes: 0, order: 1 });
     });
 
+    const scheduled = [];
     let currentDayIndex = 0;
-    let candidateIndex = 0;
 
-    // Distribute candidates across the selected study days
-    while (candidateIndex < candidates.length) {
+    for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+        const candidate = candidates[candidateIndex];
+        const activityDuration =
+            candidate.estimatedDurationMinutes ||
+            preferences.preferredSessionDuration ||
+            30;
+
+        // Find the next day with enough remaining capacity. Keep using the
+        // current day while another activity fits, allowing multiple activities
+        // per day without exceeding the learner's daily capacity.
         let placed = false;
-        const initialDayIndex = currentDayIndex;
+        for (let offset = 0; offset < orderedDays.length; offset += 1) {
+            const dayIndex = (currentDayIndex + offset) % orderedDays.length;
+            const day = orderedDays[dayIndex];
+            const allocation = dayAllocations.get(day.date);
 
-        // Try placing the current candidate on currentDayIndex or next available active day
-        for (let attempt = 0; attempt < activeStudyDays.length; attempt++) {
-            const day = activeStudyDays[(initialDayIndex + attempt) % activeStudyDays.length];
-            const alloc = dayAllocations.get(day.date);
-            const cand = candidates[candidateIndex];
-            const activityDuration = cand.estimatedDurationMinutes || preferences.preferredSessionDuration || 30;
-
-            // Strict daily capacity allocation check: NEVER schedule if exceeding daily capacity
-            if (alloc.totalMinutes + activityDuration <= dailyCapacityMinutes) {
-                scheduled.push({
-                    activityId: `act-${day.date}-${cand.targetId || candidateIndex}`,
-                    dayOfWeek: day.dayOfWeek,
-                    scheduledDate: day.date,
-                    activityType: cand.activityType,
-                    title: cand.title,
-                    courseId: cand.courseId,
-                    courseTitle: cand.courseTitle,
-                    topicId: cand.topicId,
-                    topicTitle: cand.topicTitle,
-                    targetId: cand.targetId,
-                    estimatedDurationMinutes: activityDuration,
-                    durationAllocationType: cand.durationAllocationType || "PLANNING_ALLOCATION",
-                    rationale: cand.rationale,
-                    actionUrl: cand.actionUrl,
-                    order: alloc.order
-                });
-
-                alloc.totalMinutes += activityDuration;
-                alloc.order += 1;
-                placed = true;
-                currentDayIndex = (initialDayIndex + attempt + 1) % activeStudyDays.length;
-                break;
+            if (allocation.totalMinutes + activityDuration > dailyCapacityMinutes) {
+                continue;
             }
+
+            scheduled.push({
+                activityId: `act-${day.date}-${candidate.targetId || candidateIndex}`,
+                dayOfWeek: day.dayOfWeek,
+                scheduledDate: day.date,
+                activityType: candidate.activityType,
+                title: candidate.title,
+                courseId: candidate.courseId,
+                courseTitle: candidate.courseTitle,
+                topicId: candidate.topicId,
+                topicTitle: candidate.topicTitle,
+                targetId: candidate.targetId,
+                estimatedDurationMinutes: activityDuration,
+                durationAllocationType: candidate.durationAllocationType || "PLANNING_ALLOCATION",
+                rationale: candidate.rationale,
+                actionUrl: candidate.actionUrl,
+                order: allocation.order
+            });
+
+            allocation.totalMinutes += activityDuration;
+            allocation.order += 1;
+            currentDayIndex = dayIndex;
+            placed = true;
+            break;
         }
 
-        // Advance to next candidate whether placed or skipped due to oversized duration
-        candidateIndex += 1;
-
-        // If no day had enough capacity for this candidate, and all days are full, stop scheduling
+        // No remaining day can fit this activity; later candidates cannot be
+        // assumed to be smaller, so stop rather than silently over-allocate.
         if (!placed) {
-            const allDaysFull = activeStudyDays.every((d) => {
-                const a = dayAllocations.get(d.date);
-                return a.totalMinutes >= dailyCapacityMinutes;
-            });
-            if (allDaysFull) {
-                break;
-            }
+            break;
         }
     }
 
-    // Sort scheduled activities chronologically by date and within-day order
-    scheduled.sort((a, b) => {
+    return scheduled.sort((a, b) => {
         if (a.scheduledDate !== b.scheduledDate) {
             return a.scheduledDate.localeCompare(b.scheduledDate);
         }
         return a.order - b.order;
     });
-
-    return scheduled;
 }
 
 export const SUPPORTED_ACTIVITY_TYPES = Object.freeze(["LESSON", "PRACTICE", "ASSESSMENT"]);
@@ -618,9 +682,18 @@ export async function revalidateActivities(learnerId, activities) {
             if (!practice || practice.status !== "PUBLISHED") {
                 throw new ApiError(400, "VALIDATION_ERROR", "Target practice not found or not published");
             }
-            // Validate practice topic ownership if practice has a topicId or if topic was specified
-            if (topic && practice.topicId && practice.topicId.toString() !== topic._id.toString()) {
-                throw new ApiError(400, "VALIDATION_ERROR", "Target practice does not belong to specified topic");
+            // Enforce course association
+            if (practice.courseId.toString() !== course._id.toString()) {
+                throw new ApiError(400, "VALIDATION_ERROR", "Target practice does not belong to specified course");
+            }
+            // If topic is specified in activity, practice must belong to that exact topic
+            if (topic) {
+                if (!practice.topicId || practice.topicId.toString() !== topic._id.toString()) {
+                    throw new ApiError(400, "VALIDATION_ERROR", "Target practice does not belong to specified topic");
+                }
+            } else if (practice.topicId) {
+                // If activity omitted topic but practice is topic-scoped, reject or assign topic
+                throw new ApiError(400, "VALIDATION_ERROR", "Topic-scoped practice activity must specify its topicId");
             }
             authoritativeTitle = `Practice: ${practice.title}`;
             authoritativeActionUrl = `/learner/practices/${practice._id}`;
@@ -629,12 +702,20 @@ export async function revalidateActivities(learnerId, activities) {
             if (!assessment || assessment.status !== "PUBLISHED") {
                 throw new ApiError(400, "VALIDATION_ERROR", "Target assessment not found or not published");
             }
-            // Course-level or topic-level assessment check
+            // Enforce course association
             if (assessment.courseId.toString() !== course._id.toString()) {
                 throw new ApiError(400, "VALIDATION_ERROR", "Target assessment does not belong to specified course");
             }
-            if (topic && assessment.topicId && assessment.topicId.toString() !== topic._id.toString()) {
-                throw new ApiError(400, "VALIDATION_ERROR", "Target assessment does not belong to specified topic");
+            // If activity type is topic-level (or topic specified), enforce exact topic match and type
+            if (assessment.type === "TOPIC") {
+                if (!topic || !assessment.topicId || assessment.topicId.toString() !== topic._id.toString()) {
+                    throw new ApiError(400, "VALIDATION_ERROR", "Topic assessment requires matching topicId and cannot be scheduled cross-topic or topicless");
+                }
+            } else {
+                // DIAGNOSTIC or FINAL assessment (course-level)
+                if (topic || act.topicId) {
+                    throw new ApiError(400, "VALIDATION_ERROR", "Course-level assessment (DIAGNOSTIC or FINAL) cannot be scheduled as a topic-specific activity");
+                }
             }
             authoritativeTitle = `${assessment.type} Assessment: ${assessment.title}`;
             authoritativeActionUrl = `/learner/assessments/${topic?._id || course._id}`;
@@ -703,10 +784,15 @@ export async function generateStudyPlanService(learnerId, options = {}) {
     // 2. Schedule deterministically first as authoritative base
     const scheduledActivities = buildDeterministicSchedule(candidates, weekInfo, preferences);
 
+    // Create the unique daily quota row before entering the transaction. This avoids
+    // recovering from duplicate-key errors inside an already-aborted transaction.
+    const quotaDateKey = await ensureGenerationQuotaDocument(learnerId);
+
     // 3. Concurrency-safe plan creation, quota enforcement, and superseding via transaction
     const savedPlan = await withTransaction(async (session) => {
-        // Enforce 2 generations per calendar day quota (atomic check & increment)
-        await checkAndConsumeGenerationQuota(learnerId, session);
+        // Use the same calendar date key captured before the transaction, even if
+        // the request happens to cross local midnight while it is being processed.
+        await checkAndConsumeGenerationQuota(learnerId, session, new Date(), quotaDateKey);
 
         const existingActivePlan = await StudyPlan.findOne({ learnerId, status: "ACTIVE" })
             .sort({ version: -1 })
@@ -744,7 +830,7 @@ export async function generateStudyPlanService(learnerId, options = {}) {
  */
 export async function enrichPlanWithActualState(planDoc, learnerId) {
     const plan = planDoc.toObject ? planDoc.toObject() : planDoc;
-    const courseIds = (plan.scheduledActivities || []).map((a) => a.courseId);
+    const courseIds = [...new Set((plan.scheduledActivities || []).map((a) => String(a.courseId)))];
 
     const [allEvidence, allMastery, allAttempts] = await Promise.all([
         LearningEvidence.find({ learnerId, courseId: { $in: courseIds } }).lean(),
@@ -752,54 +838,92 @@ export async function enrichPlanWithActualState(planDoc, learnerId) {
         AssessmentAttempt.find({ learnerId, courseId: { $in: courseIds } }).lean()
     ]);
 
-    const todayDate = new Date().toISOString().split("T")[0];
+    const todayDate = getCalendarDateKey(new Date(), getApplicationTimezone());
+    const dayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+    const [sy, sm, sd] = String(plan.startDate).split("-").map(Number);
+    const startUtc = new Date(Date.UTC(sy, sm - 1, sd));
+    const calendarDays = dayNames.map((dayOfWeek, index) => {
+        const d = new Date(startUtc);
+        d.setUTCDate(startUtc.getUTCDate() + index);
+        const date = d.toISOString().slice(0, 10);
+        return { dayOfWeek, date };
+    });
 
     const enrichedActivities = [];
     let completedCount = 0;
     let pendingCount = 0;
-    let missedCount = 0;
+    let overdueCount = 0;
 
     for (const act of plan.scheduledActivities || []) {
         const actualState = await evaluateActivityActualState(act, learnerId, allEvidence, allMastery, allAttempts);
+        const temporalStatus = act.scheduledDate < todayDate
+            ? "PAST"
+            : act.scheduledDate === todayDate ? "TODAY" : "UPCOMING";
 
-        let displayStatus = actualState;
-        if (actualState === "PENDING" && act.scheduledDate < todayDate) {
-            displayStatus = "MISSED";
-            missedCount += 1;
-        } else if (actualState === "COMPLETED") {
-            completedCount += 1;
-        } else {
+        if (actualState === "COMPLETED") completedCount += 1;
+        else {
             pendingCount += 1;
+            if (temporalStatus === "PAST") overdueCount += 1;
         }
 
         enrichedActivities.push({
             ...act,
-            actualStatus: displayStatus,
+            actualStatus: actualState === "COMPLETED" ? "COMPLETED" : actualState,
+            temporalStatus,
             isCompleted: actualState === "COMPLETED",
-            isToday: act.scheduledDate === todayDate,
+            isToday: temporalStatus === "TODAY",
             isUntrackedCompletion: act.activityType === "LESSON"
         });
     }
 
     const todayActivities = enrichedActivities.filter((a) => a.isToday);
-    const nextActivity = todayActivities.find((a) => !a.isCompleted) || 
-                         enrichedActivities.find((a) => !a.isCompleted) || 
-                         null;
+    const nextActivity = todayActivities.find((a) => !a.isCompleted) ||
+        enrichedActivities.find((a) => a.temporalStatus === "UPCOMING" && !a.isCompleted) ||
+        enrichedActivities.find((a) => !a.isCompleted) || null;
+
+    const weekDays = calendarDays.map((day) => {
+        const activities = enrichedActivities.filter((a) => a.scheduledDate === day.date);
+        const completed = activities.filter((a) => a.isCompleted).length;
+        const pending = activities.length - completed;
+        const dayState = day.date < todayDate ? "PAST" : day.date === todayDate ? "TODAY" : "UPCOMING";
+        return {
+            ...day,
+            dayState,
+            isToday: dayState === "TODAY",
+            activities,
+            activityCount: activities.length,
+            completedCount: completed,
+            pendingCount: pending,
+            totalDurationMinutes: activities.reduce((sum, activity) => sum + (activity.estimatedDurationMinutes || 0), 0),
+            isRestDay: activities.length === 0
+        };
+    });
 
     return {
         ...plan,
         scheduledActivities: enrichedActivities,
+        weekDays,
+        todayDate,
         summary: {
             totalScheduled: enrichedActivities.length,
             completedCount,
             pendingCount,
-            missedCount,
-            progressPercentage: enrichedActivities.length > 0 
-                ? Math.round((completedCount / enrichedActivities.length) * 100) 
+            missedCount: overdueCount,
+            overdueCount,
+            progressPercentage: enrichedActivities.length > 0
+                ? Math.round((completedCount / enrichedActivities.length) * 100)
                 : 0
         },
         todayActivities,
-        nextActivity
+        nextActivity,
+        topicInsights: allMastery.map((mastery) => ({
+            topicId: String(mastery.topicId),
+            courseId: String(mastery.courseId),
+            masteryScore: typeof mastery.masteryScore === "number" ? mastery.masteryScore : null,
+            status: mastery.status || "INSUFFICIENT_EVIDENCE",
+            confidence: typeof mastery.confidence === "number" ? mastery.confidence : null,
+            evidenceCount: mastery.evidenceCount ?? null
+        }))
     };
 }
 
@@ -926,11 +1050,18 @@ export async function acceptPlanRevisionService(learnerId, revisionData) {
         throw new ApiError(409, "PROPOSAL_STALE", "This revision proposal is expired or already resolved");
     }
 
-    const currentActive = await StudyPlan.findOne({ learnerId, status: "ACTIVE" }).sort({ version: -1 }).lean();
-    if (currentActive && currentActive.version !== existingProposal.basedOnVersion) {
+    const currentActivePre = await StudyPlan.findOne({ learnerId, status: "ACTIVE" }).sort({ version: -1 }).lean();
+    if (currentActivePre) {
+        if (currentActivePre.version !== existingProposal.basedOnVersion ||
+            (existingProposal.basedOnPlanId && currentActivePre._id.toString() !== existingProposal.basedOnPlanId.toString())) {
+            existingProposal.status = "EXPIRED";
+            await existingProposal.save();
+            throw new ApiError(409, "PROPOSAL_STALE", "Active study plan has evolved since this proposal was created");
+        }
+    } else if (existingProposal.basedOnPlanId != null) {
         existingProposal.status = "EXPIRED";
         await existingProposal.save();
-        throw new ApiError(409, "PROPOSAL_STALE", "Active study plan has evolved since this proposal was created");
+        throw new ApiError(409, "PROPOSAL_STALE", "Proposal references an active plan that no longer exists");
     }
 
     // Authoritative Server-Side Revalidation of each activity before transaction
@@ -938,16 +1069,33 @@ export async function acceptPlanRevisionService(learnerId, revisionData) {
     const weekInfo = getWeekDates();
     const preferences = await getLearnerStudyPreferences(learnerId);
 
-    // Atomically accept proposal and supersede active plan
+    // Atomically accept proposal, supersede previous active plan, and insert new active plan
     const newActivePlan = await withTransaction(async (session) => {
-        // Atomic conditional update on proposal
+        // Fetch and lock/verify current active plan within the transaction
+        const existingActive = await StudyPlan.findOne({ learnerId, status: "ACTIVE" })
+            .sort({ version: -1 })
+            .session(session);
+
+        // Strict invariant check inside the transaction: verify current active plan matches proposal's basedOnPlanId and basedOnVersion
+        if (existingActive) {
+            if (existingActive.version !== existingProposal.basedOnVersion) {
+                throw new ApiError(409, "PROPOSAL_STALE", "Active study plan version has evolved since this proposal was created");
+            }
+            if (!existingProposal.basedOnPlanId || existingActive._id.toString() !== existingProposal.basedOnPlanId.toString()) {
+                throw new ApiError(409, "PROPOSAL_STALE", "Active study plan instance has changed since this proposal was created");
+            }
+        } else if (existingProposal.basedOnPlanId != null) {
+            throw new ApiError(409, "PROPOSAL_STALE", "Active study plan referenced by this proposal was removed or superseded");
+        }
+
+        // Atomic conditional status update on proposal inside transaction: exactly one concurrent call can succeed
         const updatedProposal = await StudyPlanProposal.findOneAndUpdate(
             {
                 _id: proposalId,
                 learnerId,
                 status: "PENDING",
                 expiresAt: { $gt: new Date() },
-                basedOnVersion: currentActive ? currentActive.version : existingProposal.basedOnVersion
+                basedOnVersion: existingActive ? existingActive.version : existingProposal.basedOnVersion
             },
             { $set: { status: "ACCEPTED" } },
             { session, new: true }
@@ -956,10 +1104,6 @@ export async function acceptPlanRevisionService(learnerId, revisionData) {
         if (!updatedProposal) {
             throw new ApiError(409, "PROPOSAL_STALE", "Revision proposal could not be accepted due to concurrent resolution or status change");
         }
-
-        const existingActive = await StudyPlan.findOne({ learnerId, status: "ACTIVE" })
-            .sort({ version: -1 })
-            .session(session);
 
         const version = existingActive ? existingActive.version + 1 : (existingProposal.proposedVersion || 1);
 

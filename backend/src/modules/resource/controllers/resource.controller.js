@@ -6,7 +6,8 @@ import {
     reorderResourcesService,
     archiveResourceService,
     restoreResourceService,
-    getResourceDownloadUrlService
+    getResourceDownloadUrlService,
+    recordLearnerResourceAccessService
 } from "../services/resource.service.js";
 
 import { ApiResponse } from "../../../shared/responses/ApiResponse.js";
@@ -83,4 +84,9 @@ export async function getResourceDownloadUrl(req, res) {
 
     res.set("Cache-Control", "private, no-store");
     res.status(200).json(new ApiResponse(result, "Secure download URL generated successfully"));
+}
+
+export async function recordResourceAccess(req, res) {
+    await recordLearnerResourceAccessService(req.user._id, req.params.resourceId, req.user.role);
+    res.status(200).json(new ApiResponse({ recorded: true }, "Resource access recorded"));
 }

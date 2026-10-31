@@ -8,6 +8,7 @@ import {
     archiveAssessmentService,
     restoreAssessmentService,
     getCourseDiagnosticAssessmentService,
+    getCourseFinalAssessmentEligibilityService,
 } from "../services/assessment.service.js";
 import { ApiResponse } from "../../../shared/responses/ApiResponse.js";
 
@@ -56,3 +57,19 @@ export async function getCourseDiagnosticAssessment(req, res) {
     res.status(200).json(new ApiResponse(diagnostic, "Diagnostic assessment fetched successfully"));
 }
 
+export const getCourseFinalAssessmentEligibility = async (req, res) => {
+    const userId = req.user?._id;
+    const { courseId } = req.params;
+
+    const eligibility = await getCourseFinalAssessmentEligibilityService(
+        userId,
+        courseId
+    );
+
+    return res.status(200).json(
+        new ApiResponse(
+            eligibility,
+            "Final assessment eligibility fetched successfully"
+        )
+    );
+};

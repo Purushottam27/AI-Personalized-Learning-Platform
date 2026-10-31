@@ -22,7 +22,8 @@ import {
     reorderResources,
     archiveResource,
     restoreResource,
-    getResourceDownloadUrl
+    getResourceDownloadUrl,
+    recordResourceAccess
 } from "../controllers/resource.controller.js";
 
 const resourceRouter = Router();
@@ -51,11 +52,20 @@ resourceRouter.get(
     getResourceById
 );
 
+resourceRouter.post(
+    "/resources/:resourceId/access",
+    authMiddleware,
+    roleMiddleware("LEARNER"),
+    validateResourceId,
+    recordResourceAccess
+);
+
 resourceRouter.get(
     "/resources/:resourceId/file",
     authMiddleware,
     validateResourceId,
-    getResourceDownloadUrl
+    getResourceDownloadUrl,
+    recordResourceAccess
 );
 
 resourceRouter.patch(

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import path from "path";
 
 import { Resource } from "../models/resource.model.js";
+import { ResourceAccess } from "../models/resourceAccess.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
 import { Course } from "../../course/models/course.model.js";
 import { Lesson } from "../../lesson/models/lesson.model.js";
@@ -378,6 +379,25 @@ export async function updateResourceService(instructorId, resourceId, updateData
  * the requesting instructor or enrolled learner has access to the resource. Legacy public uploads are
  * deliberately blocked until their Cloudinary delivery type is migrated.
  */
+export async function recordLearnerResourceAccessService(learnerId, resourceId, userRole = "LEARNER") {
+    if (userRole !== "LEARNER") {
+        throw new ApiError(403, "FORBIDDEN", "Access denied");
+    }
+
+    // Reuse the existing learner resource authorization checks before recording access.
+    const resource = await getResourceByIdService(learnerId, resourceId, userRole);
+    const topic = await Topic.findById(resource.topicId);
+    if (!topic) throw new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found");
+
+    await ResourceAccess.updateOne(
+        { learnerId, resourceId: resource._id },
+        { $setOnInsert: { learnerId, resourceId: resource._id, topicId: topic._id, courseId: topic.courseId, accessedAt: new Date() } },
+        { upsert: true }
+    );
+
+    return { recorded: true };
+}
+
 export async function getResourceDownloadUrlService(userId, resourceId, userRole = "INSTRUCTOR") {
     const resource = await Resource.findById(resourceId);
     if (!resource) {
