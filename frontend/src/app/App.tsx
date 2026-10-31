@@ -21,6 +21,7 @@ import { MyCoursesPage } from '../features/learner/pages/MyCoursesPage';
 import { CourseDetailPage } from '../features/learner/pages/CourseDetailPage';
 import { CourseStudyPage } from '../features/learner/pages/CourseStudyPage';
 import { LearnerRecommendationsPage } from '../features/learner/pages/LearnerRecommendationsPage';
+import { PlaceholderPage } from '../features/learner/pages/PlaceholderPage';
 import { PracticeOverviewPage } from '../features/learner/pages/PracticeOverviewPage';
 import { PracticeSessionPage } from '../features/learner/pages/PracticeSessionPage';
 import { AssessmentOverviewPage } from '../features/learner/pages/AssessmentOverviewPage';
@@ -36,6 +37,7 @@ import { CourseWorkspacePage } from '../features/instructor/pages/CourseWorkspac
 import { TopicWorkspacePage } from '../features/instructor/pages/TopicWorkspacePage';
 import { InstructorAnalyticsPage } from '../features/instructor/pages/InstructorAnalyticsPage';
 import { InstructorLearnersPage } from '../features/instructor/pages/InstructorLearnersPage';
+import { InstructorLearnerDetailPage } from '../features/instructor/pages/InstructorLearnerDetailPage';
 
 // Profile & Settings
 import { LearnerProfilePage } from '../features/profile/pages/LearnerProfilePage';
@@ -95,6 +97,7 @@ function App() {
                   <Route path="courses/:courseId/topics/:topicId" element={<TopicWorkspacePage />} />
                   <Route path="courses/:courseId" element={<CourseWorkspacePage />} />
                   <Route path="learners" element={<InstructorLearnersPage />} />
+                  <Route path="learners/:learnerId" element={<InstructorLearnerDetailPage />} />
                   <Route path="analytics" element={<InstructorAnalyticsPage />} />
                   <Route path="profile" element={<InstructorProfilePage />} />
                 </Route>

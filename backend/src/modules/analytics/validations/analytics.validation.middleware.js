@@ -1,6 +1,7 @@
 import { ApiError } from "../../../shared/errors/ApiError.js";
 import {
     courseIdParamSchema,
+    courseLearnerParamsSchema,
     analyticsOverviewQuerySchema,
     instructorAnalyticsQuerySchema,
     assessmentIdParamSchema,
@@ -8,6 +9,15 @@ import {
 
 export function validateCourseIdParam(req, res, next) {
     const result = courseIdParamSchema.safeParse(req.params);
+    if (!result.success) {
+        throw new ApiError(400, "VALIDATION_ERROR", "Invalid path parameters", result.error.format());
+    }
+    req.params = result.data;
+    next();
+}
+
+export function validateCourseLearnerParams(req, res, next) {
+    const result = courseLearnerParamsSchema.safeParse(req.params);
     if (!result.success) {
         throw new ApiError(400, "VALIDATION_ERROR", "Invalid path parameters", result.error.format());
     }

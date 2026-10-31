@@ -3,11 +3,13 @@ import { authMiddleware } from "../../../middleware/auth.middleware.js";
 import { roleMiddleware } from "../../../middleware/role.middleware.js";
 import {
     getInstructorCourseAnalytics,
+    getInstructorCourseLearnerDetails,
     getInstructorAssessmentAnalytics,
     getInstructorQuestionAnalytics,
 } from "../controllers/instructorAnalytics.controller.js";
 import {
     validateCourseIdParam,
+    validateCourseLearnerParams,
     validateInstructorAnalyticsQuery,
     validateAssessmentIdParam,
 } from "../validations/analytics.validation.middleware.js";
@@ -23,6 +25,14 @@ instructorAnalyticsRouter.get(
     validateCourseIdParam,
     validateInstructorAnalyticsQuery,
     getInstructorCourseAnalytics
+);
+
+// GET /api/v1/instructor/courses/:courseId/learners/:learnerId
+instructorAnalyticsRouter.get(
+    "/instructor/courses/:courseId/learners/:learnerId",
+    roleMiddleware("INSTRUCTOR"),
+    validateCourseLearnerParams,
+    getInstructorCourseLearnerDetails
 );
 
 // GET /api/v1/instructor/courses/:courseId/assessments/analytics
@@ -42,5 +52,3 @@ instructorAnalyticsRouter.get(
 );
 
 export { instructorAnalyticsRouter };
-
-

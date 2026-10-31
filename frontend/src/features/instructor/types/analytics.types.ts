@@ -102,6 +102,105 @@ export interface InstructorAnalyticsQuery {
   search?: string;
 }
 
+export type LearnerMasteryStatus =
+  | 'STRONG'
+  | 'MASTERED'
+  | 'FUNCTIONAL'
+  | 'DEVELOPING'
+  | 'NEEDS_IMPROVEMENT'
+  | 'INSUFFICIENT_EVIDENCE';
+
+export interface InstructorLearnerTopicDetail {
+  topicId: string;
+  title: string;
+  order: number;
+  status: LearnerMasteryStatus;
+  masteryScore: number | null;
+  confidence: number;
+  evidenceCount: number;
+  practiceAttemptsCount: number;
+  assessmentAttemptsCount: number;
+  firstEvidenceAt: string | null;
+  lastEvidenceAt: string | null;
+  lastEvaluatedAt: string | null;
+}
+
+export interface InstructorLearnerAssessmentAttempt {
+  attemptId: string;
+  assessmentId: string;
+  assessmentTitle: string;
+  assessmentType: 'TOPIC' | 'DIAGNOSTIC' | 'FINAL';
+  topicId: string | null;
+  topicTitle: string | null;
+  attemptNumber: number;
+  status: 'IN_PROGRESS' | 'SUBMITTED';
+  startedAt: string;
+  submittedAt: string | null;
+  submissionReason: string | null;
+  totalMarks: number;
+  marksAwarded: number | null;
+  scorePercent: number | null;
+  passed: boolean | null;
+}
+
+export interface InstructorLearnerActivity {
+  evidenceId: string;
+  sourceType: 'PRACTICE' | 'ASSESSMENT';
+  title: string;
+  topicId: string | null;
+  topicTitle: string | null;
+  assessmentSubtype: 'DIAGNOSTIC' | 'TOPIC' | 'FINAL' | null;
+  completedAt: string;
+  totalQuestions: number;
+  correctCount: number | null;
+  totalMarks: number;
+  marksAwarded: number;
+  scorePercent: number;
+  passed: boolean | null;
+}
+
+export interface InstructorCourseLearnerDetails {
+  course: {
+    courseId: string;
+    title: string;
+    status: string;
+  };
+  learner: {
+    learnerId: string;
+    name: string;
+    email: string;
+    avatar: string | null;
+  };
+  enrollment: {
+    status: 'ACTIVE' | 'COMPLETED' | 'WITHDRAWN';
+    enrolledAt: string;
+    completedAt: string | null;
+    withdrawnAt: string | null;
+  };
+  overview: {
+    totalTopics: number;
+    masteredTopicsCount: number;
+    averageMasteryScore: number | null;
+    totalEvidenceCount: number;
+    totalAssessmentAttempts: number;
+    evaluatedAssessmentAttemptsCount: number;
+    lastActivityAt: string | null;
+  };
+  topics: InstructorLearnerTopicDetail[];
+  assessmentAttempts: InstructorLearnerAssessmentAttempt[];
+  recentActivity: InstructorLearnerActivity[];
+  activityPagination: {
+    returnedItems: number;
+    totalItems: number;
+    hasMore: boolean;
+  };
+  assessmentAttemptPagination: {
+    returnedItems: number;
+    totalItems: number;
+    hasMore: boolean;
+  };
+}
+
 export interface ScoreDistribution {
   range0To49: number;
   range50To69: number;
@@ -195,5 +294,3 @@ export interface InstructorQuestionAnalyticsResponse {
   questions: QuestionPerformanceItem[];
   questionInsights: ActionableInsight[];
 }
-
-

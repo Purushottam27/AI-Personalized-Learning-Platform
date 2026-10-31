@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   AlertTriangle,
@@ -162,7 +162,15 @@ const LearnerIdentity: React.FC<{ learner: LearnerPerformanceItem }> = ({ learne
 const LearnerCard: React.FC<{ learner: LearnerPerformanceItem; totalTopics: number }> = ({ learner, totalTopics }) => (
   <article className="rounded-2xl border border-border bg-surface p-4">
     <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0"><LearnerIdentity learner={learner} /></div>
+      <div className="min-w-0">
+        <Link
+          to={`/instructor/learners/${learner.learnerId}?courseId=${selectedCourseId}`}
+          className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          aria-label={`View ${learner.name}'s details in this course`}
+        >
+          <LearnerIdentity learner={learner} />
+        </Link>
+      </div>
       <span className="shrink-0 rounded-full border border-border bg-surface-elevated px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
         {enrollmentLabel(learner.enrollmentStatus)}
       </span>
@@ -495,7 +503,15 @@ export const InstructorLearnersPage: React.FC = () => {
                     <tbody className="divide-y divide-border-muted">
                       {learners.map((learner) => (
                         <tr key={learner.learnerId} className="align-middle transition-colors hover:bg-surface-elevated/60">
-                          <td className="px-5 py-4"><LearnerIdentity learner={learner} /></td>
+                          <td className="px-5 py-4">
+                            <Link
+                              to={`/instructor/learners/${learner.learnerId}?courseId=${selectedCourseId}`}
+                              className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                              aria-label={`View ${learner.name}'s details in ${analytics.course.title}`}
+                            >
+                              <LearnerIdentity learner={learner} />
+                            </Link>
+                          </td>
                           <td className="px-4 py-4">
                             <span className="inline-flex rounded-full border border-border bg-surface-elevated px-2.5 py-1 text-[11px] font-medium text-text-secondary">
                               {enrollmentLabel(learner.enrollmentStatus)}
