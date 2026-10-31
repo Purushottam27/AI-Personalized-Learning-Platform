@@ -72,6 +72,7 @@ function App() {
                   <Route path="courses" element={<MyCoursesPage />} />
                   <Route path="courses/:courseId" element={<CourseDetailPage />} />
                   <Route path="courses/:courseId/learn" element={<CourseStudyPage />} />
+                  <Route path="courses/:courseId/final-assessment" element={<AssessmentOverviewPage />} />
                   <Route path="explore" element={<ExploreCoursesPage />} />
                   <Route path="study-planner" element={<StudyPlannerPage />} />
                   <Route path="recommended" element={<LearnerRecommendationsPage />} />

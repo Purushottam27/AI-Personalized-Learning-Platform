@@ -1,17 +1,11 @@
-export type ActivityType =
-  | 'LESSON'
-  | 'PRACTICE'
-  | 'ASSESSMENT'
-  | 'RESOURCE'
-  | 'TOPIC_REVIEW'
-  | 'COURSE_DISCOVERY';
-
-export type ActivityStatus = 'PENDING' | 'COMPLETED' | 'MISSED' | 'SUBMITTED_NOT_PASSED';
+export type ActivityType = 'LESSON' | 'PRACTICE' | 'ASSESSMENT' | 'RESOURCE' | 'TOPIC_REVIEW' | 'COURSE_DISCOVERY';
+export type ActivityStatus = 'PENDING' | 'COMPLETED' | 'SUBMITTED_NOT_PASSED';
+export type DayState = 'PAST' | 'TODAY' | 'UPCOMING';
 
 export interface ScheduledActivity {
   activityId: string;
   dayOfWeek: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
-  scheduledDate: string; // YYYY-MM-DD
+  scheduledDate: string;
   activityType: ActivityType;
   title: string;
   courseId: string;
@@ -24,12 +18,24 @@ export interface ScheduledActivity {
   actionUrl: string;
   order: number;
   actualStatus?: ActivityStatus;
+  temporalStatus?: DayState;
   isCompleted?: boolean;
   isToday?: boolean;
   isUntrackedCompletion?: boolean;
   durationAllocationType?: 'ESTIMATED' | 'PLANNING_ALLOCATION';
 }
-
+export interface StudyPlanWeekDay {
+  dayOfWeek: ScheduledActivity['dayOfWeek'];
+  date: string;
+  dayState: DayState;
+  isToday: boolean;
+  activities: ScheduledActivity[];
+  activityCount: number;
+  completedCount: number;
+  pendingCount: number;
+  totalDurationMinutes: number;
+  isRestDay: boolean;
+}
 export interface StudyPreferences {
   dailyStudyTime: string | null;
   preferredLearningFormat: string[];
@@ -37,15 +43,14 @@ export interface StudyPreferences {
   preferredSessionDuration: number;
   preferredTimeOfDay: 'MORNING' | 'AFTERNOON' | 'EVENING' | 'NIGHT' | 'ANYTIME';
 }
-
 export interface PlanSummary {
   totalScheduled: number;
   completedCount: number;
   pendingCount: number;
   missedCount: number;
+  overdueCount?: number;
   progressPercentage: number;
 }
-
 export interface StudyPlan {
   _id: string;
   learnerId: string;
@@ -55,6 +60,16 @@ export interface StudyPlan {
   endDate: string;
   preferencesSnapshot: StudyPreferences;
   scheduledActivities: ScheduledActivity[];
+  weekDays: StudyPlanWeekDay[];
+  todayDate: string;
+  topicInsights?: Array<{
+    topicId: string;
+    courseId: string;
+    masteryScore: number | null;
+    status: string;
+    confidence: number | null;
+    evidenceCount: number | null;
+  }>;
   generationSource: 'AI_ASSISTED' | 'DETERMINISTIC_FALLBACK';
   revisionReason?: string | null;
   previousPlanId?: string | null;
@@ -64,7 +79,6 @@ export interface StudyPlan {
   createdAt: string;
   updatedAt: string;
 }
-
 export interface PlanHistoryItem {
   planId: string;
   version: number;
@@ -75,15 +89,14 @@ export interface PlanHistoryItem {
   revisionReason?: string | null;
   createdAt: string;
 }
-
 export interface StudyPlanQuota {
   dateKey: string;
   count: number;
   remaining: number;
   maxAllowed: number;
   resetAt: string;
+  timeZone?: string;
 }
-
 export interface ProposedPlanRevision {
   proposalId?: string;
   isRevisionRecommended: boolean;
@@ -95,22 +108,3 @@ export interface ProposedPlanRevision {
   preferencesSnapshot: StudyPreferences;
   expiresAt?: string;
 }
-
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  metadata?: {
-    usedCourseContext?: boolean;
-    referencedActivityId?: string | null;
-    fallbackUsed?: boolean;
-  };
-  timestamp?: string;
-}
-
-export interface ChatReplyResponse {
-  reply: string;
-  fallbackUsed?: boolean;
-  referencedActivity: ScheduledActivity | null;
-  timestamp: string;
-}
-

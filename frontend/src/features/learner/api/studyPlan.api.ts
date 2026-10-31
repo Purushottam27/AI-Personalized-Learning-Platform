@@ -4,8 +4,8 @@ import type {
   StudyPreferences,
   PlanHistoryItem,
   ProposedPlanRevision,
-  ChatMessage,
-  ChatReplyResponse,
+  // ChatMessage,
+  // ChatReplyResponse,
   StudyPlanQuota,
 } from '../types/studyPlan.types';
 
@@ -52,16 +52,16 @@ export const acceptPlanRevision = async (revisionData: ProposedPlanRevision): Pr
   return res.data.data.plan;
 };
 
-export const chatWithAssistant = async (message: string, activityId?: string): Promise<ChatReplyResponse> => {
-  const res = await api.post<{ data: ChatReplyResponse }>('/learning/me/study-assistant/chat', {
-    message,
-    activityId,
-  });
-  return res.data.data;
-};
+// export const chatWithAssistant = async (message: string, activityId?: string): Promise<ChatReplyResponse> => {
+//   const res = await api.post<{ data: ChatReplyResponse }>('/learning/me/study-assistant/chat', {
+//     message,
+//     activityId,
+//   });
+//   return res.data.data;
+// };
 
-export const getAssistantMessages = async (): Promise<ChatMessage[]> => {
-  const res = await api.get<{ data: ChatMessage[] }>('/learning/me/study-assistant/messages');
-  return res.data.data;
-};
+// export const getAssistantMessages = async (): Promise<ChatMessage[]> => {
+//   const res = await api.get<{ data: ChatMessage[] }>('/learning/me/study-assistant/messages');
+//   return res.data.data;
+// };
 

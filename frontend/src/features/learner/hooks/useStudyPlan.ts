@@ -1,12 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type {
-  StudyPlan,
-  StudyPreferences,
-  PlanHistoryItem,
-  ProposedPlanRevision,
-  ChatMessage,
-  StudyPlanQuota,
-} from '../types/studyPlan.types';
+import type { StudyPlan, StudyPreferences, PlanHistoryItem, ProposedPlanRevision, StudyPlanQuota } from '../types/studyPlan.types';
 import * as api from '../api/studyPlan.api';
 import { isApiError } from '../../../lib/axios';
 
@@ -16,43 +9,31 @@ export const useStudyPlan = () => {
   const [quota, setQuota] = useState<StudyPlanQuota | null>(null);
   const [history, setHistory] = useState<PlanHistoryItem[]>([]);
   const [proposedRevision, setProposedRevision] = useState<ProposedPlanRevision | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [planData, prefData, quotaData, historyData, messagesData] = await Promise.all([
+      const [planData, prefData, quotaData, historyData] = await Promise.all([
         api.getActiveStudyPlan(),
         api.getStudyPreferences(),
         api.getStudyPlanQuota().catch(() => null),
         api.getStudyPlanHistory(),
-        api.getAssistantMessages(),
       ]);
-
       setPlan(planData);
       setPreferences(prefData);
       setQuota(quotaData);
       setHistory(historyData);
-      setMessages(messagesData);
     } catch (err: unknown) {
-      if (isApiError(err)) {
-        setError(err.message);
-      } else {
-        setError('Failed to load study plan and assistant. Please try again.');
-      }
+      setError(isApiError(err) ? err.message : 'Failed to load your study plan. Please try again.');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { void fetchData(); }, [fetchData]);
 
   const handleUpdatePreferences = async (updates: Partial<StudyPreferences>) => {
     try {
@@ -103,8 +84,7 @@ export const useStudyPlan = () => {
       const accepted = await api.acceptPlanRevision(proposedRevision);
       setPlan(accepted);
       setProposedRevision(null);
-      const updatedHistory = await api.getStudyPlanHistory();
-      setHistory(updatedHistory);
+      setHistory(await api.getStudyPlanHistory());
       return accepted;
     } catch (err: unknown) {
       if (isApiError(err)) throw new Error(err.message);
@@ -114,58 +94,12 @@ export const useStudyPlan = () => {
     }
   };
 
-  const handleSendMessage = async (text: string, activityId?: string) => {
-    if (!text.trim()) return;
-    setIsSendingMessage(true);
-    const userMsg: ChatMessage = {
-      role: 'user',
-      content: text,
-      metadata: { referencedActivityId: activityId || null },
-      timestamp: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-
-    try {
-      const res = await api.chatWithAssistant(text, activityId);
-      const assistantMsg: ChatMessage = {
-        role: 'assistant',
-        content: res.reply,
-        metadata: {
-          referencedActivityId: res.referencedActivity?.activityId || null,
-          fallbackUsed: res.fallbackUsed,
-        },
-        timestamp: res.timestamp,
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
-    } catch {
-      const errorMsg: ChatMessage = {
-        role: 'assistant',
-        content: "I'm having trouble connecting right now, but your scheduled learning focus remains active. Please try asking again in a moment!",
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
-    } finally {
-      setIsSendingMessage(false);
-    }
-  };
-
   return {
-    plan,
-    preferences,
-    quota,
-    history,
-    proposedRevision,
-    setProposedRevision,
-    messages,
-    isLoading,
-    isSendingMessage,
-    error,
-    refetch: fetchData,
+    plan, preferences, quota, history, proposedRevision, setProposedRevision,
+    isLoading, error, refetch: fetchData,
     updatePreferences: handleUpdatePreferences,
     generatePlan: handleGeneratePlan,
     proposeRevision: handleProposeRevision,
     acceptRevision: handleAcceptRevision,
-    sendMessage: handleSendMessage,
   };
 };
-
