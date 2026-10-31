@@ -36,40 +36,30 @@ export const CourseStudyPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const openResource = async (resourceId: string, targetUrl: string) => {
-    // Open a temporary tab synchronously from the click so browser popup blockers
-    // do not prevent navigation while the access event is being recorded.
+    // Open synchronously from the user gesture to avoid popup blocking while
+    // the API records access and, for uploaded documents, creates a signed URL.
     const openedWindow = window.open('about:blank', '_blank');
+    if (!openedWindow) {
+      setError('Your browser blocked the resource window. Allow pop-ups for Learnova and try again.');
+      return;
+    }
+
     try {
       await api.post(`/resources/${resourceId}/access`);
-      if (openedWindow) openedWindow.location.href = targetUrl;
-    } catch (openError) {
-      openedWindow?.close();
-      console.error('Unable to open learning resource', openError);
+      let destination = targetUrl;
+
+      if (targetUrl.endsWith(`/resources/${resourceId}/file`)) {
+        const response = await api.get<{ data: { url: string } }>(`/resources/${resourceId}/file`);
+        destination = response.data.data.url;
+        if (!destination) throw new Error('The secure download URL was not returned.');
+      }
+
+      openedWindow.location.replace(destination);
+    } catch (openError: any) {
+      openedWindow.close();
+      setError(openError?.response?.data?.error?.message || openError?.response?.data?.message || openError?.message || 'Unable to open this learning resource.');
     }
   };
-
-  useEffect(() => {
-    let active = true;
-    const init = async () => {
-      if (!courseId) return;
-      try {
-        setLoading(true); setError(null);
-        const enrollments = await getMyEnrollments();
-        if (!enrollments.some((item) => item.courseId === courseId && item.status === 'ACTIVE')) {
-          navigate(`/learner/courses/${courseId}`, { replace: true }); return;
-        }
-        const [courseData, topicData] = await Promise.all([getCourseDetail(courseId), getCourseTopics(courseId)]);
-        if (!active) return;
-        const ordered = Array.isArray(topicData) ? [...topicData].sort((a, b) => a.order - b.order) : [];
-        setCourse(courseData); setTopics(ordered);
-        const resumeTopic = ordered.find((item) => item._id === resumeTopicId);
-        if (resumeTopic) { setTopic(resumeTopic); setView('TOPIC'); setExpanded(new Set([resumeTopic._id])); }
-      } catch (err: any) {
-        if (active) setError(err?.response?.data?.message || 'Failed to load the course workspace.');
-      } finally { if (active) setLoading(false); }
-    };
-    void init(); return () => { active = false; };
-  }, [courseId, navigate, resumeTopicId]);
 
   const loadTopic = useCallback(async (selected: Topic) => {
     setTopic(selected); setView('TOPIC'); setCurriculumOpen(false);
@@ -91,6 +81,29 @@ export const CourseStudyPage: React.FC = () => {
       setLessons([]); setResources([]); setPractices([]); setAssessments([]); setLesson(null);
     } finally { setTopicLoading(false); }
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const init = async () => {
+      if (!courseId) return;
+      try {
+        setLoading(true); setError(null);
+        const enrollments = await getMyEnrollments();
+        if (!enrollments.some((item) => item.courseId === courseId && item.status === 'ACTIVE')) {
+          navigate(`/learner/courses/${courseId}`, { replace: true }); return;
+        }
+        const [courseData, topicData] = await Promise.all([getCourseDetail(courseId), getCourseTopics(courseId)]);
+        if (!active) return;
+        const ordered = Array.isArray(topicData) ? [...topicData].sort((a, b) => a.order - b.order) : [];
+        setCourse(courseData); setTopics(ordered);
+        const resumeTopic = ordered.find((item) => item._id === resumeTopicId);
+        if (resumeTopic) await loadTopic(resumeTopic);
+      } catch (err: any) {
+        if (active) setError(err?.response?.data?.message || 'Failed to load the course workspace.');
+      } finally { if (active) setLoading(false); }
+    };
+    void init(); return () => { active = false; };
+  }, [courseId, navigate, resumeTopicId, loadTopic]);
 
   const topicIndex = useMemo(() => topic ? topics.findIndex((item) => item._id === topic._id) : -1, [topic, topics]);
   const openLesson = (selected: Lesson) => { setLesson(selected); setView('LESSON'); setCurriculumOpen(false); };

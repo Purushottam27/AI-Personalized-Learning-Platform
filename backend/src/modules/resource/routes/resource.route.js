@@ -64,8 +64,7 @@ resourceRouter.get(
     "/resources/:resourceId/file",
     authMiddleware,
     validateResourceId,
-    getResourceDownloadUrl,
-    recordResourceAccess
+    getResourceDownloadUrl
 );
 
 resourceRouter.patch(

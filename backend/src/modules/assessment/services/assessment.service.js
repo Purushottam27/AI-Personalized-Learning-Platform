@@ -7,6 +7,7 @@ import { Question } from "../../question/models/question.model.js";
 import { Enrollment } from "../../enrollment/models/enrollment.model.js";
 import { assertTopicUnlockedForLearner } from "../../topic/services/topicProgression.service.js";
 import { assertTopicLearningReady } from "../../topic/services/topicLearningReadiness.service.js";
+import { assertAllTopicsCompletedForCourse } from "../../topic/services/topicProgression.service.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 const TYPES = new Set(["TOPIC", "DIAGNOSTIC", "FINAL"]);
