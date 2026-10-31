@@ -21,7 +21,6 @@ import { MyCoursesPage } from '../features/learner/pages/MyCoursesPage';
 import { CourseDetailPage } from '../features/learner/pages/CourseDetailPage';
 import { CourseStudyPage } from '../features/learner/pages/CourseStudyPage';
 import { LearnerRecommendationsPage } from '../features/learner/pages/LearnerRecommendationsPage';
-import { PlaceholderPage } from '../features/learner/pages/PlaceholderPage';
 import { PracticeOverviewPage } from '../features/learner/pages/PracticeOverviewPage';
 import { PracticeSessionPage } from '../features/learner/pages/PracticeSessionPage';
 import { AssessmentOverviewPage } from '../features/learner/pages/AssessmentOverviewPage';

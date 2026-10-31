@@ -159,17 +159,25 @@ const LearnerIdentity: React.FC<{ learner: LearnerPerformanceItem }> = ({ learne
   </div>
 );
 
-const LearnerCard: React.FC<{ learner: LearnerPerformanceItem; totalTopics: number }> = ({ learner, totalTopics }) => (
+const LearnerCard: React.FC<{
+  learner: LearnerPerformanceItem;
+  totalTopics: number;
+  courseId: string | null;
+}> = ({ learner, totalTopics, courseId }) => (
   <article className="rounded-2xl border border-border bg-surface p-4">
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <Link
-          to={`/instructor/learners/${learner.learnerId}?courseId=${selectedCourseId}`}
-          className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          aria-label={`View ${learner.name}'s details in this course`}
-        >
+        {courseId ? (
+          <Link
+            to={`/instructor/learners/${learner.learnerId}?courseId=${courseId}`}
+            className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            aria-label={`View ${learner.name}'s details in this course`}
+          >
+            <LearnerIdentity learner={learner} />
+          </Link>
+        ) : (
           <LearnerIdentity learner={learner} />
-        </Link>
+        )}
       </div>
       <span className="shrink-0 rounded-full border border-border bg-surface-elevated px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
         {enrollmentLabel(learner.enrollmentStatus)}
@@ -537,7 +545,12 @@ export const InstructorLearnersPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-3 p-4 md:hidden">
                   {learners.map((learner) => (
-                    <LearnerCard key={learner.learnerId} learner={learner} totalTopics={analytics.course.totalTopicsCount} />
+                    <LearnerCard
+                      key={learner.learnerId}
+                      learner={learner}
+                      totalTopics={analytics.course.totalTopicsCount}
+                      courseId={selectedCourseId}
+                    />
                   ))}
                 </div>
               </>
