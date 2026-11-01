@@ -31,21 +31,16 @@ function requireObjectId(value, field = "id") {
  * Returns Monday and Sunday for the current (or offset) week in YYYY-MM-DD.
  */
 export function getWeekDates(referenceDate = new Date(), timeZone = getApplicationTimezone()) {
-    const dateKey = getCalendarDateKey(referenceDate, timeZone);
-    const [year, month, day] = dateKey.split("-").map(Number);
-    const calendarDate = new Date(Date.UTC(year, month - 1, day));
-    const weekday = calendarDate.getUTCDay(); // 0 Sunday
-    const diffToMonday = weekday === 0 ? -6 : 1 - weekday;
-    calendarDate.setUTCDate(calendarDate.getUTCDate() + diffToMonday);
-
-    const dayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
-    const weekDays = dayNames.map((dayOfWeek, index) => {
-        const current = new Date(calendarDate);
-        current.setUTCDate(calendarDate.getUTCDate() + index);
-        return { dayOfWeek, date: current.toISOString().slice(0, 10) };
+    const startDate = getCalendarDateKey(referenceDate, timeZone);
+    const [year, month, day] = startDate.split("-").map(Number);
+    const startUtc = new Date(Date.UTC(year, month - 1, day));
+    const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+    const weekDays = Array.from({ length: 7 }, (_, index) => {
+        const current = new Date(startUtc);
+        current.setUTCDate(startUtc.getUTCDate() + index);
+        return { dayOfWeek: dayNames[current.getUTCDay()], date: current.toISOString().slice(0, 10) };
     });
-
-    return { startDate: weekDays[0].date, endDate: weekDays[6].date, weekDays };
+    return { startDate, endDate: weekDays[6].date, weekDays };
 }
 
 /**
@@ -74,15 +69,10 @@ export function parseDailyCapacityMinutes(dailyStudyTime) {
 export async function getLearnerStudyPreferences(learnerId) {
     const profile = await LearnerProfile.findOne({ userId: learnerId }).lean();
     const prefs = profile?.studyPreferences || {};
-    
     return {
         dailyStudyTime: prefs.dailyStudyTime || "1-2 hours",
-        preferredLearningFormat: prefs.preferredLearningFormat || ["Interactive Learning", "Practice Exercises"],
-        studyDays: prefs.studyDays && prefs.studyDays.length > 0
-            ? prefs.studyDays
-            : ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
         preferredSessionDuration: prefs.preferredSessionDuration || 45,
-        preferredTimeOfDay: prefs.preferredTimeOfDay || "ANYTIME"
+        learningPriority: prefs.learningPriority || "BALANCED_PROGRESS"
     };
 }
 
@@ -163,79 +153,74 @@ export function getNextMidnightResetAt(date = new Date(), timeZone = getApplicat
  */
 export async function getStudyPlanQuotaService(learnerId) {
     requireObjectId(learnerId, "learnerId");
-    const timeZone = getApplicationTimezone();
-    const dateKey = getCalendarDateKey(new Date(), timeZone);
-    const quotaDoc = await StudyPlanGenerationQuota.findOne({ learnerId, dateKey }).lean();
-    const count = quotaDoc?.count || 0;
-    const maxAllowed = 2;
-    const remaining = Math.max(0, maxAllowed - count);
-    const resetAt = getNextMidnightResetAt(new Date(), timeZone);
-
+    const now = new Date();
+    const state = await StudyPlanGenerationQuota.findOne({ learnerId }).lean();
+    const initialAt = state?.initialGeneratedAt ? new Date(state.initialGeneratedAt) : null;
+    const regenerationDeadline = initialAt ? new Date(initialAt.getTime() + 24 * 60 * 60 * 1000) : null;
+    const regenerationAvailable = Boolean(initialAt && !state.regenerationUsedAt && now < regenerationDeadline);
+    const activePlan = await StudyPlan.findOne({ learnerId, status: "ACTIVE" }).lean();
+    const planExpired = Boolean(activePlan && getCalendarDateKey(now) > activePlan.endDate);
+    const canGenerateInitial = !initialAt || planExpired;
     return {
-        dateKey,
-        count,
-        remaining,
-        maxAllowed,
-        timeZone,
-        resetAt
+        cycleId: state?.cycleId?.toString() || null,
+        cycleNumber: state?.cycleNumber || 0,
+        initialGeneratedAt: initialAt?.toISOString() || null,
+        regenerationDeadline: regenerationDeadline?.toISOString() || null,
+        regenerationAvailable,
+        canGenerate: canGenerateInitial || regenerationAvailable,
+        generationType: regenerationAvailable ? "REGENERATION" : canGenerateInitial ? "INITIAL" : "UNAVAILABLE",
+        reason: regenerationAvailable ? "One regeneration is available within 24 hours of the initial generation." :
+            canGenerateInitial ? "A new seven-day plan can be generated." : "The current plan is active and its regeneration window has ended."
     };
 }
 
-/**
- * Atomically checks and increments the daily generation quota within a transaction session.
- * Enforces a strict limit of 2 generations per calendar day.
- */
-export async function ensureGenerationQuotaDocument(learnerId, date = new Date()) {
-    const timeZone = getApplicationTimezone();
-    const dateKey = getCalendarDateKey(date, timeZone);
+export async function ensureGenerationQuotaDocument(learnerId) {
     try {
-        await StudyPlanGenerationQuota.findOneAndUpdate(
-            { learnerId, dateKey },
-            { $setOnInsert: { learnerId, dateKey, count: 0 } },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
+        await StudyPlanGenerationQuota.updateOne(
+            { learnerId },
+            { $setOnInsert: { learnerId, cycleId: new mongoose.Types.ObjectId(), cycleNumber: 0 } },
+            { upsert: true }
         );
     } catch (error) {
-        // Concurrent upserts may race on the unique (learnerId, dateKey) index.
-        // The winning insert is authoritative; read it outside a transaction.
         if (error?.code !== 11000) throw error;
-        const existing = await StudyPlanGenerationQuota.findOne({ learnerId, dateKey }).lean();
-        if (!existing) throw error;
     }
-    return dateKey;
 }
 
-export async function checkAndConsumeGenerationQuota(learnerId, session, date = new Date(), dateKeyOverride = null) {
-    const timeZone = getApplicationTimezone();
-    const dateKey = dateKeyOverride || getCalendarDateKey(date, timeZone);
-    const maxAllowed = 2;
-    const updated = await StudyPlanGenerationQuota.findOneAndUpdate(
-        { learnerId, dateKey, count: { $lt: maxAllowed } },
-        { $inc: { count: 1 } },
-        { session, new: true, upsert: false }
-    );
-    if (!updated) {
-        throw new ApiError(429, "QUOTA_EXCEEDED", "Daily study plan generation limit reached (maximum 2 per calendar day)");
+export async function checkAndConsumeGenerationQuota(learnerId, session, date = new Date()) {
+    const state = await StudyPlanGenerationQuota.findOne({ learnerId }).session(session);
+    if (!state) throw new ApiError(409, "GENERATION_STATE_MISSING", "Study plan generation state could not be initialized.");
+    const now = date;
+    const activePlan = await StudyPlan.findOne({ learnerId, status: "ACTIVE" }).session(session);
+    const expired = Boolean(activePlan && getCalendarDateKey(now) > activePlan.endDate);
+    const initialAt = state.initialGeneratedAt ? new Date(state.initialGeneratedAt) : null;
+    const withinWindow = Boolean(initialAt && now.getTime() < initialAt.getTime() + 24 * 60 * 60 * 1000);
+    const canRegenerate = Boolean(initialAt && withinWindow && !state.regenerationUsedAt);
+    if (canRegenerate && !expired) {
+        state.regenerationUsedAt = now;
+        await state.save({ session });
+        return "REGENERATION";
     }
-    return updated;
+    if (!initialAt || expired) {
+        state.cycleId = new mongoose.Types.ObjectId();
+        state.cycleNumber = (state.cycleNumber || 0) + 1;
+        state.initialGeneratedAt = now;
+        state.regenerationUsedAt = null;
+        await state.save({ session });
+        return "INITIAL";
+    }
+    throw new ApiError(429, "GENERATION_UNAVAILABLE", "Your current plan is active and its 24-hour regeneration opportunity has ended.");
 }
 export async function updateLearnerStudyPreferencesService(learnerId, updates) {
     requireObjectId(learnerId, "learnerId");
-
-    let profile = await LearnerProfile.findOne({ userId: learnerId });
-    if (!profile) {
-        profile = new LearnerProfile({
-            userId: learnerId,
-            studyPreferences: updates
-        });
-    } else {
-        profile.studyPreferences = {
-            ...(profile.studyPreferences || {}),
-            ...updates
-        };
+    const allowed = {};
+    for (const key of ["dailyStudyTime", "preferredSessionDuration", "learningPriority"]) {
+        if (Object.prototype.hasOwnProperty.call(updates, key)) allowed[key] = updates[key];
     }
-
+    let profile = await LearnerProfile.findOne({ userId: learnerId });
+    if (!profile) profile = new LearnerProfile({ userId: learnerId, studyPreferences: allowed });
+    else profile.studyPreferences = { ...(profile.studyPreferences || {}), ...allowed };
     await profile.save();
-    return profile.studyPreferences;
+    return getLearnerStudyPreferences(learnerId);
 }
 
 /**
@@ -494,6 +479,14 @@ export async function collectCandidateActivities(learnerId, preferences) {
         }
     }
 
+    const priority = preferences.learningPriority || "BALANCED_PROGRESS";
+    const score = (candidate) => {
+        if (priority === "IMPROVE_WEAK_TOPICS") return candidate.activityType === "PRACTICE" && candidate.priority === 1 ? 0 : 1;
+        if (priority === "ASSESSMENT_PREPARATION") return candidate.activityType === "ASSESSMENT" ? 0 : candidate.activityType === "PRACTICE" ? 1 : 2;
+        if (priority === "CONTINUE_LEARNING") return candidate.activityType === "LESSON" ? 0 : candidate.activityType === "PRACTICE" ? 1 : 2;
+        return Number(candidate.priority ?? 3);
+    };
+    candidates.sort((a, b) => score(a) - score(b));
     return candidates;
 }
 
@@ -515,13 +508,8 @@ export function buildDeterministicSchedule(candidates, weekInfo, preferences = {
         return [];
     }
 
-    // Keep the complete calendar week available. studyDays expresses preference,
-    // not permission to remove the other days from the learner's weekly plan.
-    const preferredDays = new Set(preferences.studyDays || []);
-    const orderedDays = [
-        ...calendarDays.filter((day) => preferredDays.has(day.dayOfWeek)),
-        ...calendarDays.filter((day) => !preferredDays.has(day.dayOfWeek))
-    ];
+    // The seven consecutive calendar days are all eligible; no preferred-day filter. 
+    const orderedDays = [...calendarDays];
 
     const dayAllocations = new Map();
     orderedDays.forEach((day) => {
@@ -784,15 +772,13 @@ export async function generateStudyPlanService(learnerId, options = {}) {
     // 2. Schedule deterministically first as authoritative base
     const scheduledActivities = buildDeterministicSchedule(candidates, weekInfo, preferences);
 
-    // Create the unique daily quota row before entering the transaction. This avoids
-    // recovering from duplicate-key errors inside an already-aborted transaction.
-    const quotaDateKey = await ensureGenerationQuotaDocument(learnerId);
+    // Ensure the per-learner lifecycle record exists before transactional mutation.
+    await ensureGenerationQuotaDocument(learnerId);
 
-    // 3. Concurrency-safe plan creation, quota enforcement, and superseding via transaction
+    // 3. Concurrency-safe lifecycle transition and active-plan replacement.
+    const generatedAt = new Date();
     const savedPlan = await withTransaction(async (session) => {
-        // Use the same calendar date key captured before the transaction, even if
-        // the request happens to cross local midnight while it is being processed.
-        await checkAndConsumeGenerationQuota(learnerId, session, new Date(), quotaDateKey);
+        await checkAndConsumeGenerationQuota(learnerId, session, generatedAt);
 
         const existingActivePlan = await StudyPlan.findOne({ learnerId, status: "ACTIVE" })
             .sort({ version: -1 })
@@ -839,14 +825,14 @@ export async function enrichPlanWithActualState(planDoc, learnerId) {
     ]);
 
     const todayDate = getCalendarDateKey(new Date(), getApplicationTimezone());
-    const dayNames = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+    const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
     const [sy, sm, sd] = String(plan.startDate).split("-").map(Number);
     const startUtc = new Date(Date.UTC(sy, sm - 1, sd));
-    const calendarDays = dayNames.map((dayOfWeek, index) => {
+    const calendarDays = Array.from({ length: 7 }, (_, index) => {
         const d = new Date(startUtc);
         d.setUTCDate(startUtc.getUTCDate() + index);
         const date = d.toISOString().slice(0, 10);
-        return { dayOfWeek, date };
+        return { dayOfWeek: dayNames[d.getUTCDay()], date };
     });
 
     const enrichedActivities = [];
@@ -934,10 +920,7 @@ export async function getActiveStudyPlanService(learnerId) {
     requireObjectId(learnerId, "learnerId");
 
     let activePlan = await StudyPlan.findOne({ learnerId, status: "ACTIVE" }).sort({ version: -1 });
-    if (!activePlan) {
-        return generateStudyPlanService(learnerId, { revisionReason: "Initial plan auto-generation" });
-    }
-
+    if (!activePlan) return null;
     return enrichPlanWithActualState(activePlan, learnerId);
 }
 

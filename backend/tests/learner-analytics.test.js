@@ -327,6 +327,25 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
         });
         createdEvidenceIds.push(ev2._id);
 
+        // Non-contributing attempts must never inflate learner performance analytics.
+        const nonContributingEvidence = await LearningEvidence.create({
+            learnerId: activeLearnerId,
+            courseId: course1Id,
+            topicId: topic3Id,
+            sourceType: "PRACTICE",
+            sourceId: new mongoose.Types.ObjectId(),
+            attemptId: new mongoose.Types.ObjectId(),
+            scorePercent: 100,
+            correctCount: 10,
+            totalQuestions: 10,
+            marksAwarded: 10,
+            totalMarks: 10,
+            passed: true,
+            completedAt: new Date(),
+            contributeToLearningEvidence: false,
+        });
+        createdEvidenceIds.push(nonContributingEvidence._id);
+
         // TopicMastery records
         const tm1 = await TopicMastery.create({
             learnerId: activeLearnerId,
@@ -562,7 +581,15 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
         assert.equal(data.activityTotals.totalAssessmentsCompleted, 1);
         assert.equal(data.activityTotals.totalQuestionsAttempted, 18); // 10 + 8
         assert.equal(data.activityTotals.totalQuestionsCorrect, 15); // 9 + 6
-        assert.equal(data.activityTotals.overallAccuracy, 83); // 15/18 = 83%
+        assert.equal(data.activityTotals.overallAccuracy, 83); // 15/18 = 83%; excludes non-contributing evidence
+
+        // The new comparison contract uses equal-length current and previous windows.
+        assert.equal(data.periodComparison.days, 7);
+        assert.equal(data.periodComparison.current.attempts, 2);
+        assert.equal(data.periodComparison.current.totalQuestions, 18);
+        assert.equal(data.periodComparison.current.accuracyPercent, 83);
+        assert.equal(data.topicMasteryList.length, 3);
+        assert.ok(data.topicMasteryList.some((topic) => topic.topicTitle === "Dynamic Programming" && topic.status === MASTERY_STATUS.NEEDS_IMPROVEMENT));
 
         // Mastery distribution
         assert.equal(data.masteryDistribution.MASTERED, 1);

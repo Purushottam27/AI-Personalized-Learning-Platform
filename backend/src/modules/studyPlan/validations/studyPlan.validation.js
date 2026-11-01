@@ -10,24 +10,8 @@ export const updateStudyPreferencesSchema = z.object({
         "3-4 hours",
         "5 or more hours"
     ]).optional(),
-    preferredLearningFormat: z.array(z.enum([
-        "Reading",
-        "Videos",
-        "Interactive Learning",
-        "Practice Exercises",
-        "Projects"
-    ])).optional(),
-    studyDays: z.array(z.enum([
-        "MONDAY",
-        "TUESDAY",
-        "WEDNESDAY",
-        "THURSDAY",
-        "FRIDAY",
-        "SATURDAY",
-        "SUNDAY"
-    ])).min(1, "Select at least one study day").optional(),
     preferredSessionDuration: z.number().int().min(15).max(180).optional(),
-    preferredTimeOfDay: z.enum(["MORNING", "AFTERNOON", "EVENING", "NIGHT", "ANYTIME"]).optional(),
+    learningPriority: z.enum(["BALANCED_PROGRESS", "IMPROVE_WEAK_TOPICS", "ASSESSMENT_PREPARATION", "CONTINUE_LEARNING"]).optional(),
 }).strict().refine((data) => Object.keys(data).length > 0, {
     message: "At least one study preference field must be provided"
 });

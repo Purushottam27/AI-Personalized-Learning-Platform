@@ -42,43 +42,16 @@ const learnerProfileSchema = new mongoose.Schema({
             default:null
         },
 
-        preferredLearningFormat: {
-            type: [String],
-            enum: [
-                "Reading",
-                "Videos",
-                "Interactive Learning",
-                "Practice Exercises",
-                "Projects"
-            ],
-            default:[]
-        },
-
-        studyDays: {
-            type: [String],
-            enum: [
-                "MONDAY",
-                "TUESDAY",
-                "WEDNESDAY",
-                "THURSDAY",
-                "FRIDAY",
-                "SATURDAY",
-                "SUNDAY"
-            ],
-            default: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]
-        },
-
         preferredSessionDuration: {
-            type: Number, // duration in minutes
+            type: Number,
             min: 15,
             max: 180,
             default: 45
         },
-
-        preferredTimeOfDay: {
+        learningPriority: {
             type: String,
-            enum: ["MORNING", "AFTERNOON", "EVENING", "NIGHT", "ANYTIME"],
-            default: "ANYTIME"
+            enum: ["BALANCED_PROGRESS", "IMPROVE_WEAK_TOPICS", "ASSESSMENT_PREPARATION", "CONTINUE_LEARNING"],
+            default: "BALANCED_PROGRESS"
         }
     },
     onboardingState:{

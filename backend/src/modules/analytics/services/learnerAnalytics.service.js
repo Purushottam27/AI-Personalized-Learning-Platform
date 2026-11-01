@@ -258,46 +258,144 @@ export async function getLearnerAnalyticsOverviewService(learnerId, options = {}
     const days = options.days
         ? Math.min(Math.max(Number(options.days), ANALYTICS_CONSTANTS.MIN_TREND_DAYS), ANALYTICS_CONSTANTS.MAX_TREND_DAYS)
         : ANALYTICS_CONSTANTS.DEFAULT_TREND_DAYS;
-    const [evidenceTotals, practiceCount, assessmentCount, activeCoursesCount] = await Promise.all([
+
+    // Only evidence explicitly opted into the mastery/evidence ledger is eligible
+    // for learner performance analytics. This mirrors topicMastery.service.js.
+    const eligibleEvidenceFilter = {
+        learnerId,
+        contributeToLearningEvidence: true,
+    };
+    const [evidenceTotals, practiceCount, assessmentCount, activeEnrollments] = await Promise.all([
         LearningEvidence.aggregate([
-            { $match: { learnerId: new mongoose.Types.ObjectId(learnerId) } },
+            { $match: eligibleEvidenceFilter },
             { $group: { _id: null, totalQuestions: { $sum: "$totalQuestions" }, totalCorrect: { $sum: { $ifNull: ["$correctCount", 0] } }, totalMarksAwarded: { $sum: "$marksAwarded" }, totalMarksPossible: { $sum: "$totalMarks" } } },
         ]),
-        LearningEvidence.countDocuments({ learnerId, sourceType: "PRACTICE" }),
-        LearningEvidence.countDocuments({ learnerId, sourceType: "ASSESSMENT" }),
-        Enrollment.countDocuments({ learnerId, status: "ACTIVE" }),
+        LearningEvidence.countDocuments({ ...eligibleEvidenceFilter, sourceType: "PRACTICE" }),
+        LearningEvidence.countDocuments({ ...eligibleEvidenceFilter, sourceType: "ASSESSMENT" }),
+        Enrollment.find({ learnerId, status: "ACTIVE" }).select("courseId").lean(),
     ]);
+
     const aggregateStats = evidenceTotals[0] || { totalQuestions: 0, totalCorrect: 0, totalMarksAwarded: 0, totalMarksPossible: 0 };
-    const overallAccuracy = aggregateStats.totalQuestions > 0 ? Math.round((aggregateStats.totalCorrect / aggregateStats.totalQuestions) * 100) : 0;
-    const allMastery = await TopicMastery.find({ learnerId }).lean();
+    const overallAccuracy = aggregateStats.totalQuestions > 0
+        ? Math.round((aggregateStats.totalCorrect / aggregateStats.totalQuestions) * 100)
+        : 0;
+
+    const activeCourseIds = activeEnrollments.map((enrollment) => enrollment.courseId);
+    const enrolledCourses = await Course.find({
+        _id: { $in: activeCourseIds },
+        status: "PUBLISHED",
+    }).select("_id title domain category").lean();
+    const publishedActiveCourseIds = enrolledCourses.map((course) => course._id);
+
+    // Mastery is presented for currently active, published courses only. This
+    // avoids showing stale mastery from withdrawn, archived, or unavailable courses.
+    const [activeCourseMastery, activeCourseTopics] = await Promise.all([
+        TopicMastery.find({ learnerId, courseId: { $in: publishedActiveCourseIds } }).lean(),
+        Topic.find({ courseId: { $in: publishedActiveCourseIds } }).select("_id courseId title order").sort({ order: 1 }).lean(),
+    ]);
+
     const distributionCounts = {
-        [MASTERY_STATUS.MASTERED]: 0, [MASTERY_STATUS.STRONG]: 0, [MASTERY_STATUS.FUNCTIONAL]: 0,
-        [MASTERY_STATUS.DEVELOPING]: 0, [MASTERY_STATUS.NEEDS_IMPROVEMENT]: 0, [MASTERY_STATUS.INSUFFICIENT_EVIDENCE]: 0,
+        [MASTERY_STATUS.MASTERED]: 0,
+        [MASTERY_STATUS.STRONG]: 0,
+        [MASTERY_STATUS.FUNCTIONAL]: 0,
+        [MASTERY_STATUS.DEVELOPING]: 0,
+        [MASTERY_STATUS.NEEDS_IMPROVEMENT]: 0,
+        [MASTERY_STATUS.INSUFFICIENT_EVIDENCE]: 0,
     };
-    for (const m of allMastery) if (distributionCounts[m.status] !== undefined) distributionCounts[m.status]++;
-    const windowStartDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const windowEvidence = await LearningEvidence.find({ learnerId, completedAt: { $gte: windowStartDate } }).lean();
+    const evaluatedTopicIds = new Set();
+    for (const mastery of activeCourseMastery) {
+        if (mastery.evidenceCount > 0 && distributionCounts[mastery.status] !== undefined) {
+            distributionCounts[mastery.status]++;
+            evaluatedTopicIds.add(mastery.topicId.toString());
+        }
+    }
+    // Topics without eligible evidence are awaiting evidence, not struggling.
+    distributionCounts[MASTERY_STATUS.INSUFFICIENT_EVIDENCE] = Math.max(0, activeCourseTopics.length - evaluatedTopicIds.size);
+
+    const courseMap = new Map(enrolledCourses.map((course) => [course._id.toString(), course]));
+    const topicMap = new Map(activeCourseTopics.map((topic) => [topic._id.toString(), topic]));
+    const topicMasteryList = activeCourseMastery
+        .filter((mastery) => mastery.evidenceCount > 0 && topicMap.has(mastery.topicId.toString()) && courseMap.has(mastery.courseId.toString()))
+        .map((mastery) => {
+            const topic = topicMap.get(mastery.topicId.toString());
+            const course = courseMap.get(mastery.courseId.toString());
+            return {
+                topicId: topic._id.toString(),
+                courseId: course._id.toString(),
+                topicTitle: topic.title,
+                courseTitle: course.title,
+                domain: course.domain,
+                order: topic.order,
+                masteryScore: mastery.masteryScore ?? null,
+                status: mastery.status,
+                confidence: mastery.confidence ?? 0,
+                evidenceCount: mastery.evidenceCount,
+                practiceAttemptsCount: mastery.practiceAttemptsCount ?? 0,
+                assessmentAttemptsCount: mastery.assessmentAttemptsCount ?? 0,
+                lastEvaluatedAt: mastery.lastEvaluatedAt ?? null,
+            };
+        });
+
+    const now = new Date();
+    // Use calendar-day boundaries so the comparison window and daily chart describe
+    // the same selected dates. The immediately preceding window has equal length.
+    const currentPeriodStart = new Date(now);
+    currentPeriodStart.setUTCHours(0, 0, 0, 0);
+    currentPeriodStart.setUTCDate(currentPeriodStart.getUTCDate() - (days - 1));
+    const previousPeriodStart = new Date(currentPeriodStart.getTime() - days * 86400000);
+    const [windowEvidence, previousPeriodEvidence] = await Promise.all([
+        LearningEvidence.find({ ...eligibleEvidenceFilter, completedAt: { $gte: currentPeriodStart, $lte: now } }).lean(),
+        LearningEvidence.find({ ...eligibleEvidenceFilter, completedAt: { $gte: previousPeriodStart, $lt: currentPeriodStart } }).lean(),
+    ]);
     const dailyTrends = buildContinuousDailyTrends(windowEvidence, days);
-    const activeEnrollments = await Enrollment.find({ learnerId, status: "ACTIVE" }).lean();
-    const activeCourseIds = activeEnrollments.map((e) => e.courseId);
-    const enrolledCourses = await Course.find({ _id: { $in: activeCourseIds }, status: "PUBLISHED" }).select("_id title domain category").lean();
+
+    const summarizePeriod = (records) => {
+        const questions = records.reduce((sum, record) => sum + (record.totalQuestions || 0), 0);
+        const correct = records.reduce((sum, record) => sum + (record.correctCount || 0), 0);
+        return {
+            attempts: records.length,
+            practiceCount: records.filter((record) => record.sourceType === "PRACTICE").length,
+            assessmentCount: records.filter((record) => record.sourceType === "ASSESSMENT").length,
+            totalQuestions: questions,
+            totalCorrect: correct,
+            accuracyPercent: questions > 0 ? Math.round((correct / questions) * 100) : null,
+        };
+    };
+
     const courseProgressList = [];
-    for (const c of enrolledCourses) {
-        const totalTopicsCount = await Topic.countDocuments({ courseId: c._id });
-        const courseMasteries = allMastery.filter((m) => m.courseId.toString() === c._id.toString());
-        const masteredCount = courseMasteries.filter((m) => m.status === MASTERY_STATUS.MASTERED || m.status === MASTERY_STATUS.STRONG).length;
-        const evaluatedCount = courseMasteries.filter((m) => m.evidenceCount > 0).length;
+    for (const course of enrolledCourses) {
+        const courseTopics = activeCourseTopics.filter((topic) => topic.courseId.toString() === course._id.toString());
+        const courseMasteries = activeCourseMastery.filter((mastery) => mastery.courseId.toString() === course._id.toString());
+        const masteredCount = courseMasteries.filter((mastery) => mastery.evidenceCount > 0 && (mastery.status === MASTERY_STATUS.MASTERED || mastery.status === MASTERY_STATUS.STRONG)).length;
+        const evaluatedCount = courseMasteries.filter((mastery) => mastery.evidenceCount > 0).length;
         courseProgressList.push({
-            courseId: c._id.toString(), courseTitle: c.title, domain: c.domain,
-            totalTopics: totalTopicsCount, evaluatedTopics: evaluatedCount, masteredTopics: masteredCount,
-            progressPercentage: totalTopicsCount > 0 ? Math.round((masteredCount / totalTopicsCount) * 100) : 0,
+            courseId: course._id.toString(),
+            courseTitle: course.title,
+            domain: course.domain,
+            totalTopics: courseTopics.length,
+            evaluatedTopics: evaluatedCount,
+            masteredTopics: masteredCount,
+            progressPercentage: courseTopics.length > 0 ? Math.round((masteredCount / courseTopics.length) * 100) : 0,
         });
     }
+
     return {
         activityTotals: {
-            activeCoursesCount, totalPracticesCompleted: practiceCount, totalAssessmentsCompleted: assessmentCount,
-            totalQuestionsAttempted: aggregateStats.totalQuestions, totalQuestionsCorrect: aggregateStats.totalCorrect, overallAccuracy,
+            activeCoursesCount: enrolledCourses.length,
+            totalPracticesCompleted: practiceCount,
+            totalAssessmentsCompleted: assessmentCount,
+            totalQuestionsAttempted: aggregateStats.totalQuestions,
+            totalQuestionsCorrect: aggregateStats.totalCorrect,
+            overallAccuracy,
         },
-        masteryDistribution: distributionCounts, dailyTrends, courseProgressList,
+        masteryDistribution: distributionCounts,
+        topicMasteryList,
+        periodComparison: {
+            days,
+            current: summarizePeriod(windowEvidence),
+            previous: summarizePeriod(previousPeriodEvidence),
+        },
+        dailyTrends,
+        courseProgressList,
     };
 }

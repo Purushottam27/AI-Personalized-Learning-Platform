@@ -107,10 +107,8 @@ const studyPlanSchema = new mongoose.Schema({
     },
     preferencesSnapshot: {
         dailyStudyTime: { type: String, default: null },
-        preferredLearningFormat: { type: [String], default: [] },
-        studyDays: { type: [String], default: [] },
         preferredSessionDuration: { type: Number, default: 45 },
-        preferredTimeOfDay: { type: String, default: "ANYTIME" }
+        learningPriority: { type: String, enum: ["BALANCED_PROGRESS", "IMPROVE_WEAK_TOPICS", "ASSESSMENT_PREPARATION", "CONTINUE_LEARNING"], default: "BALANCED_PROGRESS" }
     },
     scheduledActivities: [scheduledActivitySchema],
     generationSource: {
