@@ -154,6 +154,7 @@ export interface AnalyticsPeriodSummary {
 
 export interface LearnerAnalyticsOverviewData {
   activityTotals: ActivityTotals;
+  engagement: { accessedResources: number; activeResourcesAvailable: number; lessonsAvailable: number; note: string };
   masteryDistribution: MasteryDistribution;
   topicMasteryList: TopicMasteryAnalyticsItem[];
   periodComparison: {
@@ -163,4 +164,59 @@ export interface LearnerAnalyticsOverviewData {
   };
   dailyTrends: DailyTrendItem[];
   courseProgressList: CourseProgressSummary[];
+}
+
+export interface LearnerCourseAnalyticsTopic {
+  topicId: string;
+  title: string;
+  order: number;
+  masteryScore: number | null;
+  status: string;
+  confidence: number;
+  evidenceCount: number;
+  practiceAttemptsCount: number;
+  assessmentAttemptsCount: number;
+  resourceAccessCount: number;
+  isUnlocked: boolean;
+  lastEvaluatedAt: string | null;
+}
+
+export interface LearnerCourseAnalyticsData {
+  course: {
+    courseId: string;
+    title: string;
+    domain?: string;
+    category?: string;
+    enrolledAt: string;
+  };
+  overview: {
+    totalTopics: number;
+    evaluatedTopics: number;
+    masteredTopics: number;
+    masteryCoveragePercent: number;
+    masteredTopicPercent: number;
+    totalLessonsAvailable: number;
+    totalActiveResources: number;
+    accessedResources: number;
+    totalEligibleAttempts: number;
+    totalQuestions: number;
+    totalCorrect: number;
+    accuracyPercent: number | null;
+  };
+  masteryDistribution: Record<string, number>;
+  topics: LearnerCourseAnalyticsTopic[];
+  activity: {
+    days: number;
+    dailyTrends: DailyTrendItem[];
+    currentPeriod: AnalyticsPeriodSummary;
+    previousPeriod: AnalyticsPeriodSummary;
+    resourceAccesses: number;
+  };
+  nextAction: {
+    topicId: string;
+    topicTitle: string;
+    kind: 'GATHER_EVIDENCE' | 'REVIEW_TOPIC';
+    explanation: string;
+  } | null;
+  evidenceGuidance: string;
 }

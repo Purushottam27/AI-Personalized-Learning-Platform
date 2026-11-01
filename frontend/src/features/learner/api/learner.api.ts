@@ -3,6 +3,7 @@ import type {
   LearnerDashboardData,
   LearnerCourseProgressDetail,
   LearnerAnalyticsOverviewData,
+  LearnerCourseAnalyticsData,
 } from '../types/learner.types';
 
 /**
@@ -23,5 +24,11 @@ export async function getLearnerAnalyticsOverview(days: number = 7): Promise<Lea
   const response = await api.get<{ data: LearnerAnalyticsOverviewData }>('/learning/me/analytics/overview', {
     params: { days },
   });
+  return response.data.data;
+}
+
+
+export async function getLearnerCourseAnalytics(courseId: string, days: number = 7): Promise<LearnerCourseAnalyticsData> {
+  const response = await api.get<{ data: LearnerCourseAnalyticsData }>(`/learning/me/analytics/courses/${courseId}`, { params: { days } });
   return response.data.data;
 }
