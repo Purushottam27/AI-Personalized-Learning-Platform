@@ -39,7 +39,7 @@ import {
     RECOMMENDATION_TIERS,
 } from "../src/modules/recommendation/constants/recommendation.constants.js";
 
-test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t) => {
+test("Stage 6 â€” Personalization & Recommendation Service Test Suite", async (t) => {
     const { MONGODB_URI, TEST_DB_NAME, DB_NAME, JWT_ACCESS_SECRET } = process.env;
     assert.ok(MONGODB_URI, "MONGODB_URI must be set in backend/.env");
     assert.ok(TEST_DB_NAME && TEST_DB_NAME.endsWith("_test"), "TEST_DB_NAME must end with _test");
@@ -84,6 +84,10 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
         TEST_DB_NAME,
         "Mongoose must be connected to the dedicated test database"
     );
+
+    // Remove only orphaned prerequisite fixtures from earlier failed runs of this suite.
+    // The unique marker is specific to Test 2.5; no other course data is touched.
+    await Course.deleteMany({ description: /Recommendation Fixture Artificial Intelligence/ });
 
     function createToken(userId, role) {
         return jwt.sign({ sub: userId.toString(), role }, JWT_ACCESS_SECRET, { expiresIn: "1h" });
@@ -141,10 +145,10 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
     await t.test("Setup test fixtures in isolated database", async () => {
         // Users
         await User.create([
-            { _id: instructorId, name: "Recom Instructor", email: "recom_inst@test.com", passwordHash: "hash123", role: "INSTRUCTOR" },
-            { _id: learner1Id, name: "Recom Learner 1", email: "recom_l1@test.com", passwordHash: "hash123", role: "LEARNER" },
-            { _id: learner2Id, name: "Recom Learner 2", email: "recom_l2@test.com", passwordHash: "hash123", role: "LEARNER" },
-            { _id: unenrolledLearnerId, name: "Recom Unenrolled", email: "recom_unenrolled@test.com", passwordHash: "hash123", role: "LEARNER" },
+            { _id: instructorId, name: "Recom Instructor", email: `recom_inst_${instructorId.toString()}@test.com`, passwordHash: "hash123", role: "INSTRUCTOR" },
+            { _id: learner1Id, name: "Recom Learner 1", email: `recom_l1_${learner1Id.toString()}@test.com`, passwordHash: "hash123", role: "LEARNER" },
+            { _id: learner2Id, name: "Recom Learner 2", email: `recom_l2_${learner2Id.toString()}@test.com`, passwordHash: "hash123", role: "LEARNER" },
+            { _id: unenrolledLearnerId, name: "Recom Unenrolled", email: `recom_unenrolled_${unenrolledLearnerId.toString()}@test.com`, passwordHash: "hash123", role: "LEARNER" },
         ]);
 
         // Courses
@@ -461,42 +465,45 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
         });
 
         await t.test("2.4 New learner with persisted interests receives course discovery recommendations", async () => {
-            // Unenrolled learner creates onboarding profile with interest in "Databases"
-            await LearnerProfile.create({
-                userId: unenrolledLearnerId,
-                interests: ["Databases"],
-                goals: ["Master SQL and Relational Systems"],
-                experienceLevel: "I have a basic understanding",
-                onboardingState: "COMPLETED",
-            });
+            try {
+                // Unenrolled learner creates onboarding profile with interest in "Databases"
+                await LearnerProfile.create({
+                    userId: unenrolledLearnerId,
+                    interests: ["Databases"],
+                    goals: ["Master SQL and Relational Systems"],
+                    experienceLevel: "I have a basic understanding",
+                    onboardingState: "COMPLETED",
+                });
 
-            const res = await getLearnerRecommendationsService(unenrolledLearnerId);
-            assert.ok(res.courseRecommendations, "Must return courseRecommendations array");
-            assert.equal(res.courseRecommendations.length > 0, true, "Must recommend matching published course");
-            assert.equal(res.courseRecommendations[0].courseId.toString(), course1Id.toString());
-            assert.equal(res.courseRecommendations[0].targetType, "COURSE");
-            assert.equal(res.courseRecommendations[0].actionType, "EXPLORE_COURSE");
-            assert.equal(res.courseRecommendations[0].matchedInterest, "Databases");
-            assert.ok(res.nextBestAction);
-            assert.equal(res.nextBestAction.actionType, "EXPLORE_COURSE");
-            assert.equal(res.nextBestAction.courseId.toString(), course1Id.toString());
-            assert.equal(res.recommendations.length, 0, "No enrolled learning actions for unenrolled learner");
-            assert.equal(res.totalCount, res.courseRecommendations.length);
-
-            // Cleanup profile for this test
-            await LearnerProfile.deleteOne({ userId: unenrolledLearnerId });
+                const res = await getLearnerRecommendationsService(unenrolledLearnerId);
+                assert.ok(res.courseRecommendations, "Must return courseRecommendations array");
+                assert.equal(res.courseRecommendations.length > 0, true, "Must recommend matching published course");
+                assert.equal(res.courseRecommendations[0].courseId.toString(), course1Id.toString());
+                assert.equal(res.courseRecommendations[0].targetType, "COURSE");
+                assert.equal(res.courseRecommendations[0].actionType, "EXPLORE_COURSE");
+                assert.equal(res.courseRecommendations[0].matchedInterest, "Databases");
+                assert.ok(res.nextBestAction);
+                assert.equal(res.nextBestAction.actionType, "EXPLORE_COURSE");
+                assert.equal(res.nextBestAction.courseId.toString(), course1Id.toString());
+                assert.equal(res.recommendations.length, 0, "No enrolled learning actions for unenrolled learner");
+                assert.equal(res.totalCount, res.courseRecommendations.length);
+            } finally {
+                // Always remove the temporary profile, including when an assertion fails.
+                await LearnerProfile.deleteOne({ userId: unenrolledLearnerId });
+            }
         });
 
         await t.test("2.5 Course discovery evaluates prerequisites and indicates completed status", async () => {
             // Setup: Prerequisite Course (published) & Advanced Course (published, requires Prerequisite Course)
             const prereqCourseId = new mongoose.Types.ObjectId();
             const advancedCourseId = new mongoose.Types.ObjectId();
+            createdCourseIds.push(prereqCourseId, advancedCourseId);
 
             await Course.create([
                 {
                     _id: prereqCourseId,
                     title: "Foundations of AI",
-                    description: "Learn machine learning basics and algebra",
+                    description: "Learn machine learning basics and algebra. Recommendation Fixture Artificial Intelligence",
                     domain: "Technology",
                     category: "Artificial Intelligence",
                     difficulty: "BEGINNER",
@@ -506,7 +513,7 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
                 {
                     _id: advancedCourseId,
                     title: "Advanced Deep Learning",
-                    description: "Deep neural networks and LLMs for AI specialists",
+                    description: "Deep neural networks and LLMs for AI specialists. Recommendation Fixture Artificial Intelligence",
                     domain: "Technology",
                     category: "Artificial Intelligence",
                     difficulty: "ADVANCED",
@@ -522,8 +529,7 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
             // Learner with interest in "Artificial Intelligence"
             await LearnerProfile.create({
                 userId: unenrolledLearnerId,
-                interests: ["Artificial Intelligence"],
-                goals: ["Master Deep Learning"],
+                interests: ["Recommendation Fixture Artificial Intelligence"],                goals: [],
                 experienceLevel: "I have substantial experience",
                 onboardingState: "COMPLETED",
             });
@@ -558,6 +564,27 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
             assert.equal(advRecIncomplete.unmetPrerequisites[0].title, "Foundations of AI");
             assert.ok(advRecIncomplete.explanation.includes("Foundations of AI"), "Explanation must explain the unmet prerequisite");
 
+            console.log("\n--- CASE B NBA DIAGNOSTIC ---");
+console.dir(
+    {
+        expectedPrerequisiteId: prereqCourseId.toString(),
+        advancedCourseId: advancedCourseId.toString(),
+        nextBestAction: resIncomplete.nextBestAction,
+        recommendations: resIncomplete.courseRecommendations.map((rec) => ({
+            title: rec.courseTitle,
+            courseId: rec.courseId.toString(),
+            matchScore: rec.matchScore,
+            unmetPrerequisites: rec.unmetPrerequisites?.map((p) => ({
+                title: p.title,
+                courseId: p.courseId?.toString(),
+                status: p.status,
+                isPublished: p.isPublished,
+            })),
+        })),
+    },
+    { depth: null }
+);
+console.log("--- END CASE B DIAGNOSTIC ---\n");
             // Verify NBA prioritizes the published prerequisite course over the target course
             assert.ok(resIncomplete.nextBestAction);
             assert.equal(resIncomplete.nextBestAction.actionType, "EXPLORE_COURSE");
@@ -567,6 +594,7 @@ test("Stage 6 — Personalization & Recommendation Service Test Suite", async (t
 
             // Case C: Multiple unmet prerequisites
             const secondPrereqCourseId = new mongoose.Types.ObjectId();
+            createdCourseIds.push(secondPrereqCourseId);
             await Course.create({
                 _id: secondPrereqCourseId,
                 title: "Probability and Statistics",

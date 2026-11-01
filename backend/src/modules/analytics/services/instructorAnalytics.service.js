@@ -134,7 +134,10 @@ export async function getInstructorCourseAnalyticsService(instructorId, courseId
         : null;
 
     // 5. Fetch All TopicMastery records for this course
-    const masteryRecords = await TopicMastery.find({ courseId: courseObjectId }).lean();
+    const masteryRecords = await TopicMastery.find({
+        courseId: courseObjectId,
+        learnerId: { $in: enrolledLearnerIds },
+    }).lean();
 
     // Map: topicIdStr -> Array of TopicMastery
     const topicMasteryMap = new Map();

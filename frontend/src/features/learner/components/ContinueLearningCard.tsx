@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowRight, PlayCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { CourseProgress } from '../types/learner.types';
+import { getCourseWorkspacePath } from '../utils/learningNavigation';
 
 interface ContinueLearningCardProps {
   progress: CourseProgress | null;
@@ -22,7 +23,7 @@ export const ContinueLearningCard: React.FC<ContinueLearningCardProps> = ({ prog
     );
   }
 
-  const resumePath = `/learner/courses/${progress.courseId}/learn${progress.currentTopicId ? `?topicId=${encodeURIComponent(progress.currentTopicId)}` : ''}`;
+  const resumePath = getCourseWorkspacePath(progress.courseId, progress.currentTopicId);
 
   return (
     <div className="rounded-2xl border border-signal/20 bg-linear-to-br from-surface-elevated via-surface to-surface-elevated p-5 sm:p-7 md:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative overflow-hidden transition-all duration-300 hover:border-signal/35" style={{ boxShadow: 'var(--shadow-premium-card)' }}>

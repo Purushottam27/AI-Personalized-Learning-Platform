@@ -194,7 +194,7 @@ const LearnerCard: React.FC<{
       <div>
         <p className="text-[11px] text-text-tertiary">Average mastery</p>
         <p className="mt-1 text-sm font-semibold tabular-nums text-text-primary">
-          {learner.averageMasteryScore === null ? '—' : `${learner.averageMasteryScore}%`}
+          {learner.averageMasteryScore === null ? 'â€”' : `${learner.averageMasteryScore}%`}
         </p>
       </div>
     </div>
@@ -264,6 +264,11 @@ export const InstructorLearnersPage: React.FC = () => {
   const totalPages = pagination?.totalPages ?? 1;
   const totalItems = pagination?.totalItems ?? 0;
   const overview = analytics?.overview;
+  const topicsNeedingAttention = [...(analytics?.topicsPerformance ?? [])]
+    .filter((topic) => topic.needsImprovementCount > 0)
+    .sort((a, b) => b.needsImprovementCount - a.needsImprovementCount
+      || b.needsImprovementPercentage - a.needsImprovementPercentage
+      || a.order - b.order);
 
   if (isLoadingCourses) {
     return (
@@ -333,12 +338,12 @@ export const InstructorLearnersPage: React.FC = () => {
             className="w-full cursor-pointer rounded-xl border border-border bg-surface px-3.5 py-3 text-sm font-semibold text-text-primary outline-none transition-colors focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25"
           >
             {courses.map((course) => (
-              <option key={course._id} value={course._id}>{course.title} · {course.status.toLowerCase()}</option>
+              <option key={course._id} value={course._id}>{course.title} Â· {course.status.toLowerCase()}</option>
             ))}
           </select>
           {selectedCourse && (
             <p className="mt-2 truncate text-xs text-text-tertiary">
-              {selectedCourse.domain || 'Course'}{selectedCourse.category ? ` · ${selectedCourse.category}` : ''}
+              {selectedCourse.domain || 'Course'}{selectedCourse.category ? ` Â· ${selectedCourse.category}` : ''}
             </p>
           )}
         </div>
@@ -380,7 +385,7 @@ export const InstructorLearnersPage: React.FC = () => {
               <MetricCard
                 label="Enrolled learners"
                 value={overview?.totalEnrolledLearners ?? 0}
-                supportingText={`${overview?.enrollmentBreakdown.active ?? 0} active · ${overview?.enrollmentBreakdown.completed ?? 0} completed`}
+                supportingText={`${overview?.enrollmentBreakdown.active ?? 0} active Â· ${overview?.enrollmentBreakdown.completed ?? 0} completed`}
                 icon={Users}
               />
               <MetricCard
@@ -406,12 +411,54 @@ export const InstructorLearnersPage: React.FC = () => {
             </div>
           </section>
 
+          <section className="overflow-hidden rounded-2xl border border-border bg-surface" aria-labelledby="topic-attention-title">
+            <div className="flex flex-col gap-1 border-b border-border-muted px-4 py-4 sm:px-5">
+              <h2 id="topic-attention-title" className="text-sm font-semibold text-text-primary">Topics needing attention</h2>
+              <p className="text-xs leading-relaxed text-text-secondary">
+                Ranked by the number of currently enrolled learners with recorded NEEDS_IMPROVEMENT mastery. Topics without demonstrated weakness are not flagged.
+              </p>
+            </div>
+            {topicsNeedingAttention.length === 0 ? (
+              <div className="px-5 py-8 text-center">
+                <p className="text-sm font-medium text-text-primary">No demonstrated topic weaknesses</p>
+                <p className="mt-1 text-xs text-text-tertiary">This reflects recorded mastery evidence only; topics awaiting evidence are not treated as weaknesses.</p>
+              </div>
+            ) : (
+              <ol className="divide-y divide-border-muted">
+                {topicsNeedingAttention.map((topic) => {
+                  const evaluated = topic.evaluatedLearnersCount;
+                  const total = topic.totalEnrolled;
+                  return (
+                    <li key={topic.topicId} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-text-tertiary">Topic {topic.order}</p>
+                        <h3 className="mt-0.5 truncate text-sm font-semibold text-text-primary">{topic.title}</h3>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          {topic.needsImprovementCount} of {evaluated} evaluated {evaluated === 1 ? 'learner' : 'learners'} flagged
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-5 sm:justify-end">
+                        <div className="min-w-24">
+                          <p className="text-[11px] text-text-tertiary">Evaluated coverage</p>
+                          <p className="mt-0.5 text-sm font-semibold tabular-nums text-text-primary">{evaluated} / {total}</p>
+                        </div>
+                        <div className="min-w-20 text-right">
+                          <p className="text-[11px] text-text-tertiary">Of evaluated</p>
+                          <p className="mt-0.5 text-lg font-semibold tabular-nums text-signal">{topic.needsImprovementPercentage}%</p>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </section>
           <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-text-primary">How to read these signals</h2>
                 <p className="mt-1 max-w-3xl text-xs leading-relaxed text-text-secondary">
-                  “Needs review” means the learner has demonstrated difficulty in one or more topics. “Awaiting evidence” means there is not enough recorded evidence to assess mastery yet; it does not mean the learner is struggling.
+                  â€œNeeds reviewâ€ means the learner has demonstrated difficulty in one or more topics. â€œAwaiting evidenceâ€ means there is not enough recorded evidence to assess mastery yet; it does not mean the learner is struggling.
                 </p>
               </div>
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-surface-elevated px-2.5 py-1.5 text-[11px] text-text-tertiary">
@@ -558,7 +605,7 @@ export const InstructorLearnersPage: React.FC = () => {
 
             <div className="flex flex-col gap-3 border-t border-border-muted px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <p className="text-xs text-text-tertiary">
-                {totalItems === 0 ? 'No results' : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalItems)} of ${totalItems}`}
+                {totalItems === 0 ? 'No results' : `Showing ${(page - 1) * PAGE_SIZE + 1}â€“${Math.min(page * PAGE_SIZE, totalItems)} of ${totalItems}`}
               </p>
               <div className="flex items-center justify-between gap-3 sm:justify-end">
                 <Button

@@ -13,10 +13,11 @@ import {
   LogOut,
 } from 'lucide-react';
 import type { EnrollmentStatus } from '../types/enrollment.types';
+import { getCourseWorkspacePath, getResumeTopicId } from '../utils/learningNavigation';
 
 export const MyCoursesPage: React.FC = () => {
   const navigate = useNavigate();
-  const { enrollments, coursesMap, loading, error, refresh, handleWithdraw } = useMyEnrollments();
+  const { enrollments, coursesMap, courseProgressMap, loading, error, refresh, handleWithdraw } = useMyEnrollments({ includeProgress: true });
   const [filterStatus, setFilterStatus] = useState<EnrollmentStatus | 'ALL'>('ALL');
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
   const [confirmWithdrawId, setConfirmWithdrawId] = useState<string | null>(null);
@@ -157,6 +158,8 @@ export const MyCoursesPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredEnrollments.map((enrollment) => {
             const course = coursesMap[enrollment.courseId];
+            const courseProgress = courseProgressMap[enrollment.courseId];
+            const resumePath = getCourseWorkspacePath(enrollment.courseId, getResumeTopicId(courseProgress));
             const isConfirming = confirmWithdrawId === enrollment._id;
             const isBusy = withdrawingId === enrollment._id;
 
@@ -186,6 +189,19 @@ export const MyCoursesPage: React.FC = () => {
                       {course?.description || 'View details and topic syllabus.'}
                     </p>
                   </div>
+
+                  {enrollment.status === 'ACTIVE' && courseProgress && (
+                    <div className="rounded-xl border border-border bg-surface/70 p-3.5">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="text-xs font-semibold text-text-primary">Learning progress</span>
+                        <span className="text-xs font-bold tabular-nums text-signal">{courseProgress.progressPercentage}%</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-border" role="progressbar" aria-label={`${course?.title || 'Course'} mastery progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.max(0, courseProgress.progressPercentage))}>
+                        <div className="h-full rounded-full bg-gradient-to-r from-signal to-sage transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, courseProgress.progressPercentage))}%` }} />
+                      </div>
+                      <p className="mt-2 text-[11px] text-text-tertiary">{courseProgress.masteredTopics} of {courseProgress.totalTopics} topics demonstrated at strong or mastered level</p>
+                    </div>
+                  )}
 
                   {/* Enrolled Date */}
                   <div className="flex items-center gap-2 text-xs text-text-tertiary pt-2 border-t border-border/60">
@@ -240,7 +256,7 @@ export const MyCoursesPage: React.FC = () => {
                     </button>
                     {enrollment.status === 'ACTIVE' && (
                       <button
-                        onClick={() => navigate(`/learner/courses/${enrollment.courseId}/learn`)}
+                        onClick={() => navigate(resumePath)}
                         className="py-2 px-4 rounded-xl bg-signal text-white text-xs font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5"
                       >
                         <span>Continue</span>

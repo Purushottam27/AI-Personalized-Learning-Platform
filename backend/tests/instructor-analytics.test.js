@@ -294,6 +294,28 @@ test("Instructor Course Analytics Test Suite", async (t) => {
     // 2. Unit / Service Tests
     // ==========================================
 
+    await t.test("Topic insights exclude mastery records for learners without an authoritative course enrollment", async () => {
+        const historicalLearnerId = new mongoose.Types.ObjectId();
+        const historicalMastery = await TopicMastery.create({
+            learnerId: historicalLearnerId,
+            courseId: course1Id,
+            topicId: topic1Id,
+            status: MASTERY_STATUS.NEEDS_IMPROVEMENT,
+            masteryScore: 10,
+            confidence: 0.9,
+            evidenceCount: 4,
+        });
+        createdMasteryIds.push(historicalMastery._id);
+
+        const data = await getInstructorCourseAnalyticsService(instructor1Id, course1Id);
+        const topic1 = data.topicsPerformance.find((topic) => topic.topicId === topic1Id.toString());
+
+        assert.equal(data.overview.totalEnrolledLearners, 3);
+        assert.equal(topic1.totalEnrolled, 3);
+        assert.equal(topic1.needsImprovementCount, 1);
+        assert.equal(topic1.evaluatedLearnersCount, 2);
+        assert.equal(topic1.masteryDistribution.INSUFFICIENT_EVIDENCE.count, 1);
+    });
     await t.test("getInstructorCourseAnalyticsService aggregates course metrics accurately", async () => {
         const data = await getInstructorCourseAnalyticsService(instructor1Id, course1Id);
 

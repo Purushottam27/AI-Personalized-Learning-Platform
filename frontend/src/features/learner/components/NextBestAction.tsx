@@ -3,6 +3,7 @@ import { ArrowRight, Brain, Target, BookOpen, FileText, Loader2, Compass } from 
 import { useNavigate } from 'react-router-dom';
 import type { NextBestAction as NextBestActionType } from '../types/learner.types';
 import { getLearnerPracticeById, getLearnerPracticesByTopic } from '../api/practiceAttempt.api';
+import { getCourseWorkspacePath } from '../utils/learningNavigation';
 
 interface NextBestActionProps { action: NextBestActionType | null; }
 
@@ -42,8 +43,7 @@ export const NextBestAction: React.FC<NextBestActionProps> = ({ action }) => {
       const courseId = action.courseId;
       const topicId = action.topicId || (action.targetType === 'TOPIC' ? action.targetId : '');
       if (courseId && /^[0-9a-fA-F]{24}$/.test(courseId)) {
-        const query = topicId && /^[0-9a-fA-F]{24}$/.test(topicId) ? `?topicId=${encodeURIComponent(topicId)}` : '';
-        navigate(`/learner/courses/${courseId}/learn${query}`);
+        navigate(getCourseWorkspacePath(courseId, topicId));
       }
       return;
     }

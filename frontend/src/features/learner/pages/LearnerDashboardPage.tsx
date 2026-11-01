@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useLearnerDashboard } from '../hooks/useLearnerDashboard';
 import { WelcomeHeader } from '../components/WelcomeHeader';
 import { ContinueLearningCard } from '../components/ContinueLearningCard';
@@ -8,7 +9,7 @@ import { LearningSummary } from '../components/LearningSummary';
 import { StudyPlannerWidget } from '../components/StudyPlannerWidget';
 import { RecommendedCourses } from '../components/RecommendedCourses';
 import { RecentActivity } from '../components/RecentActivity';
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, ArrowRight } from 'lucide-react';
 
 export const LearnerDashboardPage: React.FC = () => {
   const { data, isLoading, error } = useLearnerDashboard();
@@ -46,7 +47,10 @@ export const LearnerDashboardPage: React.FC = () => {
       <div className="w-full min-w-0 space-y-10 pb-14 sm:space-y-12">
         <WelcomeHeader />
         <section aria-labelledby="continue-learning-heading" className="space-y-5">
-          <div className="border-b border-border-muted pb-3"><p className="mb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-signal">Keep your momentum</p><h2 id="continue-learning-heading" className="font-display text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">Continue Learning</h2></div>
+          <div className="flex items-end justify-between gap-3 border-b border-border-muted pb-3">
+            <div><p className="mb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-signal">Keep your momentum</p><h2 id="continue-learning-heading" className="font-display text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">Continue Learning</h2></div>
+            <Link to="/learner/courses" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-signal transition-colors hover:bg-signal/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">All my courses <ArrowRight className="h-3.5 w-3.5" /></Link>
+          </div>
           <ContinueLearningCard progress={null} />
         </section>
         <StudyPlannerWidget />
@@ -81,7 +85,7 @@ export const LearnerDashboardPage: React.FC = () => {
       <section aria-labelledby="continue-learning-heading" className="space-y-5">
         <div className="flex items-end justify-between gap-3 border-b border-border-muted pb-3">
           <div><p className="mb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-signal">Keep your momentum</p><h2 id="continue-learning-heading" className="font-display text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">Continue Learning</h2></div>
-          <span className="hidden text-xs font-medium text-text-tertiary sm:inline">Pick up where you left off</span>
+          <Link to="/learner/courses" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-signal transition-colors hover:bg-signal/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">All my courses <ArrowRight className="h-3.5 w-3.5" /></Link>
         </div>
         <ContinueLearningCard progress={data.continueLearning} />
       </section>
