@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   CircleHelp,
   Clock3,
-  Flame,
   Loader2,
   RefreshCw,
   Target,
@@ -63,6 +62,7 @@ function TopicRow({ topic, rank }: { topic: TopicMasteryAnalyticsItem; rank: 'st
 export const LearnerAnalyticsPage: React.FC = () => {
   const { data, isLoading, error, days, setDays, refetch } = useLearnerAnalytics(7);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const engagement = data?.engagement ?? null;
 
   const derived = useMemo(() => {
     if (!data) return null;
@@ -115,15 +115,6 @@ export const LearnerAnalyticsPage: React.FC = () => {
   if (!data || !derived) return null;
 
   const { activityTotals, dailyTrends, courseProgressList } = data;
-  // Older/current backend responses may not include engagement yet.
-  // Keep the analytics page render-safe while showing an honest unavailable state.
-  const hasEngagementData = Boolean(data.engagement);
-  const engagement = data.engagement ?? {
-    accessedResources: 0,
-    activeResourcesAvailable: 0,
-    lessonsAvailable: 0,
-    note: 'Resource engagement data is not available from the analytics service yet.',
-  };
   const hasAnyEvidence = activityTotals.totalQuestionsAttempted > 0;
 
   return (
@@ -146,7 +137,7 @@ export const LearnerAnalyticsPage: React.FC = () => {
         <div className={`${panelClass} p-5 transition-colors hover:border-signal/30`}><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Active courses</span><BookOpen className="h-4 w-4 text-signal" /></div><div className="font-display text-3xl font-bold tabular-nums text-text-primary">{activityTotals.activeCoursesCount}</div><p className="mt-1 text-xs text-text-secondary">Courses you are currently enrolled in</p></div>
         <div className={`${panelClass} p-5 transition-colors hover:border-sage/40`}><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Strong mastery topics</span><Award className="h-4 w-4 text-sage" /></div><div className="font-display text-3xl font-bold tabular-nums text-text-primary">{derived.masteredTopics}</div><p className="mt-1 text-xs text-text-secondary">Of {derived.totalTopics} topics across active courses</p></div>
         <div className={`${panelClass} p-5 transition-colors hover:border-signal/30`}><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Evidence coverage</span><Target className="h-4 w-4 text-signal" /></div><div className="font-display text-3xl font-bold tabular-nums text-text-primary">{derived.evaluatedTopics}<span className="ml-1 text-base font-semibold text-text-tertiary">/ {derived.totalTopics}</span></div><p className="mt-1 text-xs text-text-secondary">Topics with eligible mastery evidence</p></div>
-        <div className={`${panelClass} p-5 transition-colors hover:border-signal/30`}><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Resources accessed</span><BookOpen className="h-4 w-4 text-signal" /></div><div className="font-display text-3xl font-bold tabular-nums text-text-primary">{hasEngagementData ? engagement.accessedResources : '—'}</div><p className="mt-1 text-xs text-text-secondary">Distinct resources across active courses</p></div>
+        <div className={`${panelClass} p-5 transition-colors hover:border-signal/30`}><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Resources accessed</span><BookOpen className="h-4 w-4 text-signal" /></div><div className="font-display text-3xl font-bold tabular-nums text-text-primary">{engagement ? engagement.accessedResources : '—'}</div><p className="mt-1 text-xs text-text-secondary">Distinct resources across active courses</p></div>
       </section>
 
       {!hasAnyEvidence && (
@@ -162,12 +153,11 @@ export const LearnerAnalyticsPage: React.FC = () => {
         <div className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-signal" /><h2 className="text-base font-semibold text-text-primary">Your learning engagement</h2></div>
         <p className="mt-1 text-xs text-text-secondary">A view of the learning material you have accessed across your active courses, separate from demonstrated mastery.</p>
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {!hasEngagementData && <p className="sm:col-span-3 rounded-xl border border-border-muted bg-surface-elevated px-4 py-3 text-xs leading-5 text-text-secondary">Resource and lesson engagement is not included in the analytics response yet. These values are intentionally left unavailable rather than shown as zero.</p>}
-          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{engagement.accessedResources}</p><p className="mt-1 text-xs text-text-secondary">Distinct resources accessed</p></div>
-          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{engagement.activeResourcesAvailable}</p><p className="mt-1 text-xs text-text-secondary">Active resources available</p></div>
-          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{engagement.lessonsAvailable}</p><p className="mt-1 text-xs text-text-secondary">Lessons available</p></div>
+          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{engagement ? engagement.accessedResources : '—'}</p><p className="mt-1 text-xs text-text-secondary">Distinct resources accessed</p></div>
+          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{engagement ? engagement.activeResourcesAvailable : '—'}</p><p className="mt-1 text-xs text-text-secondary">Active resources available</p></div>
+          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{engagement && engagement.lessonsAvailable > 0 ? engagement.lessonsAvailable : '—'}</p><p className="mt-1 text-xs text-text-secondary">{engagement && engagement.lessonsAvailable > 0 ? 'Lessons available' : 'No lessons available'}</p></div>
         </div>
-        <p className="mt-3 text-xs leading-5 text-text-tertiary">{engagement.note}</p>
+        <p className="mt-3 text-xs leading-5 text-text-tertiary">{engagement?.note || 'Engagement data is not included in this analytics response. Missing data is not treated as zero.'}</p>
       </section>
 
       <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.35fr_0.9fr]">
@@ -222,7 +212,33 @@ export const LearnerAnalyticsPage: React.FC = () => {
         <div className={`${panelClass} p-5 sm:p-6`}><div className="flex items-center gap-2"><Activity className="h-5 w-5 text-signal" /><h2 className="text-base font-semibold text-text-primary">Course progression</h2></div><p className="mt-1 text-xs text-text-secondary">Topics with Strong or Mastered evidence, out of each active course curriculum</p>{courseProgressList.length ? <div className="mt-5 space-y-4">{courseProgressList.map((course) => <button type="button" key={course.courseId} onClick={() => setSelectedCourseId(course.courseId)} className="group block w-full cursor-pointer rounded-xl border border-border-muted bg-surface-elevated p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-signal/40 hover:bg-surface hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-text-primary">{course.courseTitle}</p>{course.domain && <p className="mt-0.5 text-xs text-text-tertiary">{course.domain}</p>}</div><span className="shrink-0 text-sm font-bold tabular-nums text-text-primary">{course.progressPercentage}%</span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-disabled"><div className="h-full rounded-full bg-signal transition-all" style={{ width: `${clampPercent(course.progressPercentage)}%` }} /></div><div className="mt-2 flex items-center justify-between text-[11px] text-text-tertiary"><span>{course.masteredTopics} of {course.totalTopics} topics Strong or Mastered</span><span className="inline-flex items-center gap-1">View course analytics <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" /></span></div></button>)}</div> : <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-center"><p className="text-sm font-medium text-text-primary">No active published courses</p><Link to="/learner/explore" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-signal hover:underline">Explore courses <ArrowRight className="h-3 w-3" /></Link></div>}</div>
       </section>
 
-      <section className={`${panelClass} p-5 sm:p-6`}><div className="flex items-center gap-2"><Flame className="h-5 w-5 text-signal" /><h2 className="text-base font-semibold text-text-primary">Daily learning activity</h2></div><p className="mt-1 text-xs text-text-secondary">Completed eligible practice and assessment activity in the selected {days}-day period</p><div className="mt-4 overflow-x-auto"><div className="min-w-[620px]"><div className="grid grid-cols-[100px_1fr_1fr_90px] gap-3 border-b border-border px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-tertiary"><span>Day</span><span>Practice</span><span>Assessment</span><span className="text-right">Questions</span></div>{dailyTrends.map((item) => <div key={item.date} className="grid grid-cols-[100px_1fr_1fr_90px] items-center gap-3 border-b border-border-muted px-2 py-3 last:border-0"><span className="text-xs font-medium text-text-secondary">{formatDay(item.date)}</span><div className="flex items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-disabled"><div className="h-full rounded-full bg-signal" style={{ width: `${item.practiceCount ? Math.max(5, (item.practiceCount / derived.maxDailySessions) * 100) : 0}%` }} /></div><span className="w-5 text-right text-xs tabular-nums text-text-secondary">{item.practiceCount}</span></div><div className="flex items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-disabled"><div className="h-full rounded-full bg-sage" style={{ width: `${item.assessmentCount ? Math.max(5, (item.assessmentCount / derived.maxDailySessions) * 100) : 0}%` }} /></div><span className="w-5 text-right text-xs tabular-nums text-text-secondary">{item.assessmentCount}</span></div><span className="text-right text-xs tabular-nums text-text-secondary">{item.totalQuestions}</span></div>)}</div></div><div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-text-tertiary"><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-signal" /> Practice sessions</span><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sage" /> Assessment attempts</span></div></section>
+      <section className={`${panelClass} p-5 sm:p-6`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><div className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-signal"/><h2 className="text-base font-semibold text-text-primary">Performance over time</h2></div><p className="mt-1 text-xs text-text-secondary">Question-weighted accuracy from eligible completed evidence in the selected {days}-day period.</p></div>
+          <span className="text-xs text-text-tertiary">Missing days are not scored as zero</span>
+        </div>
+        <div className="mt-5 space-y-4">
+          {[{key:'practiceAccuracyPercent',label:'Practice accuracy',tone:'bg-signal',questions:'practiceQuestions'},{key:'assessmentAccuracyPercent',label:'Assessment accuracy',tone:'bg-sage',questions:'assessmentQuestions'}].map((series) => {
+            const observed = dailyTrends.filter((day) => day[series.key as 'practiceAccuracyPercent' | 'assessmentAccuracyPercent'] !== null);
+            return <div key={series.key}>
+              <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold text-text-secondary">{series.label}</p><p className="text-[11px] text-text-tertiary">{observed.length} day{observed.length === 1 ? '' : 's'} with evidence</p></div>
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {dailyTrends.map((day) => {
+                  const value = day[series.key as 'practiceAccuracyPercent' | 'assessmentAccuracyPercent'];
+                  const questions = day[series.questions as 'practiceQuestions' | 'assessmentQuestions'];
+                  return <div key={`${series.key}-${day.date}`} className="min-w-10 flex-1 text-center" title={`${formatDay(day.date)} · ${series.label}: ${value === null ? 'No eligible evidence' : `${value}% from ${questions} questions`}`}>
+                    <div className="flex h-24 items-end justify-center rounded-lg bg-surface-elevated px-1 pt-2"><div className={`w-full max-w-8 rounded-t-md ${value === null ? 'bg-border' : series.tone}`} style={{height:value === null ? '3px' : `${Math.max(5, value)}%`}}/></div>
+                    <p className="mt-1.5 text-[10px] font-semibold tabular-nums text-text-secondary">{value === null ? '—' : `${value}%`}</p>
+                    <p className="text-[9px] text-text-tertiary">{new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined,{weekday:'short'})}</p>
+                  </div>;
+                })}
+              </div>
+            </div>;
+          })}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-border pt-3 text-[11px] text-text-tertiary"><span>Current period: {derived.current.totalQuestions} eligible questions · {derived.current.attempts} completed submissions</span><span>Practice and assessment accuracy are calculated separately.</span></div>
+        {derived.current.totalQuestions === 0 && <p className="mt-3 rounded-xl border border-dashed border-border p-4 text-xs leading-5 text-text-secondary">No eligible completed evidence was recorded in this period. Accuracy is unavailable until a practice or assessment submission contributes eligible evidence.</p>}
+      </section>
 
       <p className="px-1 text-[11px] leading-5 text-text-tertiary">How to read this page: performance metrics use only evidence explicitly marked as eligible for learning evidence. Topic mastery is calculated by the platform's mastery engine from eligible evidence; opening lessons or resources does not increase mastery. “Awaiting evidence” means there is not enough eligible evidence to assess a topic, not that you are struggling.</p>
     </div>

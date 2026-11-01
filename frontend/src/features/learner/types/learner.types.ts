@@ -113,8 +113,12 @@ export interface DailyTrendItem {
   practiceCount: number;
   assessmentCount: number;
   totalQuestions: number;
-  accuracyPercent: number;
-  averageScore: number;
+  accuracyPercent: number | null;
+  practiceAccuracyPercent: number | null;
+  assessmentAccuracyPercent: number | null;
+  practiceQuestions: number;
+  assessmentQuestions: number;
+  totalCorrect: number;
 }
 
 export interface CourseProgressSummary {

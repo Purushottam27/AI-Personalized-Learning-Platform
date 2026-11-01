@@ -2,6 +2,7 @@ import {
     getLearnerDashboardService,
     getLearnerCourseProgressService,
     getLearnerAnalyticsOverviewService,
+    getLearnerCourseAnalyticsService,
 } from "../services/learnerAnalytics.service.js";
 import { ApiResponse } from "../../../shared/responses/ApiResponse.js";
 
@@ -46,4 +47,16 @@ export async function getLearnerAnalyticsOverview(req, res) {
     res.status(200).json(
         new ApiResponse(result, "Learner analytics overview retrieved successfully")
     );
+}
+
+
+/**
+ * GET /api/v1/learning/me/analytics/courses/:courseId
+ */
+export async function getLearnerCourseAnalytics(req, res) {
+    const learnerId = req.user._id || req.user.id;
+    const { courseId } = req.params;
+    const query = req.validatedQuery || req.query || {};
+    const result = await getLearnerCourseAnalyticsService(learnerId, courseId, { days: query.days });
+    res.status(200).json(new ApiResponse(result, "Course analytics retrieved successfully"));
 }

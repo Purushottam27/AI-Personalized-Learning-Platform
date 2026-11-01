@@ -436,9 +436,26 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
             assert.ok(typeof day.date === "string");
             assert.equal(day.practiceCount, 0);
             assert.equal(day.assessmentCount, 0);
-            assert.equal(day.accuracyPercent, 0);
-            assert.equal(day.averageScore, 0);
+            assert.equal(day.accuracyPercent, null);
+            assert.equal(day.practiceAccuracyPercent, null);
+            assert.equal(day.assessmentAccuracyPercent, null);
+            assert.equal(day.practiceQuestions, 0);
+            assert.equal(day.assessmentQuestions, 0);
         }
+    });
+
+    await t.test("Unit: daily trends calculate practice and assessment accuracy separately", () => {
+        const completedAt = new Date();
+        const trends = buildContinuousDailyTrends([
+            { completedAt, sourceType: "PRACTICE", totalQuestions: 5, correctCount: 4 },
+            { completedAt, sourceType: "ASSESSMENT", totalQuestions: 10, correctCount: 6 },
+        ], 7);
+        const today = trends.at(-1);
+        assert.equal(today.practiceAccuracyPercent, 80);
+        assert.equal(today.assessmentAccuracyPercent, 60);
+        assert.equal(today.accuracyPercent, 67);
+        assert.equal(today.practiceQuestions, 5);
+        assert.equal(today.assessmentQuestions, 10);
     });
 
     // --- Endpoints Tests ---
@@ -603,6 +620,31 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
         assert.equal(data.courseProgressList.length, 1);
         assert.equal(data.courseProgressList[0].courseTitle, "Data Structures & Algorithms");
         assert.equal(data.courseProgressList[0].progressPercentage, 67);
+    });
+
+    await t.test("GET /api/v1/learning/me/analytics/courses/:courseId: returns course-scoped evidence, mastery, and engagement analytics", async () => {
+        const res = await apiRequest({
+            method: "GET",
+            reqPath: `/api/v1/learning/me/analytics/courses/${course1Id}?days=7`,
+            token: activeLearnerToken,
+        });
+        assert.equal(res.statusCode, 200);
+        assert.ok(res.body.success);
+        const data = res.body.data;
+        assert.equal(data.course.courseId, course1Id.toString());
+        assert.equal(data.course.title, "Data Structures & Algorithms");
+        assert.equal(data.overview.totalTopics, 3);
+        assert.equal(data.overview.evaluatedTopics, 3);
+        assert.equal(data.overview.masteredTopics, 2);
+        assert.equal(data.overview.totalQuestions, 18);
+        assert.equal(data.overview.totalCorrect, 15);
+        assert.equal(data.overview.accuracyPercent, 83);
+        assert.equal(data.topics.length, 3);
+        assert.ok(data.topics.some((topic) => topic.title === "Dynamic Programming" && topic.status === MASTERY_STATUS.NEEDS_IMPROVEMENT));
+        assert.equal(data.activity.dailyTrends.length, 7);
+        assert.equal(typeof data.overview.totalLessonsAvailable, "number");
+        assert.equal(typeof data.overview.totalActiveResources, "number");
+        assert.equal(data.evidenceGuidance.includes("does not increase mastery"), true);
     });
 
     await t.test("GET /api/v1/learning/me/analytics/overview: validates query days boundary (days > 30 returns 400)", async () => {

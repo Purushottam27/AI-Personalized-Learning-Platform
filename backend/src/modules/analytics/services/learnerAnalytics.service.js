@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import { LearningEvidence } from "../../learningEvidence/models/learningEvidence.model.js";
 import { TopicMastery } from "../../topicMastery/models/topicMastery.model.js";
 import { MASTERY_STATUS } from "../../topicMastery/constants/mastery.constants.js";
@@ -7,6 +6,10 @@ import { Course } from "../../course/models/course.model.js";
 import { Topic } from "../../topic/models/topic.model.js";
 import { PracticeAttempt } from "../../practice/models/practiceAttempt.model.js";
 import { AssessmentAttempt } from "../../assessmentAttempt/models/assessmentAttempt.model.js";
+import { ResourceAccess } from "../../resource/models/resourceAccess.model.js";
+import { Resource } from "../../resource/models/resource.model.js";
+import { Lesson } from "../../lesson/models/lesson.model.js";
+import { isTopicUnlockedForLearner } from "../../topic/services/topicProgression.service.js";
 import { getLearnerRecommendationsService } from "../../recommendation/services/recommendation.service.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 import { ANALYTICS_CONSTANTS, ANALYTICS_ERROR_CODES } from "../constants/analytics.constants.js";
@@ -55,23 +58,42 @@ export function buildContinuousDailyTrends(evidenceList, days = 7) {
     const now = new Date();
     for (let i = days - 1; i >= 0; i--) {
         const dateStr = new Date(now.getTime() - i * 86400000).toISOString().split("T")[0];
-        trendMap.set(dateStr, { date: dateStr, practiceCount: 0, assessmentCount: 0, totalQuestions: 0, totalCorrect: 0, scores: [] });
+        trendMap.set(dateStr, {
+            date: dateStr, practiceCount: 0, assessmentCount: 0,
+            totalQuestions: 0, totalCorrect: 0,
+            practiceQuestions: 0, practiceCorrect: 0,
+            assessmentQuestions: 0, assessmentCorrect: 0,
+        });
     }
     for (const ev of evidenceList) {
         if (!ev.completedAt) continue;
         const dayRecord = trendMap.get(new Date(ev.completedAt).toISOString().split("T")[0]);
         if (!dayRecord) continue;
-        if (ev.sourceType === "PRACTICE") dayRecord.practiceCount++;
-        else if (ev.sourceType === "ASSESSMENT") dayRecord.assessmentCount++;
-        dayRecord.totalQuestions += ev.totalQuestions || 0;
-        if (typeof ev.correctCount === "number") dayRecord.totalCorrect += ev.correctCount;
-        if (typeof ev.scorePercent === "number") dayRecord.scores.push(ev.scorePercent);
+        const questions = Number(ev.totalQuestions) || 0;
+        const correct = Number(ev.correctCount) || 0;
+        dayRecord.totalQuestions += questions;
+        dayRecord.totalCorrect += correct;
+        if (ev.sourceType === "PRACTICE") {
+            dayRecord.practiceCount++;
+            dayRecord.practiceQuestions += questions;
+            dayRecord.practiceCorrect += correct;
+        } else if (ev.sourceType === "ASSESSMENT") {
+            dayRecord.assessmentCount++;
+            dayRecord.assessmentQuestions += questions;
+            dayRecord.assessmentCorrect += correct;
+        }
     }
     return Array.from(trendMap.values()).map((day) => ({
-        date: day.date, practiceCount: day.practiceCount, assessmentCount: day.assessmentCount,
+        date: day.date,
+        practiceCount: day.practiceCount,
+        assessmentCount: day.assessmentCount,
         totalQuestions: day.totalQuestions,
-        accuracyPercent: day.totalQuestions > 0 ? Math.round((day.totalCorrect / day.totalQuestions) * 100) : 0,
-        averageScore: day.scores.length > 0 ? Math.round(day.scores.reduce((a, b) => a + b, 0) / day.scores.length) : 0,
+        totalCorrect: day.totalCorrect,
+        accuracyPercent: day.totalQuestions > 0 ? Math.round((day.totalCorrect / day.totalQuestions) * 100) : null,
+        practiceAccuracyPercent: day.practiceQuestions > 0 ? Math.round((day.practiceCorrect / day.practiceQuestions) * 100) : null,
+        assessmentAccuracyPercent: day.assessmentQuestions > 0 ? Math.round((day.assessmentCorrect / day.assessmentQuestions) * 100) : null,
+        practiceQuestions: day.practiceQuestions,
+        assessmentQuestions: day.assessmentQuestions,
     }));
 }
 
@@ -83,7 +105,7 @@ export async function getLearnerDashboardService(learnerId) {
     let progress = null;
 
     if (activeCourseIds.length > 0) {
-        const latestEvidence = await LearningEvidence.findOne({ learnerId, courseId: { $in: activeCourseIds } }).sort({ completedAt: -1 }).lean();
+        const latestEvidence = await LearningEvidence.findOne({ learnerId, courseId: { $in: activeCourseIds }, contributeToLearningEvidence: true }).sort({ completedAt: -1 }).lean();
         const activeCourseId = latestEvidence?.courseId || activeCourseIds[0];
         const currentCourse = await Course.findById(activeCourseId).lean();
         if (currentCourse && currentCourse.status === "PUBLISHED") {
@@ -159,7 +181,7 @@ export async function getLearnerDashboardService(learnerId) {
     }));
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const weeklyEvidence = await LearningEvidence.find({ learnerId, completedAt: { $gte: sevenDaysAgo } }).lean();
+    const weeklyEvidence = await LearningEvidence.find({ learnerId, contributeToLearningEvidence: true, completedAt: { $gte: sevenDaysAgo } }).lean();
     const practiceAttemptIds = weeklyEvidence.filter((e) => e.sourceType === "PRACTICE" && e.attemptId).map((e) => e.attemptId);
     const assessmentAttemptIds = weeklyEvidence.filter((e) => e.sourceType === "ASSESSMENT" && e.attemptId).map((e) => e.attemptId);
     const [practiceAttempts, assessmentAttempts] = await Promise.all([
@@ -173,11 +195,11 @@ export async function getLearnerDashboardService(learnerId) {
     const topicsCompletedThisWeek = await TopicMastery.countDocuments({
         learnerId, status: { $in: [MASTERY_STATUS.STRONG, MASTERY_STATUS.MASTERED] }, updatedAt: { $gte: sevenDaysAgo },
     });
-    const allEvidenceDates = await LearningEvidence.find({ learnerId }).select("completedAt").lean();
+    const allEvidenceDates = await LearningEvidence.find({ learnerId, contributeToLearningEvidence: true }).select("completedAt").lean();
     const currentStreakDays = calculateStreak(allEvidenceDates.map((e) => e.completedAt));
     const summary = { weeklyStudyMinutes, topicsCompletedThisWeek, currentStreakDays };
 
-    const recentEvidence = await LearningEvidence.find({ learnerId }).sort({ completedAt: -1 }).limit(ANALYTICS_CONSTANTS.RECENT_ACTIVITY_LIMIT).lean();
+    const recentEvidence = await LearningEvidence.find({ learnerId, contributeToLearningEvidence: true }).sort({ completedAt: -1 }).limit(ANALYTICS_CONSTANTS.RECENT_ACTIVITY_LIMIT).lean();
     const recentEnrollments = await Enrollment.find({ learnerId }).sort({ enrolledAt: -1 }).limit(5).lean();
     const activityCourseIds = [...recentEvidence.map((e) => e.courseId), ...recentEnrollments.map((e) => e.courseId)];
     const activityTopicIds = recentEvidence.map((e) => e.topicId).filter(Boolean);
@@ -261,25 +283,7 @@ export async function getLearnerAnalyticsOverviewService(learnerId, options = {}
 
     // Only evidence explicitly opted into the mastery/evidence ledger is eligible
     // for learner performance analytics. This mirrors topicMastery.service.js.
-    const eligibleEvidenceFilter = {
-        learnerId,
-        contributeToLearningEvidence: true,
-    };
-    const [evidenceTotals, practiceCount, assessmentCount, activeEnrollments] = await Promise.all([
-        LearningEvidence.aggregate([
-            { $match: eligibleEvidenceFilter },
-            { $group: { _id: null, totalQuestions: { $sum: "$totalQuestions" }, totalCorrect: { $sum: { $ifNull: ["$correctCount", 0] } }, totalMarksAwarded: { $sum: "$marksAwarded" }, totalMarksPossible: { $sum: "$totalMarks" } } },
-        ]),
-        LearningEvidence.countDocuments({ ...eligibleEvidenceFilter, sourceType: "PRACTICE" }),
-        LearningEvidence.countDocuments({ ...eligibleEvidenceFilter, sourceType: "ASSESSMENT" }),
-        Enrollment.find({ learnerId, status: "ACTIVE" }).select("courseId").lean(),
-    ]);
-
-    const aggregateStats = evidenceTotals[0] || { totalQuestions: 0, totalCorrect: 0, totalMarksAwarded: 0, totalMarksPossible: 0 };
-    const overallAccuracy = aggregateStats.totalQuestions > 0
-        ? Math.round((aggregateStats.totalCorrect / aggregateStats.totalQuestions) * 100)
-        : 0;
-
+    const activeEnrollments = await Enrollment.find({ learnerId, status: "ACTIVE" }).select("courseId").lean();
     const activeCourseIds = activeEnrollments.map((enrollment) => enrollment.courseId);
     const enrolledCourses = await Course.find({
         _id: { $in: activeCourseIds },
@@ -287,12 +291,43 @@ export async function getLearnerAnalyticsOverviewService(learnerId, options = {}
     }).select("_id title domain category").lean();
     const publishedActiveCourseIds = enrolledCourses.map((course) => course._id);
 
+    // Overall analytics are scoped to currently active, published enrollments.
+    // Historical evidence from withdrawn or unavailable courses must not leak into
+    // the learner's current learning picture.
+    const eligibleEvidenceFilter = {
+        learnerId,
+        courseId: { $in: publishedActiveCourseIds },
+        contributeToLearningEvidence: true,
+    };
+    const [evidenceTotals, practiceCount, assessmentCount] = await Promise.all([
+        LearningEvidence.aggregate([
+            { $match: eligibleEvidenceFilter },
+            { $group: { _id: null, totalQuestions: { $sum: "$totalQuestions" }, totalCorrect: { $sum: { $ifNull: ["$correctCount", 0] } }, totalMarksAwarded: { $sum: "$marksAwarded" }, totalMarksPossible: { $sum: "$totalMarks" } } },
+        ]),
+        LearningEvidence.countDocuments({ ...eligibleEvidenceFilter, sourceType: "PRACTICE" }),
+        LearningEvidence.countDocuments({ ...eligibleEvidenceFilter, sourceType: "ASSESSMENT" }),
+    ]);
+
+    const aggregateStats = evidenceTotals[0] || { totalQuestions: 0, totalCorrect: 0, totalMarksAwarded: 0, totalMarksPossible: 0 };
+    const overallAccuracy = aggregateStats.totalQuestions > 0
+        ? Math.round((aggregateStats.totalCorrect / aggregateStats.totalQuestions) * 100)
+        : 0;
+
     // Mastery is presented for currently active, published courses only. This
     // avoids showing stale mastery from withdrawn, archived, or unavailable courses.
     const [activeCourseMastery, activeCourseTopics] = await Promise.all([
         TopicMastery.find({ learnerId, courseId: { $in: publishedActiveCourseIds } }).lean(),
         Topic.find({ courseId: { $in: publishedActiveCourseIds } }).select("_id courseId title order").sort({ order: 1 }).lean(),
     ]);
+    const activeTopicIds = activeCourseTopics.map((topic) => topic._id);
+    const [recordedResourceAccesses, activeResourceCount, availableLessonCount] = await Promise.all([
+        ResourceAccess.find({ learnerId, courseId: { $in: publishedActiveCourseIds } }).select("resourceId").lean(),
+        Resource.countDocuments({ topicId: { $in: activeTopicIds }, status: "ACTIVE" }),
+        Lesson.countDocuments({ topicId: { $in: activeTopicIds } }),
+    ]);
+    const activeAccessedResourceCount = recordedResourceAccesses.length
+        ? await Resource.countDocuments({ _id: { $in: recordedResourceAccesses.map((access) => access.resourceId) }, topicId: { $in: activeTopicIds }, status: "ACTIVE" })
+        : 0;
 
     const distributionCounts = {
         [MASTERY_STATUS.MASTERED]: 0,
@@ -388,6 +423,12 @@ export async function getLearnerAnalyticsOverviewService(learnerId, options = {}
             totalQuestionsCorrect: aggregateStats.totalCorrect,
             overallAccuracy,
         },
+        engagement: {
+            accessedResources: activeAccessedResourceCount,
+            activeResourcesAvailable: activeResourceCount,
+            lessonsAvailable: availableLessonCount,
+            note: "Resource access is recorded engagement, not proof of understanding. Lesson completion and reading time are not currently tracked as learner progress.",
+        },
         masteryDistribution: distributionCounts,
         topicMasteryList,
         periodComparison: {
@@ -397,5 +438,97 @@ export async function getLearnerAnalyticsOverviewService(learnerId, options = {}
         },
         dailyTrends,
         courseProgressList,
+    };
+}
+
+
+/**
+ * Course-scoped learner analytics. Engagement (resource access) is intentionally
+ * reported separately from outcome evidence and never contributes to mastery.
+ */
+export async function getLearnerCourseAnalyticsService(learnerId, courseId, options = {}) {
+    requireObjectId(learnerId, "learnerId");
+    requireObjectId(courseId, "courseId");
+    const days = Math.min(Math.max(Number(options.days) || 7, 1), 30);
+    const course = await Course.findOne({ _id: courseId, status: "PUBLISHED" }).select("_id title domain category description status progressionPolicy publicationRequirements").lean();
+    if (!course) throw new ApiError(404, ANALYTICS_ERROR_CODES.COURSE_NOT_AVAILABLE, "Course is not published or does not exist");
+    const enrollment = await Enrollment.findOne({ learnerId, courseId, status: "ACTIVE" }).select("enrolledAt").lean();
+    if (!enrollment) throw new ApiError(403, ANALYTICS_ERROR_CODES.ACTIVE_ENROLLMENT_REQUIRED, "Active enrollment is required to view course analytics");
+
+    const topics = await Topic.find({ courseId }).sort({ order: 1 }).select("_id title order").lean();
+    const topicIds = topics.map((topic) => topic._id);
+    const [masteryRecords, evidence, recordedResourceAccesses, activeResources, lessonCounts] = await Promise.all([
+        TopicMastery.find({ learnerId, courseId, topicId: { $in: topicIds } }).lean(),
+        LearningEvidence.find({ learnerId, courseId, contributeToLearningEvidence: true }).sort({ completedAt: 1 }).lean(),
+        ResourceAccess.find({ learnerId, courseId }).select("resourceId topicId accessedAt").lean(),
+        Resource.countDocuments({ topicId: { $in: topicIds }, status: "ACTIVE" }),
+        Lesson.countDocuments({ topicId: { $in: topicIds } }),
+    ]);
+    const activeAccessedResources = recordedResourceAccesses.length
+        ? await Resource.find({ _id: { $in: recordedResourceAccesses.map((access) => access.resourceId) }, topicId: { $in: topicIds }, status: "ACTIVE" }).select("_id").lean()
+        : [];
+    const activeAccessedResourceIds = new Set(activeAccessedResources.map((resource) => resource._id.toString()));
+    const resourceAccesses = recordedResourceAccesses.filter((access) => activeAccessedResourceIds.has(access.resourceId.toString()));
+    const masteryMap = new Map(masteryRecords.map((record) => [record.topicId.toString(), record]));
+    const accessByTopic = new Map();
+    for (const access of resourceAccesses) {
+        const key = access.topicId.toString();
+        accessByTopic.set(key, (accessByTopic.get(key) || 0) + 1);
+    }
+    const topicAnalytics = topics.map((topic) => {
+        const mastery = masteryMap.get(topic._id.toString());
+        const status = mastery?.status || MASTERY_STATUS.INSUFFICIENT_EVIDENCE;
+        const evidenceCount = mastery?.evidenceCount || 0;
+        return {
+            topicId: topic._id.toString(), title: topic.title, order: topic.order,
+            masteryScore: evidenceCount > 0 ? (mastery.masteryScore ?? null) : null,
+            status: evidenceCount > 0 ? status : MASTERY_STATUS.INSUFFICIENT_EVIDENCE,
+            confidence: evidenceCount > 0 ? (mastery.confidence ?? 0) : 0, evidenceCount,
+            practiceAttemptsCount: mastery?.practiceAttemptsCount || 0,
+            assessmentAttemptsCount: mastery?.assessmentAttemptsCount || 0,
+            resourceAccessCount: accessByTopic.get(topic._id.toString()) || 0,
+            lastEvaluatedAt: evidenceCount > 0 ? (mastery.lastEvaluatedAt ?? null) : null,
+        };
+    });
+    const unlockByTopic = new Map();
+    for (const topic of topics) {
+        const unlock = await isTopicUnlockedForLearner(learnerId, course, topic);
+        unlockByTopic.set(topic._id.toString(), Boolean(unlock.isUnlocked));
+    }
+    for (const topic of topicAnalytics) topic.isUnlocked = Boolean(unlockByTopic.get(topic.topicId));
+    const totalQuestions = evidence.reduce((sum, item) => sum + (item.totalQuestions || 0), 0);
+    const totalCorrect = evidence.reduce((sum, item) => sum + (item.correctCount || 0), 0);
+    const masteredTopics = topicAnalytics.filter((topic) => [MASTERY_STATUS.STRONG, MASTERY_STATUS.MASTERED].includes(topic.status)).length;
+    const evaluatedTopics = topicAnalytics.filter((topic) => topic.evidenceCount > 0).length;
+    const now = new Date();
+    const currentStart = new Date(now); currentStart.setUTCHours(0, 0, 0, 0); currentStart.setUTCDate(currentStart.getUTCDate() - (days - 1));
+    const previousStart = new Date(currentStart.getTime() - days * 86400000);
+    const currentEvidence = evidence.filter((item) => item.completedAt >= currentStart && item.completedAt <= now);
+    const previousEvidence = evidence.filter((item) => item.completedAt >= previousStart && item.completedAt < currentStart);
+    const summarize = (records) => {
+        const questions = records.reduce((sum, item) => sum + (item.totalQuestions || 0), 0);
+        const correct = records.reduce((sum, item) => sum + (item.correctCount || 0), 0);
+        return { attempts: records.length, practiceCount: records.filter((item) => item.sourceType === "PRACTICE").length, assessmentCount: records.filter((item) => item.sourceType === "ASSESSMENT").length, totalQuestions: questions, totalCorrect: correct, accuracyPercent: questions ? Math.round(correct / questions * 100) : null };
+    };
+    const dailyTrends = buildContinuousDailyTrends(currentEvidence, days);
+    const focusTopic = topicAnalytics.find((topic) => topic.isUnlocked && [MASTERY_STATUS.NEEDS_IMPROVEMENT, MASTERY_STATUS.DEVELOPING].includes(topic.status))
+        || topicAnalytics.find((topic) => topic.isUnlocked && topic.status === MASTERY_STATUS.INSUFFICIENT_EVIDENCE)
+        || null;
+    const nextAction = focusTopic ? {
+        topicId: focusTopic.topicId, topicTitle: focusTopic.title,
+        kind: focusTopic.status === MASTERY_STATUS.INSUFFICIENT_EVIDENCE ? "GATHER_EVIDENCE" : "REVIEW_TOPIC",
+        explanation: focusTopic.status === MASTERY_STATUS.INSUFFICIENT_EVIDENCE
+            ? "There is not enough eligible evidence to assess this topic yet. Work through its learning material and use an available practice or assessment to demonstrate your understanding."
+            : `Your current mastery status is ${focusTopic.status.replaceAll("_", " ").toLowerCase()}. Revisit the topic and use focused practice to strengthen your understanding.`,
+    } : null;
+    const distribution = Object.values(MASTERY_STATUS).reduce((result, status) => { result[status] = topicAnalytics.filter((topic) => topic.status === status).length; return result; }, {});
+
+    return {
+        course: { courseId: course._id.toString(), title: course.title, domain: course.domain, category: course.category, enrolledAt: enrollment.enrolledAt },
+        overview: { totalTopics: topics.length, evaluatedTopics, masteredTopics, masteryCoveragePercent: topics.length ? Math.round(evaluatedTopics / topics.length * 100) : 0, masteredTopicPercent: topics.length ? Math.round(masteredTopics / topics.length * 100) : 0, totalLessonsAvailable: lessonCounts, totalActiveResources: activeResources, accessedResources: resourceAccesses.length, totalEligibleAttempts: evidence.length, totalQuestions, totalCorrect, accuracyPercent: totalQuestions ? Math.round(totalCorrect / totalQuestions * 100) : null },
+        masteryDistribution: distribution, topics: topicAnalytics,
+        activity: { days, dailyTrends, currentPeriod: summarize(currentEvidence), previousPeriod: summarize(previousEvidence), resourceAccesses: resourceAccesses.length },
+        nextAction,
+        evidenceGuidance: "Mastery and performance use only eligible LearningEvidence and the authoritative TopicMastery records. Resource access is engagement evidence only; it does not increase mastery. Lesson completion or reading time is not tracked by a dedicated learner progress record.",
     };
 }

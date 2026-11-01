@@ -5,6 +5,7 @@ import {
     getLearnerDashboard,
     getLearnerCourseProgress,
     getLearnerAnalyticsOverview,
+    getLearnerCourseAnalytics,
 } from "../controllers/learnerAnalytics.controller.js";
 import {
     validateCourseIdParam,
@@ -39,3 +40,12 @@ learnerAnalyticsRouter.get(
 );
 
 export { learnerAnalyticsRouter };
+
+// GET /api/v1/learning/me/analytics/courses/:courseId
+learnerAnalyticsRouter.get(
+    "/learning/me/analytics/courses/:courseId",
+    roleMiddleware("LEARNER"),
+    validateCourseIdParam,
+    validateAnalyticsQuery,
+    getLearnerCourseAnalytics
+);

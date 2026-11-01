@@ -23,6 +23,66 @@ import { useInstructorAssessmentAnalytics } from '../hooks/useInstructorAssessme
 import { getInstructorQuestionAnalytics } from '../api/analytics.api';
 import type { InstructorQuestionAnalyticsResponse } from '../types/analytics.types';
 
+type MasteryDistribution = {
+  STRONG: { count: number; percentage: number };
+  DEVELOPING: { count: number; percentage: number };
+  NEEDS_IMPROVEMENT: { count: number; percentage: number };
+  INSUFFICIENT_EVIDENCE: { count: number; percentage: number };
+};
+
+const MASTERY_SEGMENTS = [
+  { key: 'STRONG', label: 'Strong', className: 'bg-emerald-500' },
+  { key: 'DEVELOPING', label: 'Developing', className: 'bg-blue-500' },
+  { key: 'NEEDS_IMPROVEMENT', label: 'Needs Improvement', className: 'bg-rose-500' },
+  { key: 'INSUFFICIENT_EVIDENCE', label: 'Awaiting Evidence', className: 'bg-neutral-300 dark:bg-neutral-700' },
+] as const;
+
+const MasteryDistributionBar: React.FC<{
+  distribution: MasteryDistribution;
+  compact?: boolean;
+}> = ({ distribution, compact = false }) => {
+  const total = MASTERY_SEGMENTS.reduce(
+    (sum, segment) => sum + distribution[segment.key].count,
+    0,
+  );
+
+  if (total === 0) {
+    return (
+      <p className="text-[10px] text-text-tertiary whitespace-nowrap">
+        No learner evidence yet
+      </p>
+    );
+  }
+
+  return (
+    <div
+      role="img"
+      aria-label={MASTERY_SEGMENTS
+        .filter((segment) => distribution[segment.key].count > 0)
+        .map((segment) => {
+          const item = distribution[segment.key];
+          return `${segment.label}: ${item.count} learners (${item.percentage}%)`;
+        })
+        .join(', ')}
+      className={`${compact ? 'w-32 h-2' : 'w-full h-3.5'} rounded-full overflow-hidden flex bg-surface-elevated border border-border`}
+    >
+      {MASTERY_SEGMENTS.map((segment) => {
+        const item = distribution[segment.key];
+        if (item.count <= 0) return null;
+
+        return (
+          <div
+            key={segment.key}
+            className={`${segment.className} transition-[width] duration-300`}
+            style={{ width: `${(item.count / total) * 100}%` }}
+            title={`${segment.label}: ${item.count} (${item.percentage}%)`}
+          />
+        );
+      })}
+    </div>
+  );
+};
+
 export const InstructorAnalyticsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const courseIdParam = searchParams.get('courseId');
@@ -284,7 +344,7 @@ export const InstructorAnalyticsPage: React.FC = () => {
                       {analytics.overview.totalEligibleAttempts}
                     </span>
                     <span className="text-xs text-text-tertiary block mt-1">
-                      Avg Accuracy:{' '}
+                      Weighted Accuracy:{' '}
                       <strong className="text-text-primary">
                         {analytics.overview.overallAverageAccuracy !== null ? `${analytics.overview.overallAverageAccuracy}%` : 'N/A'}
                       </strong>
@@ -334,7 +394,7 @@ export const InstructorAnalyticsPage: React.FC = () => {
                             Topic {tp.order}: {tp.title}
                           </span>
                           <span className="text-[11px] text-text-tertiary">
-                            Evaluated: {tp.evaluatedLearnersCount} learners • Avg Score:{' '}
+                            Evaluated: {tp.evaluatedLearnersCount} learners • Average mastery score:{' '}
                             {tp.averageMasteryScore !== null ? `${tp.averageMasteryScore}%` : 'Awaiting evidence'}
                           </span>
                         </div>
@@ -344,26 +404,10 @@ export const InstructorAnalyticsPage: React.FC = () => {
                               {tp.needsImprovementCount} Needs Impr. ({tp.needsImprovementPercentage}%)
                             </span>
                           )}
-                          <div className="w-32 hidden sm:flex h-2 rounded-full overflow-hidden bg-surface-elevated border border-border">
-                            <div
-                              style={{ width: `${tp.masteryDistribution.STRONG.percentage}%` }}
-                              className="bg-emerald-500"
-                              title={`Strong: ${tp.masteryDistribution.STRONG.count}`}
-                            />
-                            <div
-                              style={{ width: `${tp.masteryDistribution.DEVELOPING.percentage}%` }}
-                              className="bg-blue-500"
-                              title={`Developing: ${tp.masteryDistribution.DEVELOPING.count}`}
-                            />
-                            <div
-                              style={{ width: `${tp.masteryDistribution.NEEDS_IMPROVEMENT.percentage}%` }}
-                              className="bg-rose-500"
-                              title={`Needs Improvement: ${tp.masteryDistribution.NEEDS_IMPROVEMENT.count}`}
-                            />
-                            <div
-                              style={{ width: `${tp.masteryDistribution.INSUFFICIENT_EVIDENCE.percentage}%` }}
-                              className="bg-neutral-300 dark:bg-neutral-700"
-                              title={`Insufficient Evidence: ${tp.masteryDistribution.INSUFFICIENT_EVIDENCE.count}`}
+                          <div className="hidden sm:block">
+                            <MasteryDistributionBar
+                              distribution={tp.masteryDistribution}
+                              compact
                             />
                           </div>
                         </div>
@@ -431,7 +475,7 @@ export const InstructorAnalyticsPage: React.FC = () => {
                             )}
                           </div>
                           <span className="text-xs text-text-tertiary mt-1 block">
-                            Evaluated learners: <strong>{tp.evaluatedLearnersCount}</strong> of {tp.totalEnrolled} enrolled • Avg Score:{' '}
+                            Evaluated learners: <strong>{tp.evaluatedLearnersCount}</strong> of {tp.totalEnrolled} enrolled • Average mastery score:{' '}
                             <strong>{tp.averageMasteryScore !== null ? `${tp.averageMasteryScore}%` : 'N/A'}</strong>
                           </span>
                         </div>
@@ -439,28 +483,9 @@ export const InstructorAnalyticsPage: React.FC = () => {
 
                       {/* Distribution Bar */}
                       <div className="space-y-1.5">
-                        <div className="h-3.5 rounded-full overflow-hidden flex bg-surface-elevated border border-border">
-                          <div
-                            style={{ width: `${tp.masteryDistribution.STRONG.percentage}%` }}
-                            className="bg-emerald-500 transition-all duration-300"
-                            title={`Strong: ${tp.masteryDistribution.STRONG.count} (${tp.masteryDistribution.STRONG.percentage}%)`}
-                          />
-                          <div
-                            style={{ width: `${tp.masteryDistribution.DEVELOPING.percentage}%` }}
-                            className="bg-blue-500 transition-all duration-300"
-                            title={`Developing: ${tp.masteryDistribution.DEVELOPING.count} (${tp.masteryDistribution.DEVELOPING.percentage}%)`}
-                          />
-                          <div
-                            style={{ width: `${tp.masteryDistribution.NEEDS_IMPROVEMENT.percentage}%` }}
-                            className="bg-rose-500 transition-all duration-300"
-                            title={`Needs Improvement: ${tp.masteryDistribution.NEEDS_IMPROVEMENT.count} (${tp.masteryDistribution.NEEDS_IMPROVEMENT.percentage}%)`}
-                          />
-                          <div
-                            style={{ width: `${tp.masteryDistribution.INSUFFICIENT_EVIDENCE.percentage}%` }}
-                            className="bg-neutral-300 dark:bg-neutral-700 transition-all duration-300"
-                            title={`Insufficient Evidence: ${tp.masteryDistribution.INSUFFICIENT_EVIDENCE.count} (${tp.masteryDistribution.INSUFFICIENT_EVIDENCE.percentage}%)`}
-                          />
-                        </div>
+                        <MasteryDistributionBar
+                          distribution={tp.masteryDistribution}
+                        />
 
                         {/* Breakdown Numbers */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px]">
@@ -780,15 +805,8 @@ export const InstructorAnalyticsPage: React.FC = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {assessmentAnalytics.insights.map((insight) => {
-                    let borderClass = 'border-border';
-                    let badgeClass = 'bg-surface-elevated text-text-secondary';
-                    if (insight.category === 'PERFORMANCE' || insight.category === 'CURRICULUM_ALIGNMENT') {
-                      borderClass = 'border-rose-500/30';
-                      badgeClass = 'bg-rose-500/10 text-rose-600 dark:text-rose-400';
-                    } else if (insight.category === 'COMPLETION') {
-                      borderClass = 'border-amber-500/30';
-                      badgeClass = 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
-                    }
+                    const borderClass = 'border-border';
+                    const badgeClass = 'bg-surface-elevated text-text-secondary border border-border';
 
                     return (
                       <div
@@ -799,28 +817,35 @@ export const InstructorAnalyticsPage: React.FC = () => {
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${badgeClass}`}>
                             {insight.category.replace('_', ' ')}
                           </span>
-                          <span className="text-[11px] text-text-tertiary">
-                            Ref: {insight.reference.type}
+
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                            Observation
                           </span>
-                        </div>
-                        <div>
                           <h3 className="text-sm font-bold text-text-primary">{insight.title}</h3>
-                          <p className="text-xs text-text-secondary mt-1">{insight.observation}</p>
+                          <p className="text-xs text-text-secondary">{insight.observation}</p>
                         </div>
-                        <div className="p-3 rounded-xl bg-surface-elevated border border-border/60 text-xs space-y-1">
-                          <span className="text-[11px] font-semibold text-text-tertiary block uppercase tracking-wider">
-                            Supporting Metric
+                        <div className="p-3 rounded-xl bg-surface-elevated border border-border/60 text-xs space-y-1.5">
+                          <span className="text-[10px] font-bold text-text-tertiary block uppercase tracking-wider">
+                            Evidence behind this insight
                           </span>
                           <p className="text-text-primary font-medium">{insight.supportingEvidence}</p>
+                          <span className="text-[10px] text-text-tertiary block pt-1">
+                            Evidence reference: {insight.reference.type}
+                          </span>
                         </div>
-                        <div className="text-xs space-y-1 pt-1">
-                          <span className="font-bold text-signal block">Recommended Action:</span>
+                        <div className="text-xs space-y-1.5 pt-1">
+                          <span className="font-bold text-signal block uppercase tracking-wider text-[10px]">
+                            Suggested instructor action
+                          </span>
                           <p className="text-text-secondary">{insight.suggestedAction}</p>
                         </div>
                         {insight.dataLimitationNotice && (
-                          <span className="text-[10px] text-text-tertiary block border-t border-border/50 pt-2">
-                            Notice: {insight.dataLimitationNotice}
-                          </span>
+                          <div className="text-[11px] text-text-tertiary border-t border-border/50 pt-3">
+                            <span className="font-semibold text-text-secondary">Interpretation limit: </span>
+                            {insight.dataLimitationNotice}
+                          </div>
                         )}
                       </div>
                     );
@@ -867,6 +892,13 @@ export const InstructorAnalyticsPage: React.FC = () => {
                 </div>
               </div>
 
+              <div className="rounded-xl border border-border bg-surface-elevated/60 px-4 py-3 text-xs text-text-secondary">
+                <span className="font-semibold text-text-primary">How to read this breakdown:</span>{' '}
+                enrollment status describes the learner’s course enrollment, while topic badges describe
+                demonstrated mastery. “Awaiting Evidence” means there is not enough evidence to show a
+                mastery level; it is not a low-performance rating.
+              </div>
+
               {/* Learners Table / Cards */}
               {analytics.learners.items.length === 0 ? (
                 <div className="p-12 text-center rounded-2xl bg-surface border border-border text-xs text-text-tertiary">
@@ -907,7 +939,7 @@ export const InstructorAnalyticsPage: React.FC = () => {
 
                         <div className="text-right flex sm:flex-col items-center sm:items-end justify-between sm:justify-center">
                           <span className="text-xs text-text-secondary">
-                            Avg Mastery:{' '}
+                            Average mastery score:{' '}
                             <strong className="text-text-primary">
                               {learner.averageMasteryScore !== null ? `${learner.averageMasteryScore}%` : 'N/A'}
                             </strong>
@@ -920,13 +952,18 @@ export const InstructorAnalyticsPage: React.FC = () => {
 
                       {/* Topic-by-Topic Mastery Pills */}
                       <div className="space-y-1.5">
-                        <span className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider block">
-                          Topic Performance Breakdown
-                        </span>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider">
+                            Topic Performance Breakdown
+                          </span>
+                          <span className="text-[10px] text-text-tertiary">
+                            Score and status are shown per topic
+                          </span>
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           {learner.topics.map((t) => {
                             let badgeClass = 'bg-surface-elevated text-text-tertiary border-border';
-                            let label = 'Awaiting';
+                            let label = 'Awaiting evidence';
                             if (t.status === 'STRONG' || t.status === 'MASTERED') {
                               badgeClass = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
                               label = `${t.masteryScore}%`;
