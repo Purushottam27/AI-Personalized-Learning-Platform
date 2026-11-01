@@ -50,15 +50,13 @@ export const StudyPlannerPage: React.FC = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [dailyTime, setDailyTime] = useState('1-2 hours');
   const [sessionDuration, setSessionDuration] = useState(45);
-  const [timeOfDay, setTimeOfDay] = useState<StudyPreferences['preferredTimeOfDay']>('ANYTIME');
-  const [studyDays, setStudyDays] = useState<string[]>(DAY_NAMES);
+  const [learningPriority, setLearningPriority] = useState<StudyPreferences['learningPriority']>('BALANCED_PROGRESS');
 
   useEffect(() => {
     if (!preferences) return;
     setDailyTime(preferences.dailyStudyTime || '1-2 hours');
     setSessionDuration(preferences.preferredSessionDuration || 45);
-    setTimeOfDay(preferences.preferredTimeOfDay || 'ANYTIME');
-    setStudyDays(preferences.studyDays?.length ? preferences.studyDays : DAY_NAMES);
+    setLearningPriority(preferences.learningPriority || 'BALANCED_PROGRESS');
   }, [preferences]);
 
   const todayActivities = plan?.todayActivities ?? [];
@@ -75,7 +73,7 @@ export const StudyPlannerPage: React.FC = () => {
     isRestDay: !(plan?.scheduledActivities ?? []).some((a) => a.dayOfWeek === day),
   })), [plan]);
 
-  const isWeekFinished = Boolean(plan?.endDate && plan.endDate <= (plan.todayDate || new Date().toISOString().slice(0, 10)));
+  const isWeekFinished = Boolean(plan?.endDate && plan.endDate < (plan.todayDate || new Date().toISOString().slice(0, 10)));
   const topicInsights = plan?.topicInsights ?? [];
 
   const savePreferences = async (event: React.FormEvent) => {
@@ -83,7 +81,7 @@ export const StudyPlannerPage: React.FC = () => {
     setSaving(true);
     setNotice(null);
     try {
-      await updatePreferences({ dailyStudyTime: dailyTime, preferredSessionDuration: sessionDuration, preferredTimeOfDay: timeOfDay, studyDays });
+      await updatePreferences({ dailyStudyTime: dailyTime, preferredSessionDuration: sessionDuration, learningPriority });
       const proposal = await proposeRevision('Learner updated weekly study preferences');
       setNotice(proposal.isRevisionRecommended ? 'Preferences saved. A revised schedule is ready for your review.' : 'Preferences saved. Your current schedule remains suitable.');
     } catch (e) {
@@ -93,6 +91,16 @@ export const StudyPlannerPage: React.FC = () => {
 
   if (isLoading && !plan) return <div className="flex min-h-[50vh] items-center justify-center gap-3 text-sm text-text-secondary"><RefreshCw className="h-5 w-5 animate-spin text-signal" /> Loading your seven-day study plan…</div>;
   if (error && !plan) return <div className="mx-auto max-w-xl rounded-2xl border border-border bg-surface p-8 text-center"><AlertCircle className="mx-auto mb-3 h-7 w-7 text-error" /><h2 className="font-semibold text-text-primary">Unable to load your study plan</h2><p className="my-3 text-sm text-text-secondary">{error}</p><button onClick={() => void refetch()} className="rounded-lg bg-signal px-4 py-2 text-sm font-semibold text-white">Try again</button></div>;
+
+  if (!plan) return (
+    <div className="mx-auto max-w-3xl space-y-5 py-12 text-center">
+      <Sparkles className="mx-auto h-9 w-9 text-signal" />
+      <h1 className="font-display text-2xl font-bold text-text-primary">Create your study plan</h1>
+      <p className="text-sm text-text-secondary">Your study plan is generated only when you choose to create it. Opening this page does not use a generation opportunity.</p>
+      <button type="button" onClick={() => void generatePlan('Learner requested initial study plan')} disabled={isLoading || quota?.canGenerate === false} className="rounded-xl bg-signal px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{isLoading ? 'Generating…' : 'Generate my seven-day plan'}</button>
+      {quota?.reason && <p className="text-xs text-text-tertiary">{quota.reason}</p>}
+    </div>
+  );
 
   return (
     <div className="mx-auto max-w-6xl space-y-7 pb-16">
@@ -104,8 +112,8 @@ export const StudyPlannerPage: React.FC = () => {
           {plan && <p className="mt-2 text-xs text-text-tertiary">{plan.startDate} – {plan.endDate} · Plan v{plan.version}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {quota && <span className="mr-1 text-right text-xs text-text-secondary">{quota.remaining}/{quota.maxAllowed} regenerations left today<span className="block text-[10px] text-text-tertiary">Resets {new Date(quota.resetAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {quota.timeZone || 'application timezone'}</span></span>}
-          <button type="button" onClick={() => void generatePlan('Learner requested weekly plan regeneration')} disabled={isLoading || quota?.remaining === 0} className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-text-primary hover:border-signal disabled:cursor-not-allowed disabled:opacity-40"><RefreshCw className="h-4 w-4" /> Regenerate</button>
+          <span className="mr-1 max-w-52 text-right text-xs text-text-secondary">{quota?.reason || 'Generate a seven-day plan when you are ready.'}{quota?.regenerationDeadline && quota.regenerationAvailable && <span className="block text-[10px] text-text-tertiary">Regeneration closes {new Date(quota.regenerationDeadline).toLocaleString()}</span>}</span>
+          <button type="button" onClick={() => void generatePlan('Learner requested study plan generation')} disabled={isLoading || quota?.canGenerate === false} className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-text-primary hover:border-signal disabled:cursor-not-allowed disabled:opacity-40"><RefreshCw className="h-4 w-4" /> {plan ? 'Regenerate plan' : 'Generate plan'}</button>
           <button type="button" onClick={() => setTab('PREFERENCES')} className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-text-primary hover:border-signal"><Settings2 className="h-4 w-4" /> Preferences</button>
         </div>
       </header>
@@ -164,12 +172,11 @@ export const StudyPlannerPage: React.FC = () => {
       </section>}
 
       {tab === 'PREFERENCES' && <form onSubmit={savePreferences} className="max-w-2xl space-y-5 rounded-2xl border border-border bg-surface p-5">
-        <div><h2 className="font-semibold text-text-primary">Schedule preferences</h2><p className="mt-1 text-xs text-text-secondary">Preferred days influence how activities are distributed, but the weekly plan always shows all seven days.</p></div>
-        <div><label className="mb-2 block text-xs font-semibold text-text-primary">Preferred study days</label><div className="flex flex-wrap gap-2">{DAY_NAMES.map((day) => <button key={day} type="button" onClick={() => setStudyDays((prev) => prev.includes(day) ? prev.filter((x) => x !== day) : [...prev, day])} className={`rounded-lg border px-3 py-2 text-xs font-semibold ${studyDays.includes(day) ? 'border-signal bg-signal text-white' : 'border-border text-text-secondary'}`}>{day.slice(0,3)}</button>)}</div></div>
+        <div><h2 className="font-semibold text-text-primary">Schedule preferences</h2><p className="mt-1 text-xs text-text-secondary">These settings directly affect daily capacity, activity grouping, and which learning activities are prioritized.</p></div>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-xs font-semibold text-text-primary">Daily capacity<select value={dailyTime} onChange={(e) => setDailyTime(e.target.value)} className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm"><option>Less than 1 hour</option><option>1-2 hours</option><option>2-3 hours</option><option>3-4 hours</option><option>5 or more hours</option></select></label>
           <label className="text-xs font-semibold text-text-primary">Preferred session<select value={sessionDuration} onChange={(e) => setSessionDuration(Number(e.target.value))} className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm">{[15,30,45,60,90,120].map((n) => <option key={n} value={n}>{n} minutes</option>)}</select></label>
-          <label className="text-xs font-semibold text-text-primary sm:col-span-2">Preferred time<select value={timeOfDay} onChange={(e) => setTimeOfDay(e.target.value as StudyPreferences['preferredTimeOfDay'])} className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm"><option value="ANYTIME">Flexible / anytime</option><option value="MORNING">Morning</option><option value="AFTERNOON">Afternoon</option><option value="EVENING">Evening</option><option value="NIGHT">Night</option></select></label>
+          <label className="text-xs font-semibold text-text-primary sm:col-span-2">Learning priority<select value={learningPriority} onChange={(e) => setLearningPriority(e.target.value as StudyPreferences['learningPriority'])} className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm"><option value="BALANCED_PROGRESS">Balanced progress</option><option value="IMPROVE_WEAK_TOPICS">Improve weak topics</option><option value="ASSESSMENT_PREPARATION">Assessment preparation</option><option value="CONTINUE_LEARNING">Continue learning</option></select></label>
         </div>
         {notice && <p className="text-xs text-text-secondary">{notice}</p>}
         <button disabled={saving} className="rounded-lg bg-signal px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Saving…' : 'Save preferences'}</button>

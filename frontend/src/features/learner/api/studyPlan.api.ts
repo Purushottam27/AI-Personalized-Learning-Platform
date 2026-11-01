@@ -19,8 +19,8 @@ export const updateStudyPreferences = async (updates: Partial<StudyPreferences>)
   return res.data.data;
 };
 
-export const getActiveStudyPlan = async (): Promise<StudyPlan> => {
-  const res = await api.get<{ data: { plan: StudyPlan } }>('/learning/me/study-plan');
+export const getActiveStudyPlan = async (): Promise<StudyPlan | null> => {
+  const res = await api.get<{ data: { plan: StudyPlan | null } }>('/learning/me/study-plan');
   return res.data.data.plan;
 };
 

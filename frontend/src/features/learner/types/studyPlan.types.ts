@@ -38,10 +38,8 @@ export interface StudyPlanWeekDay {
 }
 export interface StudyPreferences {
   dailyStudyTime: string | null;
-  preferredLearningFormat: string[];
-  studyDays: string[];
   preferredSessionDuration: number;
-  preferredTimeOfDay: 'MORNING' | 'AFTERNOON' | 'EVENING' | 'NIGHT' | 'ANYTIME';
+  learningPriority: 'BALANCED_PROGRESS' | 'IMPROVE_WEAK_TOPICS' | 'ASSESSMENT_PREPARATION' | 'CONTINUE_LEARNING';
 }
 export interface PlanSummary {
   totalScheduled: number;
@@ -90,12 +88,14 @@ export interface PlanHistoryItem {
   createdAt: string;
 }
 export interface StudyPlanQuota {
-  dateKey: string;
-  count: number;
-  remaining: number;
-  maxAllowed: number;
-  resetAt: string;
-  timeZone?: string;
+  cycleId: string | null;
+  cycleNumber: number;
+  initialGeneratedAt: string | null;
+  regenerationDeadline: string | null;
+  regenerationAvailable: boolean;
+  canGenerate: boolean;
+  generationType: 'INITIAL' | 'REGENERATION' | 'UNAVAILABLE';
+  reason: string;
 }
 export interface ProposedPlanRevision {
   proposalId?: string;

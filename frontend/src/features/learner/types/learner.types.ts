@@ -127,9 +127,40 @@ export interface CourseProgressSummary {
   progressPercentage: number;
 }
 
+export interface TopicMasteryAnalyticsItem {
+  topicId: string;
+  courseId: string;
+  topicTitle: string;
+  courseTitle: string;
+  domain?: string;
+  order: number;
+  masteryScore: number | null;
+  status: string;
+  confidence: number;
+  evidenceCount: number;
+  practiceAttemptsCount: number;
+  assessmentAttemptsCount: number;
+  lastEvaluatedAt: string | null;
+}
+
+export interface AnalyticsPeriodSummary {
+  attempts: number;
+  practiceCount: number;
+  assessmentCount: number;
+  totalQuestions: number;
+  totalCorrect: number;
+  accuracyPercent: number | null;
+}
+
 export interface LearnerAnalyticsOverviewData {
   activityTotals: ActivityTotals;
   masteryDistribution: MasteryDistribution;
+  topicMasteryList: TopicMasteryAnalyticsItem[];
+  periodComparison: {
+    days: number;
+    current: AnalyticsPeriodSummary;
+    previous: AnalyticsPeriodSummary;
+  };
   dailyTrends: DailyTrendItem[];
   courseProgressList: CourseProgressSummary[];
 }

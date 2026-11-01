@@ -194,7 +194,7 @@ const LearnerCard: React.FC<{
       <div>
         <p className="text-[11px] text-text-tertiary">Average mastery</p>
         <p className="mt-1 text-sm font-semibold tabular-nums text-text-primary">
-          {learner.averageMasteryScore === null ? 'â€”' : `${learner.averageMasteryScore}%`}
+          {learner.averageMasteryScore === null ? '—' : `${learner.averageMasteryScore}%`}
         </p>
       </div>
     </div>
@@ -338,12 +338,12 @@ export const InstructorLearnersPage: React.FC = () => {
             className="w-full cursor-pointer rounded-xl border border-border bg-surface px-3.5 py-3 text-sm font-semibold text-text-primary outline-none transition-colors focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25"
           >
             {courses.map((course) => (
-              <option key={course._id} value={course._id}>{course.title} Â· {course.status.toLowerCase()}</option>
+              <option key={course._id} value={course._id}>{course.title} · {course.status.toLowerCase()}</option>
             ))}
           </select>
           {selectedCourse && (
             <p className="mt-2 truncate text-xs text-text-tertiary">
-              {selectedCourse.domain || 'Course'}{selectedCourse.category ? ` Â· ${selectedCourse.category}` : ''}
+              {selectedCourse.domain || 'Course'}{selectedCourse.category ? ` · ${selectedCourse.category}` : ''}
             </p>
           )}
         </div>
@@ -385,7 +385,7 @@ export const InstructorLearnersPage: React.FC = () => {
               <MetricCard
                 label="Enrolled learners"
                 value={overview?.totalEnrolledLearners ?? 0}
-                supportingText={`${overview?.enrollmentBreakdown.active ?? 0} active Â· ${overview?.enrollmentBreakdown.completed ?? 0} completed`}
+                supportingText={`${overview?.enrollmentBreakdown.active ?? 0} active · ${overview?.enrollmentBreakdown.completed ?? 0} completed`}
                 icon={Users}
               />
               <MetricCard
@@ -458,7 +458,7 @@ export const InstructorLearnersPage: React.FC = () => {
               <div>
                 <h2 className="text-sm font-semibold text-text-primary">How to read these signals</h2>
                 <p className="mt-1 max-w-3xl text-xs leading-relaxed text-text-secondary">
-                  â€œNeeds reviewâ€ means the learner has demonstrated difficulty in one or more topics. â€œAwaiting evidenceâ€ means there is not enough recorded evidence to assess mastery yet; it does not mean the learner is struggling.
+                  “Needs review” means the learner has demonstrated difficulty in one or more topics. “Awaiting evidence” means there is not enough recorded evidence to assess mastery yet; it does not mean the learner is struggling.
                 </p>
               </div>
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-surface-elevated px-2.5 py-1.5 text-[11px] text-text-tertiary">
@@ -605,7 +605,7 @@ export const InstructorLearnersPage: React.FC = () => {
 
             <div className="flex flex-col gap-3 border-t border-border-muted px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <p className="text-xs text-text-tertiary">
-                {totalItems === 0 ? 'No results' : `Showing ${(page - 1) * PAGE_SIZE + 1}â€“${Math.min(page * PAGE_SIZE, totalItems)} of ${totalItems}`}
+                {totalItems === 0 ? 'No results' : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalItems)} of ${totalItems}`}
               </p>
               <div className="flex items-center justify-between gap-3 sm:justify-end">
                 <Button
