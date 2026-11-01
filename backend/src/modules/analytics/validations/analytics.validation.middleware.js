@@ -5,6 +5,7 @@ import {
     analyticsOverviewQuerySchema,
     instructorAnalyticsQuerySchema,
     assessmentIdParamSchema,
+    instructorLearnersOverviewQuerySchema,
 } from "./analytics.validation.js";
 
 export function validateCourseIdParam(req, res, next) {
@@ -45,6 +46,15 @@ export function validateAnalyticsQuery(req, res, next) {
 
 export function validateInstructorAnalyticsQuery(req, res, next) {
     const result = instructorAnalyticsQuerySchema.safeParse(req.query);
+    if (!result.success) {
+        throw new ApiError(400, "VALIDATION_ERROR", "Invalid query parameters", result.error.format());
+    }
+    req.validatedQuery = result.data;
+    next();
+}
+
+export function validateInstructorLearnersOverviewQuery(req, res, next) {
+    const result = instructorLearnersOverviewQuerySchema.safeParse(req.query);
     if (!result.success) {
         throw new ApiError(400, "VALIDATION_ERROR", "Invalid query parameters", result.error.format());
     }

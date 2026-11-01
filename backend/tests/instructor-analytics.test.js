@@ -584,6 +584,95 @@ test("Instructor Course Analytics Test Suite", async (t) => {
         assert.equal(learner.topics[0].masteryScore, 70);
     });
 
+    await t.test("All-courses overview deduplicates learners across courses and enrollment history", async () => {
+        const secondCourseId = new mongoose.Types.ObjectId();
+        createdCourseIds.push(secondCourseId);
+
+        await Course.create({
+            _id: secondCourseId,
+            title: "Second Instructor Course",
+            description: "A second course used to verify cross-course learner aggregation.",
+            createdBy: instructor1Id,
+            domain: "Computer Science",
+            category: "Algorithms",
+            difficulty: "INTERMEDIATE",
+            status: "DRAFT",
+        });
+
+        const oldEnrollment = await Enrollment.create({
+            learnerId: learner1Id,
+            courseId: secondCourseId,
+            status: "WITHDRAWN",
+            enrolledAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
+        });
+        const learner1SecondCourse = await Enrollment.create({
+            learnerId: learner1Id,
+            courseId: secondCourseId,
+            status: "ACTIVE",
+            enrolledAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        });
+        const learner2SecondCourse = await Enrollment.create({
+            learnerId: learner2Id,
+            courseId: secondCourseId,
+            status: "COMPLETED",
+        });
+        createdEnrollmentIds.push(oldEnrollment._id, learner1SecondCourse._id, learner2SecondCourse._id);
+
+        const res = await apiRequest({
+            method: "GET",
+            reqPath: "/api/v1/instructor/learners/overview",
+            token: instructor1Token,
+        });
+
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.body.success, true);
+        const data = res.body.data;
+       assert.equal(data.overview.totalCourses, 5);
+assert.equal(data.overview.totalEnrollments, 7);
+assert.equal(data.overview.uniqueLearnersCount, 5);
+
+assert.deepEqual(data.overview.enrollmentBreakdown, {
+    active: 6,
+    completed: 1,
+    withdrawn: 0,
+});
+
+        const learner1 = data.learners.items.find((item) => item.learnerId === learner1Id.toString());
+        assert.ok(learner1);
+        assert.equal(learner1.coursesCount, 2);
+        assert.equal(learner1.courses.length, 2);
+        assert.equal(learner1.courses.find((item) => item.courseId === secondCourseId.toString()).enrollmentStatus, "ACTIVE");
+
+        const secondCourse = data.courses.find((item) => item.courseId === secondCourseId.toString());
+        assert.equal(secondCourse.totalEnrollments, 2);
+        assert.equal(secondCourse.enrollmentBreakdown.active, 1);
+        assert.equal(secondCourse.enrollmentBreakdown.completed, 1);
+        assert.equal(secondCourse.enrollmentBreakdown.withdrawn, 0);
+    });
+
+    await t.test("All-courses overview search filters directory without changing global totals", async () => {
+        const res = await apiRequest({
+            method: "GET",
+            reqPath: "/api/v1/instructor/learners/overview?search=Learner%20Weak",
+            token: instructor1Token,
+        });
+
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.body.data.learners.pagination.totalItems, 1);
+        assert.equal(res.body.data.learners.items[0].learnerId, learner1Id.toString());
+        assert.equal(res.body.data.overview.uniqueLearnersCount, 5);
+assert.equal(res.body.data.overview.totalEnrollments, 7);
+    });
+
+    await t.test("All-courses overview rejects non-instructor roles", async () => {
+        const res = await apiRequest({
+            method: "GET",
+            reqPath: "/api/v1/instructor/learners/overview",
+            token: learner1Token,
+        });
+
+        assert.equal(res.statusCode, 403);
+    });
     // ==========================================
     // 3. Authorization & HTTP API Tests
     // ==========================================

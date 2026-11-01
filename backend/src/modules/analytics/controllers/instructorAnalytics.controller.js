@@ -1,6 +1,7 @@
 import { ApiResponse } from "../../../shared/responses/ApiResponse.js";
 import { getInstructorCourseAnalyticsService } from "../services/instructorAnalytics.service.js";
 import { getInstructorCourseLearnerDetailsService } from "../services/instructorLearnerDetails.service.js";
+import { getInstructorLearnersOverviewService } from "../services/instructorLearnersOverview.service.js";
 import {
     getInstructorAssessmentAnalyticsService,
     getInstructorQuestionAnalyticsService,
@@ -64,5 +65,19 @@ export async function getInstructorQuestionAnalytics(req, res) {
 
     return res.status(200).json(
         new ApiResponse(data, "Instructor question analytics fetched successfully")
+    );
+}
+
+/**
+ * Controller for GET /api/v1/instructor/learners/overview
+ */
+export async function getInstructorLearnersOverview(req, res) {
+    const instructorId = req.user._id;
+    const query = req.validatedQuery || {};
+
+    const overview = await getInstructorLearnersOverviewService(instructorId, query);
+
+    return res.status(200).json(
+        new ApiResponse(overview, "Instructor learners overview fetched successfully")
     );
 }

@@ -6,17 +6,27 @@ import {
     getInstructorCourseLearnerDetails,
     getInstructorAssessmentAnalytics,
     getInstructorQuestionAnalytics,
+    getInstructorLearnersOverview,
 } from "../controllers/instructorAnalytics.controller.js";
 import {
     validateCourseIdParam,
     validateCourseLearnerParams,
     validateInstructorAnalyticsQuery,
     validateAssessmentIdParam,
+    validateInstructorLearnersOverviewQuery,
 } from "../validations/analytics.validation.middleware.js";
 
 const instructorAnalyticsRouter = Router();
 
 instructorAnalyticsRouter.use(authMiddleware);
+
+// GET /api/v1/instructor/learners/overview
+instructorAnalyticsRouter.get(
+    "/instructor/learners/overview",
+    roleMiddleware("INSTRUCTOR"),
+    validateInstructorLearnersOverviewQuery,
+    getInstructorLearnersOverview
+);
 
 // GET /api/v1/instructor/courses/:courseId/analytics
 instructorAnalyticsRouter.get(
