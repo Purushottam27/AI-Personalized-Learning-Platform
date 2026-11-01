@@ -327,7 +327,7 @@ export const InstructorLearnersPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="w-full lg:max-w-sm">
+        <div className="w-full lg:max-w-sm">         
           <label htmlFor="learners-course-select" className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-text-secondary">
             Viewing learners in
           </label>
