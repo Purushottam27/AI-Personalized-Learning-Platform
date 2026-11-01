@@ -86,8 +86,13 @@ test("Stage 6 â€” Personalization & Recommendation Service Test Suite", asy
     );
 
     // Remove only orphaned prerequisite fixtures from earlier failed runs of this suite.
-    // The unique marker is specific to Test 2.5; no other course data is touched.
-    await Course.deleteMany({ description: /Recommendation Fixture Artificial Intelligence/ });
+    // Clean up test-specific fixture courses to prevent cross-run interference in shared test DB.
+    await Course.deleteMany({
+        $or: [
+            { description: /Recommendation Fixture Artificial Intelligence/ },
+            { title: { $in: ["Foundations of AI", "Advanced Deep Learning", "Probability and Statistics", "Personalization Course 1", "Personalization Course 2"] } }
+        ]
+    });
 
     function createToken(userId, role) {
         return jwt.sign({ sub: userId.toString(), role }, JWT_ACCESS_SECRET, { expiresIn: "1h" });

@@ -597,32 +597,87 @@ export const InstructorAnalyticsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Question Insights Banner if any */}
-                  {questionAnalytics.questionInsights.length > 0 && (
-                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2">
-                      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold text-xs">
-                        <Info className="w-4 h-4 shrink-0" />
-                        <span>Question Performance Signals</span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
-                        {questionAnalytics.questionInsights.map((qi) => (
-                          <div key={qi.id} className="p-3 rounded-xl bg-surface border border-amber-500/30 text-xs space-y-1">
-                            <span className="font-bold text-text-primary block">{qi.title}</span>
-                            <p className="text-[11px] text-text-secondary">{qi.observation}</p>
-                            <span className="text-[10px] text-text-tertiary block font-medium">
-                              Suggestion: {qi.suggestedAction}
-                            </span>
+                  {/* Assessment evidence summary */}
+                  {(() => {
+                    const assessmentSummary = assessmentAnalytics?.assessments.find(
+                      (item) => item.assessmentId === selectedAssessmentId,
+                    );
+                    const flaggedQuestions = questionAnalytics.questions.filter(
+                      (question) => question.responsePatternSignal === 'HIGH_INCORRECT_RATE'
+                        || question.responsePatternSignal === 'HIGH_UNANSWERED_RATE',
+                    );
+                    const evaluatedAttempts = questionAnalytics.totalEvaluatedAttempts ?? 0;
+                    const unevaluatedAttempts = questionAnalytics.totalUnevaluatedAttempts ?? Math.max(
+                      0,
+                      questionAnalytics.totalCompletedAttempts - evaluatedAttempts,
+                    );
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                          {[
+                            { label: 'Submitted attempts', value: questionAnalytics.totalCompletedAttempts, detail: 'All submitted attempts' },
+                            { label: 'Evaluated attempts', value: evaluatedAttempts, detail: 'Used for response analysis' },
+                            { label: 'Unevaluated attempts', value: unevaluatedAttempts, detail: 'Excluded from performance signals' },
+                            { label: 'Questions in pool', value: questionAnalytics.totalPoolQuestions, detail: `${questionAnalytics.questions.length} question records returned` },
+                          ].map((metric) => (
+                            <div key={metric.label} className="rounded-xl border border-border bg-surface p-4 space-y-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">{metric.label}</span>
+                              <p className="text-2xl font-display font-bold text-text-primary tabular-nums">{metric.value}</p>
+                              <p className="text-[10px] text-text-tertiary">{metric.detail}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="rounded-xl border border-border bg-surface-elevated/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <p className="text-xs font-bold text-text-primary">Question response overview</p>
+                            <p className="text-[11px] text-text-secondary">
+                              {flaggedQuestions.length > 0
+                                ? `${flaggedQuestions.length} question(s) currently carry a response-pattern signal. Review their individual evidence below.`
+                                : 'No high-incorrect or high-unanswered response signals are currently recorded for this assessment.'}
+                            </p>
                           </div>
-                        ))}
+                          <div className="shrink-0 text-right">
+                            <span className="text-2xl font-bold text-text-primary tabular-nums">{flaggedQuestions.length}</span>
+                            <span className="block text-[10px] text-text-tertiary uppercase tracking-wider">Flagged questions</span>
+                          </div>
+                        </div>
+
+                        {assessmentSummary && (
+                          <div className="rounded-xl border border-border bg-surface p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-bold text-text-primary">Assessment outcome</p>
+                                <p className="text-[11px] text-text-tertiary mt-1">Pass/fail metrics use evaluated attempts only.</p>
+                              </div>
+                              <div className="flex flex-wrap gap-5">
+                                <div><p className="text-lg font-bold text-text-primary tabular-nums">{assessmentSummary.passPercentage !== null ? `${assessmentSummary.passPercentage}%` : '—'}</p><p className="text-[10px] text-text-tertiary">Pass rate</p></div>
+                                <div><p className="text-lg font-bold text-text-primary tabular-nums">{assessmentSummary.averageScore !== null ? `${assessmentSummary.averageScore}%` : '—'}</p><p className="text-[10px] text-text-tertiary">Average score</p></div>
+                                <div><p className="text-lg font-bold text-text-primary tabular-nums">{assessmentSummary.passingScore}%</p><p className="text-[10px] text-text-tertiary">Pass threshold</p></div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Question-level evidence */}
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-1">
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
+                          Question-level evidence ({questionAnalytics.questions.length})
+                        </h4>
+                        <p className="text-[11px] text-text-tertiary mt-1">Response counts are based on evaluated exposures; each question shows its own sample size.</p>
+                      </div>
+                      <div className="flex flex-wrap gap-3 text-[10px] text-text-tertiary">
+                        <span className="flex items-center gap-1"><i className="w-2 h-2 rounded-full bg-emerald-500" />Correct</span>
+                        <span className="flex items-center gap-1"><i className="w-2 h-2 rounded-full bg-rose-500" />Incorrect</span>
+                        <span className="flex items-center gap-1"><i className="w-2 h-2 rounded-full bg-neutral-400" />Unanswered</span>
                       </div>
                     </div>
-                  )}
-
-                  {/* Question Items Table / Cards */}
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
-                      Question Pool Responses ({questionAnalytics.questions.length})
-                    </h4>
                     {questionAnalytics.questions.map((q, idx) => (
                       <div key={q.questionId} className="p-4 rounded-xl border border-border bg-surface space-y-3">
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
@@ -803,53 +858,57 @@ export const InstructorAnalyticsPage: React.FC = () => {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {assessmentAnalytics.insights.map((insight) => {
-                    const borderClass = 'border-border';
-                    const badgeClass = 'bg-surface-elevated text-text-secondary border border-border';
+                <div className="grid grid-cols-1 gap-4">
+                  {assessmentAnalytics.insights.map((insight) => (
+                    <article
+                      key={insight.id}
+                      className="relative overflow-hidden rounded-2xl border border-border bg-surface shadow-xs"
+                    >
+                      <div className="absolute inset-y-0 left-0 w-1 bg-signal" />
+                      <div className="p-5 sm:p-6 pl-6 sm:pl-7 space-y-5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-elevated px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                            <Sparkles className="w-3 h-3 text-signal" />
+                            {insight.category.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+                            Evidence source · {insight.reference.type}
+                          </span>
+                        </div>
 
-                    return (
-                      <div
-                        key={insight.id}
-                        className={`p-5 rounded-2xl border ${borderClass} bg-surface space-y-3 shadow-xs`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${badgeClass}`}>
-                            {insight.category.replace('_', ' ')}
-                          </span>
+                        <div className="max-w-4xl space-y-2">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-signal">Observed learning signal</span>
+                          <h3 className="text-base sm:text-lg font-bold text-text-primary">{insight.title}</h3>
+                          <p className="text-sm leading-relaxed text-text-secondary">{insight.observation}</p>
+                        </div>
 
+                        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-3">
+                          <div className="rounded-xl border border-border bg-surface-elevated/70 p-4 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Info className="w-4 h-4 text-text-tertiary" />
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">Evidence behind this finding</span>
+                            </div>
+                            <p className="text-sm font-semibold leading-relaxed text-text-primary">{insight.supportingEvidence}</p>
+                            {insight.reference.title && <p className="text-[11px] text-text-tertiary">Reference: {insight.reference.title}</p>}
+                          </div>
+                          <div className="rounded-xl border border-signal/25 bg-signal/5 p-4 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="w-4 h-4 text-signal" />
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-signal">Suggested instructor action</span>
+                            </div>
+                            <p className="text-sm leading-relaxed text-text-primary">{insight.suggestedAction}</p>
+                          </div>
                         </div>
-                        <div className="space-y-1">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
-                            Observation
-                          </span>
-                          <h3 className="text-sm font-bold text-text-primary">{insight.title}</h3>
-                          <p className="text-xs text-text-secondary">{insight.observation}</p>
-                        </div>
-                        <div className="p-3 rounded-xl bg-surface-elevated border border-border/60 text-xs space-y-1.5">
-                          <span className="text-[10px] font-bold text-text-tertiary block uppercase tracking-wider">
-                            Evidence behind this insight
-                          </span>
-                          <p className="text-text-primary font-medium">{insight.supportingEvidence}</p>
-                          <span className="text-[10px] text-text-tertiary block pt-1">
-                            Evidence reference: {insight.reference.type}
-                          </span>
-                        </div>
-                        <div className="text-xs space-y-1.5 pt-1">
-                          <span className="font-bold text-signal block uppercase tracking-wider text-[10px]">
-                            Suggested instructor action
-                          </span>
-                          <p className="text-text-secondary">{insight.suggestedAction}</p>
-                        </div>
+
                         {insight.dataLimitationNotice && (
-                          <div className="text-[11px] text-text-tertiary border-t border-border/50 pt-3">
-                            <span className="font-semibold text-text-secondary">Interpretation limit: </span>
-                            {insight.dataLimitationNotice}
+                          <div className="flex items-start gap-2 border-t border-border pt-3 text-[11px] leading-relaxed text-text-tertiary">
+                            <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                            <p><span className="font-semibold text-text-secondary">Interpretation limit: </span>{insight.dataLimitationNotice}</p>
                           </div>
                         )}
                       </div>
-                    );
-                  })}
+                    </article>
+                  ))}
                 </div>
               )}
             </div>

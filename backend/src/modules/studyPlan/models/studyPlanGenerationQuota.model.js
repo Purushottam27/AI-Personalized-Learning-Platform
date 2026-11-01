@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 // One persistent generation lifecycle per learner. Calendar boundaries never reset allowances.
 const studyPlanGenerationQuotaSchema = new mongoose.Schema({
-    learnerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true, index: true },
+    learnerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     cycleId: { type: mongoose.Schema.Types.ObjectId, default: () => new mongoose.Types.ObjectId(), required: true },
     initialGeneratedAt: { type: Date, default: null },
     regenerationUsedAt: { type: Date, default: null },

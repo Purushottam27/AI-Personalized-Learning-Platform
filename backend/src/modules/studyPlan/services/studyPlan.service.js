@@ -154,13 +154,15 @@ export function getNextMidnightResetAt(date = new Date(), timeZone = getApplicat
 export async function getStudyPlanQuotaService(learnerId) {
     requireObjectId(learnerId, "learnerId");
     const now = new Date();
+    const activePlan = await StudyPlan.findOne({ learnerId, status: "ACTIVE" }).lean();
+    const planExpired = Boolean(activePlan && getCalendarDateKey(now) > activePlan.endDate);
     const state = await StudyPlanGenerationQuota.findOne({ learnerId }).lean();
     const initialAt = state?.initialGeneratedAt ? new Date(state.initialGeneratedAt) : null;
     const regenerationDeadline = initialAt ? new Date(initialAt.getTime() + 24 * 60 * 60 * 1000) : null;
-    const regenerationAvailable = Boolean(initialAt && !state.regenerationUsedAt && now < regenerationDeadline);
-    const activePlan = await StudyPlan.findOne({ learnerId, status: "ACTIVE" }).lean();
-    const planExpired = Boolean(activePlan && getCalendarDateKey(now) > activePlan.endDate);
-    const canGenerateInitial = !initialAt || planExpired;
+    const regenerationAvailable = Boolean(initialAt && !state?.regenerationUsedAt && now < regenerationDeadline && !planExpired);
+    // A calendar expiry never grants a fresh allowance. The lifecycle is reset only
+    // after the active plan is authoritatively completed.
+    const canGenerateInitial = !initialAt;
     return {
         cycleId: state?.cycleId?.toString() || null,
         cycleNumber: state?.cycleNumber || 0,
@@ -170,7 +172,7 @@ export async function getStudyPlanQuotaService(learnerId) {
         canGenerate: canGenerateInitial || regenerationAvailable,
         generationType: regenerationAvailable ? "REGENERATION" : canGenerateInitial ? "INITIAL" : "UNAVAILABLE",
         reason: regenerationAvailable ? "One regeneration is available within 24 hours of the initial generation." :
-            canGenerateInitial ? "A new seven-day plan can be generated." : "The current plan is active and its regeneration window has ended."
+            canGenerateInitial ? "Your initial seven-day plan is ready to generate." : "Your generation allowance has been used. Complete the active plan to unlock the next generation cycle."
     };
 }
 
@@ -200,7 +202,7 @@ export async function checkAndConsumeGenerationQuota(learnerId, session, date = 
         await state.save({ session });
         return "REGENERATION";
     }
-    if (!initialAt || expired) {
+    if (!initialAt) {
         state.cycleId = new mongoose.Types.ObjectId();
         state.cycleNumber = (state.cycleNumber || 0) + 1;
         state.initialGeneratedAt = now;
@@ -508,8 +510,14 @@ export function buildDeterministicSchedule(candidates, weekInfo, preferences = {
         return [];
     }
 
-    // The seven consecutive calendar days are all eligible; no preferred-day filter. 
-    const orderedDays = [...calendarDays];
+    // If studyDays preference is provided, prefer those days in order, otherwise all calendar days.
+    let orderedDays = [...calendarDays];
+    if (Array.isArray(preferences.studyDays) && preferences.studyDays.length > 0) {
+        const preferred = calendarDays.filter((d) => preferences.studyDays.includes(d.dayOfWeek));
+        if (preferred.length > 0) {
+            orderedDays = preferred;
+        }
+    }
 
     const dayAllocations = new Map();
     orderedDays.forEach((day) => {
@@ -564,11 +572,9 @@ export function buildDeterministicSchedule(candidates, weekInfo, preferences = {
             break;
         }
 
-        // No remaining day can fit this activity; later candidates cannot be
-        // assumed to be smaller, so stop rather than silently over-allocate.
-        if (!placed) {
-            break;
-        }
+        // Skip a candidate that cannot fit in any remaining day. A later, shorter
+        // candidate may still fit; do not let one oversized item block the schedule.
+        if (!placed) continue;
     }
 
     return scheduled.sort((a, b) => {
@@ -914,7 +920,7 @@ export async function enrichPlanWithActualState(planDoc, learnerId) {
 }
 
 /**
- * Retrieves the currently active study plan (or generates one if missing).
+ * Retrieves the currently active study plan without implicitly generating one.
  */
 export async function getActiveStudyPlanService(learnerId) {
     requireObjectId(learnerId, "learnerId");

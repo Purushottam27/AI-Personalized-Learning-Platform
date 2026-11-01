@@ -677,7 +677,7 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         resetAiProvider();
     });
 
-    await t.test("17. Quota Enforcement: Exceeding 2 generations in single calendar day throws 429", async () => {
+    await t.test("17. Quota Enforcement: Exceeding initial generation + 24h regeneration throws GENERATION_UNAVAILABLE", async () => {
         const testLearnerId = new mongoose.Types.ObjectId();
         await Enrollment.create({
             learnerId: testLearnerId,
@@ -686,22 +686,22 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
             enrolledAt: new Date(),
         });
 
-        // 1st generation -> success
+        // 1st generation -> success (initial)
         const plan1 = await generateStudyPlanService(testLearnerId);
         assert.ok(plan1);
 
-        // 2nd generation -> success
+        // 2nd generation -> success (regeneration within 24h)
         const plan2 = await generateStudyPlanService(testLearnerId);
         assert.ok(plan2);
 
-        // 3rd generation -> must fail with 429 QUOTA_EXCEEDED
+        // 3rd generation -> must fail with 429 GENERATION_UNAVAILABLE
         await assert.rejects(
             async () => {
                 await generateStudyPlanService(testLearnerId);
             },
             (err) => {
                 assert.equal(err.statusCode, 429);
-                assert.equal(err.code, "QUOTA_EXCEEDED");
+                assert.equal(err.code, "GENERATION_UNAVAILABLE");
                 return true;
             }
         );
@@ -1309,14 +1309,13 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
             enrolledAt: new Date()
         });
 
-        // 1. Quota service returns consistent timezone and resetAt
+        // 1. Quota service returns lifecycle state
         const quotaInfo = await getStudyPlanQuotaService(tzLearnerId);
-        assert.ok(quotaInfo.dateKey);
-        assert.equal(quotaInfo.maxAllowed, 2);
-        assert.equal(quotaInfo.count, 0);
-        assert.equal(quotaInfo.remaining, 2);
-        assert.ok(quotaInfo.timeZone);
-        assert.ok(quotaInfo.resetAt);
+        assert.equal(quotaInfo.cycleNumber, 0);
+        assert.equal(quotaInfo.canGenerate, true);
+        assert.equal(quotaInfo.generationType, "INITIAL");
+        assert.equal(quotaInfo.regenerationAvailable, false);
+        assert.ok(quotaInfo.reason);
 
         // 2. Date key formatter respects specified timezone offset
         const fixedDate = new Date("2026-11-01T23:30:00.000Z"); // 23:30 UTC Nov 1 = 05:00 Nov 2 in Asia/Kolkata
@@ -1346,19 +1345,14 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         );
 
         // 4. Failed plan generation does NOT consume quota
-        // To simulate failed generation: temporarily set Course status to invalid within callback or make session fail
         await assert.rejects(
             async () => {
-                // learner without enrollment cannot generate if no course is active -> wait, let's test quota when generation throws
-                const badLearnerId = new mongoose.Types.ObjectId();
-                // Pass learner with no enrollments: collectCandidateActivities yields [] and schedule is []
-                // Instead, force an error inside withTransaction by passing invalid ObjectId in learnerId
                 await generateStudyPlanService("not-an-object-id");
             }
         );
 
         const quotaAfterFailure = await getStudyPlanQuotaService(tzLearnerId);
-        assert.equal(quotaAfterFailure.count, 0, "Failed generation must not consume quota");
+        assert.equal(quotaAfterFailure.cycleNumber, 0, "Failed generation must not consume quota");
 
         // Cleanup
         await Enrollment.deleteMany({ learnerId: tzLearnerId });
@@ -1438,7 +1432,7 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         ]);
     });
 
-    await t.test("25. Concurrent first quota creation and generation never exceed the daily limit", async () => {
+    await t.test("25. Concurrent first quota creation and generation never exceed the cycle allowance", async () => {
         const concurrentLearnerId = new mongoose.Types.ObjectId();
         await Enrollment.create({
             learnerId: concurrentLearnerId,
@@ -1453,11 +1447,12 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         ]);
         const successful = results.filter((result) => result.status === "fulfilled");
         const failed = results.filter((result) => result.status === "rejected");
-        assert.equal(successful.length, 2, "Exactly two concurrent generations may succeed");
+        assert.equal(successful.length, 2, "Exactly two generations (initial + 1 regeneration) may succeed");
         assert.equal(failed.length, 1, "The third concurrent generation must be rejected");
-        const dateKey = getCalendarDateKey(new Date(), process.env.APP_TIMEZONE || "UTC");
-        const quota = await StudyPlanGenerationQuota.findOne({ learnerId: concurrentLearnerId, dateKey }).lean();
-        assert.equal(quota?.count, 2, "Persisted quota count must match successful generations");
+        const quota = await StudyPlanGenerationQuota.findOne({ learnerId: concurrentLearnerId }).lean();
+        assert.equal(quota?.cycleNumber, 1, "Persisted cycle number must match first cycle");
+        assert.ok(quota?.initialGeneratedAt, "Initial generation timestamp must be recorded");
+        assert.ok(quota?.regenerationUsedAt, "Regeneration timestamp must be recorded");
         assert.equal(await StudyPlan.countDocuments({ learnerId: concurrentLearnerId, status: "ACTIVE" }), 1);
         assert.equal(await StudyPlan.countDocuments({ learnerId: concurrentLearnerId }), 2);
         await Promise.all([

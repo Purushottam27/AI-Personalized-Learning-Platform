@@ -605,6 +605,7 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
         assert.equal(data.periodComparison.current.attempts, 2);
         assert.equal(data.periodComparison.current.totalQuestions, 18);
         assert.equal(data.periodComparison.current.accuracyPercent, 83);
+        assert.equal(Object.prototype.hasOwnProperty.call(data, "engagement"), false, "overall analytics must not aggregate course material counts");
         assert.equal(data.topicMasteryList.length, 3);
         assert.ok(data.topicMasteryList.some((topic) => topic.topicTitle === "Dynamic Programming" && topic.status === MASTERY_STATUS.NEEDS_IMPROVEMENT));
 
@@ -642,6 +643,13 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
         assert.equal(data.topics.length, 3);
         assert.ok(data.topics.some((topic) => topic.title === "Dynamic Programming" && topic.status === MASTERY_STATUS.NEEDS_IMPROVEMENT));
         assert.equal(data.activity.dailyTrends.length, 7);
+        assert.equal(data.activity.currentPeriod.practice.attempts, 1);
+        assert.equal(data.activity.currentPeriod.practice.totalQuestions, 10);
+        assert.equal(data.activity.currentPeriod.practice.accuracyPercent, 90);
+        assert.equal(data.activity.currentPeriod.assessment.attempts, 1);
+        assert.equal(data.activity.currentPeriod.assessment.totalQuestions, 8);
+        assert.equal(data.activity.currentPeriod.assessment.accuracyPercent, 75);
+        assert.equal(typeof data.learningState.allTopicsMastered, "boolean");
         assert.equal(typeof data.overview.totalLessonsAvailable, "number");
         assert.equal(typeof data.overview.totalActiveResources, "number");
         assert.equal(data.evidenceGuidance.includes("does not increase mastery"), true);
