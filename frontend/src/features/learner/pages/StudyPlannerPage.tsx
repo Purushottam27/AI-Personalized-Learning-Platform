@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle,  CheckCircle2, Clock3, RefreshCw, Settings2, Sparkles,  TrendingUp, Circle, ChevronRight } from 'lucide-react';
+import { AlertCircle,  CheckCircle2, Clock3, RefreshCw, Settings2, Sparkles, Circle, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useStudyPlan } from '../hooks/useStudyPlan';
 import type { ScheduledActivity, StudyPreferences } from '../types/studyPlan.types';
-
+import { WeeklyLearningReview } from './WeeklyLearningReview';
 type Tab = 'WEEK' | 'TODAY' | 'REVIEW' | 'PREFERENCES';
 const DAY_NAMES = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
@@ -72,9 +72,6 @@ export const StudyPlannerPage: React.FC = () => {
     totalDurationMinutes: (plan?.scheduledActivities ?? []).filter((a) => a.dayOfWeek === day).reduce((n, a) => n + a.estimatedDurationMinutes, 0),
     isRestDay: !(plan?.scheduledActivities ?? []).some((a) => a.dayOfWeek === day),
   })), [plan]);
-
-  const isWeekFinished = Boolean(plan?.endDate && plan.endDate < (plan.todayDate || new Date().toISOString().slice(0, 10)));
-  const topicInsights = plan?.topicInsights ?? [];
 
   const savePreferences = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -152,24 +149,7 @@ export const StudyPlannerPage: React.FC = () => {
         {plan?.nextActivity && <p className="text-xs text-text-tertiary">Next suggested activity: <strong className="text-text-primary">{plan.nextActivity.title}</strong></p>}
       </section>}
 
-      {tab === 'REVIEW' && <section className="space-y-5">
-        <div className="rounded-2xl border border-border bg-surface p-5">
-          <div className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-sage" /><h2 className="font-display text-lg font-semibold text-text-primary">Weekly learning review</h2></div>
-          <p className="mt-2 text-sm text-text-secondary">{isWeekFinished ? 'Your scheduled week has ended. Here is the outcome based on recorded learning evidence.' : `Your week is still in progress. This is a live snapshot through ${plan?.todayDate ?? 'today'}; the final review becomes available after ${plan?.endDate}.`}</p>
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-xl bg-surface-elevated p-3"><p className="text-xs text-text-tertiary">Completed</p><p className="mt-1 text-xl font-bold text-sage">{plan?.summary.completedCount ?? 0}</p></div>
-            <div className="rounded-xl bg-surface-elevated p-3"><p className="text-xs text-text-tertiary">Still pending</p><p className="mt-1 text-xl font-bold text-text-primary">{plan?.summary.pendingCount ?? 0}</p></div>
-            <div className="rounded-xl bg-surface-elevated p-3"><p className="text-xs text-text-tertiary">Past-day pending</p><p className="mt-1 text-xl font-bold text-amber-600">{plan?.summary.overdueCount ?? 0}</p></div>
-            <div className="rounded-xl bg-surface-elevated p-3"><p className="text-xs text-text-tertiary">Completion</p><p className="mt-1 text-xl font-bold text-text-primary">{plan?.summary.progressPercentage ?? 0}%</p></div>
-          </div>
-        </div>
-        <div className="rounded-2xl border border-border bg-surface p-5">
-          <h3 className="text-sm font-bold text-text-primary">Topic learning evidence</h3>
-          <p className="mt-1 text-xs text-text-secondary">These are current mastery records, not AI-generated estimates or proof that a scheduled task alone improved mastery.</p>
-          {topicInsights.length ? <div className="mt-3 divide-y divide-border">{topicInsights.map((topic: any) => <div key={topic.topicId} className="flex flex-wrap items-center justify-between gap-2 py-3"><div><p className="text-sm font-medium text-text-primary">{topic.status.replaceAll('_',' ')}</p><p className="text-xs text-text-tertiary">Evidence count: {topic.evidenceCount ?? '—'}</p></div><div className="text-right"><p className="text-sm font-semibold text-text-primary">{topic.masteryScore == null ? 'Insufficient evidence' : `${topic.masteryScore}% mastery`}</p><p className="text-xs text-text-tertiary">Confidence: {topic.confidence ?? '—'}</p></div></div>)}</div> : <p className="mt-3 text-sm text-text-secondary">No topic mastery evidence is available yet. Completing lessons alone does not create a mastery score.</p>}
-        </div>
-        <div className="rounded-xl border border-border bg-surface-elevated p-4 text-xs text-text-secondary">Study-plan completion is a consistency measure. Mastery, grades, course completion, and progression continue to depend on the platform's authoritative assessment and learning-evidence rules.</div>
-      </section>}
+      {tab === 'REVIEW' && <WeeklyLearningReview planId={plan._id} />}
 
       {tab === 'PREFERENCES' && <form onSubmit={savePreferences} className="max-w-2xl space-y-5 rounded-2xl border border-border bg-surface p-5">
         <div><h2 className="font-semibold text-text-primary">Schedule preferences</h2><p className="mt-1 text-xs text-text-secondary">These settings directly affect daily capacity, activity grouping, and which learning activities are prioritized.</p></div>

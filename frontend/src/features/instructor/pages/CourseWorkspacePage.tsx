@@ -104,9 +104,7 @@ export const CourseWorkspacePage: React.FC = () => {
   };
 
   const handleArchive = async () => {
-    if (!window.confirm('Are you sure you want to archive this course? Learners will no longer be able to discover or enroll in it.')) {
-      return;
-    }
+    if (!window.confirm('Are you sure you want to archive this course? Learners will no longer be able to discover or enroll in it.')) return;
     try {
       setIsActing(true);
       setActionError(null);
@@ -143,44 +141,27 @@ export const CourseWorkspacePage: React.FC = () => {
             <StatusBadge status={course.status} />
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            {course.status === 'DRAFT' && (
-              <>
-                <Button variant="secondary" onClick={() => navigate(`/instructor/courses/${course._id}/setup`)} className="w-full shrink-0 sm:w-auto">
-                  <FileText className="h-4 w-4" aria-hidden="true" />
-                  Continue Setup
-                </Button>
-                <Button onClick={handlePublish} disabled={isActing} className="w-full shrink-0 sm:w-auto">
-                  {isActing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
-                  Publish Course
-                </Button>
-              </>
-            )}
-            {course.status === 'PUBLISHED' && (
-              <Button variant="secondary" onClick={handleArchive} disabled={isActing} className="w-full shrink-0 sm:w-auto text-error hover:border-error/40">
-                {isActing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
-                Archive Course
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            {course.status === 'DRAFT' && <>
+              <Button variant="secondary" onClick={() => navigate(`/instructor/courses/${course._id}/setup`)} className="w-full shrink-0 sm:w-auto">
+                <FileText className="h-4 w-4" aria-hidden="true" />Continue Setup
               </Button>
-            )}
+              <Button onClick={handlePublish} disabled={isActing} className="w-full shrink-0 sm:w-auto">
+                {isActing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}Publish Course
+              </Button>
+            </>}
+            {course.status === 'PUBLISHED' && <Button variant="secondary" onClick={handleArchive} disabled={isActing} className="w-full shrink-0 text-error hover:border-error/40 sm:w-auto">
+              {isActing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}Archive Course
+            </Button>}
           </div>
         </div>
 
-        {actionError && (
-          <div className="flex items-center gap-2 rounded-xl border border-error/20 bg-error-soft p-3 text-xs text-error">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{actionError}</span>
-          </div>
-        )}
+        {actionError && <div className="flex items-center gap-2 rounded-xl border border-error/20 bg-error-soft p-3 text-xs text-error"><AlertCircle className="h-4 w-4 shrink-0" /><span>{actionError}</span></div>}
 
-        {course.status === 'DRAFT' && (
-          <div className="flex items-start gap-3 rounded-xl border border-signal/20 bg-signal-soft p-4 text-signal">
-            <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <div className="space-y-1">
-              <p className="text-sm font-semibold">Your course is saved as a draft.</p>
-              <p className="text-sm leading-relaxed text-text-secondary">Continue setting up course-level information, then manage each topic and its lessons from the course structure below.</p>
-            </div>
-          </div>
-        )}
+        {course.status === 'DRAFT' && <div className="flex items-start gap-3 rounded-xl border border-signal/20 bg-signal-soft p-4 text-signal">
+          <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <div className="space-y-1"><p className="text-sm font-semibold">Your course is saved as a draft.</p><p className="text-sm leading-relaxed text-text-secondary">Complete the course setup, create its topics and Question Banks, then configure any enabled course-level assessment before publishing.</p></div>
+        </div>}
       </motion.header>
 
       <motion.section
@@ -191,13 +172,8 @@ export const CourseWorkspacePage: React.FC = () => {
         className="space-y-5 rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6"
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface-elevated text-text-secondary">
-            <BookOpen className="h-4 w-4" aria-hidden="true" />
-          </div>
-          <div>
-            <h2 id="course-details-heading" className="text-base font-semibold text-text-primary">Course details</h2>
-            <p className="text-xs text-text-secondary">The course-level information learners will see.</p>
-          </div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface-elevated text-text-secondary"><BookOpen className="h-4 w-4" aria-hidden="true" /></div>
+          <div><h2 id="course-details-heading" className="text-base font-semibold text-text-primary">Course details</h2><p className="text-xs text-text-secondary">The course-level information learners will see.</p></div>
         </div>
 
         <div className="grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
@@ -207,38 +183,15 @@ export const CourseWorkspacePage: React.FC = () => {
           {duration && <MetaItem label="Estimated duration" value={<span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />{duration}</span>} />}
         </div>
 
-        <div className="border-t border-border-muted pt-4">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-tertiary">Description</p>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">{course.description}</p>
-        </div>
+        <div className="border-t border-border-muted pt-4"><p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-tertiary">Description</p><p className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">{course.description}</p></div>
 
-        {course.objectives.length > 0 && (
-          <div className="border-t border-border-muted pt-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-tertiary">Course learning objectives</p>
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {course.objectives.map((objective, index) => (
-                <li key={`${index}-${objective}`} className="flex items-start gap-2.5 rounded-lg bg-surface-elevated p-3 text-sm leading-relaxed text-text-secondary">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sage-soft text-sage"><span className="text-[10px] font-bold">{index + 1}</span></span>
-                  {objective}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {course.objectives.length > 0 && <div className="border-t border-border-muted pt-4">
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-tertiary">Course learning objectives</p>
+          <ul className="grid gap-2 sm:grid-cols-2">{course.objectives.map((objective, index) => <li key={`${index}-${objective}`} className="flex items-start gap-2.5 rounded-lg bg-surface-elevated p-3 text-sm leading-relaxed text-text-secondary"><span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sage-soft text-sage"><span className="text-[10px] font-bold">{index + 1}</span></span>{objective}</li>)}</ul>
+        </div>}
 
-        {course.progressionPolicy && (
-          <div className="border-t border-border-muted pt-4">
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-tertiary">Topic progression</p>
-            <p className="text-sm text-text-secondary">{course.progressionPolicy.lockingEnabled ? 'Sequential — learners must complete topics in order.' : 'Open — learners can access topics independently.'}</p>
-          </div>
-        )}
+        {course.progressionPolicy && <div className="border-t border-border-muted pt-4"><p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-tertiary">Topic progression</p><p className="text-sm text-text-secondary">{course.progressionPolicy.lockingEnabled ? 'Sequential — learners must complete topics in order.' : 'Open — learners can access topics independently.'}</p></div>}
       </motion.section>
-
-      <DiagnosticAssessmentManagement
-        course={course}
-        courseStatus={course.status}
-        onChanged={refetch}
-      />
 
       <motion.section
         initial={{ opacity: 0, y: 8 }}
@@ -248,21 +201,15 @@ export const CourseWorkspacePage: React.FC = () => {
         className="space-y-4"
       >
         <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-signal/20 bg-signal-soft text-signal">
-            <Layers3 className="h-4 w-4" aria-hidden="true" />
-          </div>
-          <div>
-            <h2 id="course-topics-heading" className="text-base font-semibold text-text-primary">Course structure</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-text-secondary">Organize the course into topics. Open a topic to manage its details, lessons, and future learning materials on a dedicated page.</p>
-          </div>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-signal/20 bg-signal-soft text-signal"><Layers3 className="h-4 w-4" aria-hidden="true" /></div>
+          <div><h2 id="course-topics-heading" className="text-base font-semibold text-text-primary">Course structure</h2><p className="mt-1 max-w-2xl text-sm leading-relaxed text-text-secondary">Create the topics first. Each topic has its own Question Bank, lessons, practice and learning materials.</p></div>
         </div>
 
-        <TopicManagement
-          courseId={course._id}
-          courseStatus={course.status}
-          onManageTopic={openTopic}
-        />
+        <TopicManagement courseId={course._id} courseStatus={course.status} onManageTopic={openTopic} />
       </motion.section>
+
+      {/* Course-level diagnostic is intentionally placed after Topics so its source banks can be created first. */}
+      {course.diagnosticPolicy?.enabled && <DiagnosticAssessmentManagement course={course} courseStatus={course.status} onChanged={refetch} />}
     </div>
   );
 };

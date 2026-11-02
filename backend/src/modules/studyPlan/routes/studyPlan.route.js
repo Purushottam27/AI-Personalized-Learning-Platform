@@ -12,7 +12,8 @@ import {
     proposePlanRevision,
     acceptPlanRevision,
     chatAssistant,
-    getAssistantMessages
+    getAssistantMessages,
+    getStudyPlanWeeklyReview
 } from "../controllers/studyPlan.controller.js";
 import {
     updateStudyPreferencesSchema,
@@ -42,6 +43,7 @@ studyPlanRouter.patch("/learning/me/study-preferences", validateBody(updateStudy
 
 // Active Study Plan & Generation
 studyPlanRouter.get("/learning/me/study-plan", getActivePlan);
+studyPlanRouter.get("/learning/me/study-plan/:planId/review", getStudyPlanWeeklyReview);
 studyPlanRouter.post("/learning/me/study-plan/generate", generatePlan);
 studyPlanRouter.get("/learning/me/study-plan/quota", getPlanQuota);
 studyPlanRouter.get("/learning/me/study-plan/history", getPlanHistory);
@@ -55,4 +57,3 @@ studyPlanRouter.post("/learning/me/study-assistant/chat", validateBody(assistant
 studyPlanRouter.get("/learning/me/study-assistant/messages", getAssistantMessages);
 
 export { studyPlanRouter };
-

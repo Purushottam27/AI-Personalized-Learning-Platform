@@ -11,6 +11,7 @@ import {
     getLearnerStudyPreferences,
     getStudyPlanQuotaService,
 } from "../services/studyPlan.service.js";
+import { getStudyPlanWeeklyReviewService } from "../services/studyPlanReview.service.js";
 
 export async function getStudyPreferences(req, res) {
     const learnerId = req.user._id;
@@ -73,4 +74,10 @@ export async function getAssistantMessages(req, res) {
     const learnerId = req.user._id;
     const data = await getAssistantConversationService(learnerId);
     return res.status(200).json(new ApiResponse(data, "Assistant conversation fetched successfully"));
+}
+
+export async function getStudyPlanWeeklyReview(req, res) {
+    const learnerId = req.user._id;
+    const review = await getStudyPlanWeeklyReviewService(learnerId, req.params.planId);
+    return res.status(200).json(new ApiResponse(review, "Study plan weekly review fetched successfully"));
 }

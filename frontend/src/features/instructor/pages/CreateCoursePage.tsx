@@ -387,6 +387,19 @@ function validateSection(sectionId: string, form: FormState): FormErrors {
 
     if (form.durationWeeks && (isNaN(Number(form.durationWeeks)) || Number(form.durationWeeks) <= 0)) errors.durationWeeks = 'Weeks must be a positive number';
 
+  } else if (sectionId === 'settings' && form.diagnosticEnabled) {
+
+    const passingScore = Number(form.diagnosticPassingScore);
+    const questionsPerAttempt = Number(form.diagnosticQuestionsPerAttempt);
+
+    if (!Number.isInteger(passingScore) || passingScore < 0 || passingScore > 100) {
+      errors.diagnosticPassingScore = 'Passing threshold must be a whole number from 0 to 100';
+    }
+
+    if (!Number.isInteger(questionsPerAttempt) || questionsPerAttempt < 5 || questionsPerAttempt > 10) {
+      errors.diagnosticQuestionsPerAttempt = 'Questions per attempt must be a whole number from 5 to 10';
+    }
+
   }
 
   return errors;
@@ -1018,15 +1031,15 @@ export const CreateCoursePage: React.FC = () => {
                           <div className="flex flex-col gap-1.5">
                             <label htmlFor="diagnostic-passing-score" className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Passing threshold (%)</label>
                             <input id="diagnostic-passing-score" type="number" min={0} max={100} step={1} value={form.diagnosticPassingScore} onChange={e => updateField('diagnosticPassingScore', e.target.value)} className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-primary outline-none transition-colors focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" />
+                            {errors.diagnosticPassingScore && <p role="alert" className="text-xs text-error">{errors.diagnosticPassingScore}</p>}
                           </div>
                           <div className="flex flex-col gap-1.5">
                             <label htmlFor="diagnostic-question-count" className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Questions per attempt</label>
-                            <input id="diagnostic-question-count" type="number" min={1} max={50} step={1} value={form.diagnosticQuestionsPerAttempt} onChange={e => updateField('diagnosticQuestionsPerAttempt', e.target.value)} className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-primary outline-none transition-colors focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" />
+                            <input id="diagnostic-question-count" type="number" min={5} max={10} step={1} value={form.diagnosticQuestionsPerAttempt} onChange={e => updateField('diagnosticQuestionsPerAttempt', e.target.value)} className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-primary outline-none transition-colors focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" />
+                            {errors.diagnosticQuestionsPerAttempt && <p role="alert" className="text-xs text-error">{errors.diagnosticQuestionsPerAttempt}</p>}
                           </div>
-                          <p className="sm:col-span-2 text-xs leading-relaxed text-text-tertiary">Build the assessment question pool separately in the course workspace. The pool must contain enough active questions for the selected attempt size.</p>
+                          <p className="sm:col-span-2 text-xs leading-relaxed text-text-tertiary">Choose between 5 and 10 questions per attempt. The diagnostic question pool is assembled from active questions in this course’s topic Question Banks.</p>
                         </div>}
-                      </div>
-
                       </div>
 
                     </div>
