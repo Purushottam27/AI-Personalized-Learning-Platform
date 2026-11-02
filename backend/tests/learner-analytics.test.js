@@ -31,11 +31,26 @@ import {
     calculateStreak,
     calculateStudyMinutes,
     buildContinuousDailyTrends,
+    summarizeSubmittedPracticeAttempts,
+    buildPracticeActivityDailyTrends,
     getLearnerDashboardService,
     getLearnerCourseProgressService,
     getLearnerAnalyticsOverviewService,
 } from "../src/modules/analytics/services/learnerAnalytics.service.js";
 import { ANALYTICS_ERROR_CODES } from "../src/modules/analytics/constants/analytics.constants.js";
+
+test("submitted formative practice attempts appear in activity summaries without requiring mastery eligibility", () => {
+    const attempts = [
+        { totalQuestions: 10, correctCount: 6, scorePercent: 60, contributeToLearningEvidence: false },
+        { totalQuestions: 10, correctCount: 8, scorePercent: 80, contributeToLearningEvidence: true },
+    ];
+    const summary = summarizeSubmittedPracticeAttempts(attempts);
+    assert.equal(summary.attempts, 2);
+    assert.equal(summary.totalQuestions, 20);
+    assert.equal(summary.totalCorrect, 14);
+    assert.equal(summary.averageScorePercent, 70);
+    assert.equal(summary.eligibleAttempts, 1);
+});
 
 test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
     const { MONGODB_URI, TEST_DB_NAME, DB_NAME, JWT_ACCESS_SECRET } = process.env;
@@ -257,6 +272,36 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
             scorePercent: 90,
             correctCount: 9,
             contributeToLearningEvidence: true,
+        });
+
+        // A submitted formative attempt is visible in practice activity even though
+        // it is deliberately excluded from LearningEvidence and topic mastery.
+        const formativeAttemptId = new mongoose.Types.ObjectId();
+        createdAttemptIds.push(formativeAttemptId);
+        await PracticeAttempt.create({
+            _id: formativeAttemptId,
+            practiceId: new mongoose.Types.ObjectId(),
+            learnerId: activeLearnerId,
+            courseId: course1Id,
+            topicId: topic1Id,
+            attemptNumber: 1,
+            status: "SUBMITTED",
+            startedAt: new Date(Date.now() - 60 * 60 * 1000),
+            submittedAt: new Date(Date.now() - 45 * 60 * 1000),
+            questions: [{
+                questionId: new mongoose.Types.ObjectId(),
+                questionText: "What is a formative practice?",
+                type: "MCQ_SINGLE",
+                correctAnswer: "A",
+                marks: 1,
+                difficulty: "EASY",
+            }],
+            totalQuestions: 10,
+            totalMarks: 10,
+            marksAwarded: 6,
+            scorePercent: 60,
+            correctCount: 6,
+            contributeToLearningEvidence: false,
         });
 
         // Evidence from Practice Attempt
@@ -594,7 +639,7 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
 
         // Activity totals
         assert.equal(data.activityTotals.activeCoursesCount, 1);
-        assert.equal(data.activityTotals.totalPracticesCompleted, 1);
+        assert.equal(data.activityTotals.totalPracticesCompleted, 2, "Submitted formative practice is included in activity totals");
         assert.equal(data.activityTotals.totalAssessmentsCompleted, 1);
         assert.equal(data.activityTotals.totalQuestionsAttempted, 18); // 10 + 8
         assert.equal(data.activityTotals.totalQuestionsCorrect, 15); // 9 + 6
@@ -613,6 +658,18 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
         assert.equal(data.masteryDistribution.MASTERED, 1);
         assert.equal(data.masteryDistribution.STRONG, 1);
         assert.equal(data.masteryDistribution.NEEDS_IMPROVEMENT, 1);
+
+        // Submitted practice activity is reported independently of mastery eligibility.
+        assert.equal(data.practiceActivity.allTimeCompleted, 2);
+        assert.equal(data.practiceActivity.currentPeriod.attempts, 2);
+        assert.equal(data.practiceActivity.currentPeriod.totalQuestions, 20);
+        assert.equal(data.practiceActivity.currentPeriod.averageScorePercent, 75);
+        assert.equal(data.practiceActivity.currentPeriod.eligibleAttempts, 1);
+        assert.equal(data.practiceActivity.dailyTrends.length, 7);
+
+        // The formative attempt must not inflate eligible outcome evidence.
+        assert.equal(data.periodComparison.current.attempts, 2);
+        assert.equal(data.periodComparison.current.totalQuestions, 18);
 
         // Continuous trends
         assert.equal(data.dailyTrends.length, 7);
@@ -646,6 +703,9 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
         assert.equal(data.activity.currentPeriod.practice.attempts, 1);
         assert.equal(data.activity.currentPeriod.practice.totalQuestions, 10);
         assert.equal(data.activity.currentPeriod.practice.accuracyPercent, 90);
+        assert.equal(data.practiceActivity.currentPeriod.attempts, 2);
+        assert.equal(data.practiceActivity.currentPeriod.averageScorePercent, 75);
+        assert.equal(data.practiceActivity.currentPeriod.eligibleAttempts, 1);
         assert.equal(data.activity.currentPeriod.assessment.attempts, 1);
         assert.equal(data.activity.currentPeriod.assessment.totalQuestions, 8);
         assert.equal(data.activity.currentPeriod.assessment.accuracyPercent, 75);

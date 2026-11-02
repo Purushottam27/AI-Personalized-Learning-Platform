@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   CircleHelp,
   Clock3,
+  ChevronDown,
+  Check,
   Loader2,
   RefreshCw,
   Target,
@@ -62,12 +64,12 @@ function TopicRow({ topic, rank }: { topic: TopicMasteryAnalyticsItem; rank: 'st
 export const LearnerAnalyticsPage: React.FC = () => {
   const { data, isLoading, error, days, setDays, refetch } = useLearnerAnalytics(7);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const engagement = data?.engagement ?? null;
+  const [isCourseMenuOpen, setIsCourseMenuOpen] = useState(false);
 
   const derived = useMemo(() => {
     if (!data) return null;
     const activeDays = data.dailyTrends.filter((item) => item.practiceCount + item.assessmentCount > 0).length;
-    const totalSessionsInWindow = data.periodComparison.current.attempts;
+    const totalSessionsInWindow = data.practiceActivity.currentPeriod.attempts + data.periodComparison.current.assessmentCount;
     const current = data.periodComparison.current;
     const previous = data.periodComparison.previous;
     const accuracyDelta = current.accuracyPercent !== null && previous.accuracyPercent !== null
@@ -116,18 +118,30 @@ export const LearnerAnalyticsPage: React.FC = () => {
 
   const { activityTotals, dailyTrends, courseProgressList } = data;
   const hasAnyEvidence = activityTotals.totalQuestionsAttempted > 0;
+  const overallAccuracy = activityTotals.totalQuestionsAttempted > 0 ? activityTotals.overallAccuracy : null;
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-7 pb-12">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+      <header className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div className="min-w-0">
           <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-signal/20 bg-signal-soft/50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-signal"><Brain className="h-3.5 w-3.5" /> Your learning intelligence</div>
           <h1 className="font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Learning analytics</h1>
           <p className="mt-1.5 max-w-2xl text-sm leading-6 text-text-secondary">See what is improving, where your understanding is strongest, and which topics deserve your next study session.</p>
         </div>
-        <div className="flex items-center gap-2 self-start rounded-xl border border-border bg-surface-elevated p-1 lg:self-auto">
-          {[7, 14, 30].map((value) => <button key={value} onClick={() => setDays(value)} aria-pressed={days === value} className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 ${days === value ? 'border border-signal/25 bg-signal-soft text-signal shadow-sm' : 'border border-transparent text-text-secondary hover:bg-surface hover:text-text-primary'}`}>{value} days</button>)}
-          <button onClick={refetch} aria-label="Refresh analytics" className="ml-1 cursor-pointer rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface hover:text-text-primary"><RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} /></button>
+        <div className="grid w-full grid-cols-1 gap-3 xl:w-auto xl:min-w-[440px] xl:grid-cols-[250px_auto] xl:justify-items-end">
+          {courseProgressList.length > 0 && <div className="relative w-full xl:w-[250px]">
+            <button type="button" aria-label="Select course analytics" aria-haspopup="listbox" aria-expanded={isCourseMenuOpen} onClick={() => setIsCourseMenuOpen((open) => !open)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface-elevated px-3.5 py-2.5 text-left shadow-sm transition-colors hover:border-signal/40 hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40">
+              <span className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">Course analytics</span><span className="mt-0.5 block truncate text-xs font-semibold text-text-primary">{courseProgressList.find((course) => course.courseId === selectedCourseId)?.courseTitle || 'All courses'}</span></span><ChevronDown className={`h-4 w-4 shrink-0 text-text-tertiary transition-transform ${isCourseMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isCourseMenuOpen && <><button type="button" aria-label="Close course menu" className="fixed inset-0 z-20 cursor-default" onClick={() => setIsCourseMenuOpen(false)} /><div role="listbox" aria-label="Course analytics options" className="absolute right-0 z-30 mt-2 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-xl ring-1 ring-black/5">
+              <button type="button" role="option" aria-selected={!selectedCourseId} onClick={() => { setSelectedCourseId(null); setIsCourseMenuOpen(false); }} className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-text-primary transition-colors hover:bg-surface-elevated"><span>All courses</span>{!selectedCourseId && <Check className="h-4 w-4 text-signal" />}</button>
+              {courseProgressList.map((course) => <button key={course.courseId} type="button" role="option" aria-selected={selectedCourseId === course.courseId} onClick={() => { setSelectedCourseId(course.courseId); setIsCourseMenuOpen(false); }} className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-text-primary transition-colors hover:bg-surface-elevated"><span className="min-w-0 truncate">{course.courseTitle}</span>{selectedCourseId === course.courseId && <Check className="h-4 w-4 shrink-0 text-signal" />}</button>)}
+            </div></>}
+          </div>}
+          <div className="flex w-full items-center justify-between gap-1 rounded-xl border border-border bg-surface-elevated p-1 xl:w-auto">
+            <div className="flex min-w-0 flex-1 items-center gap-1">{[7, 14, 30].map((value) => <button key={value} onClick={() => setDays(value)} aria-pressed={days === value} className={`min-h-9 flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all duration-200 sm:flex-none ${days === value ? 'border border-signal/25 bg-signal-soft text-signal shadow-sm' : 'border border-transparent text-text-secondary hover:bg-surface hover:text-text-primary'}`}>{value} days</button>)}</div>
+            <button onClick={refetch} aria-label="Refresh analytics" className="ml-1 min-h-9 min-w-9 cursor-pointer rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface hover:text-text-primary"><RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} /></button>
+          </div>
         </div>
       </header>
 
@@ -137,28 +151,19 @@ export const LearnerAnalyticsPage: React.FC = () => {
         <div className={`${panelClass} p-5 transition-colors hover:border-signal/30`}><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Active courses</span><BookOpen className="h-4 w-4 text-signal" /></div><div className="font-display text-3xl font-bold tabular-nums text-text-primary">{activityTotals.activeCoursesCount}</div><p className="mt-1 text-xs text-text-secondary">Courses you are currently enrolled in</p></div>
         <div className={`${panelClass} p-5 transition-colors hover:border-sage/40`}><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Strong mastery topics</span><Award className="h-4 w-4 text-sage" /></div><div className="font-display text-3xl font-bold tabular-nums text-text-primary">{derived.masteredTopics}</div><p className="mt-1 text-xs text-text-secondary">Of {derived.totalTopics} topics across active courses</p></div>
         <div className={`${panelClass} p-5 transition-colors hover:border-signal/30`}><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Evidence coverage</span><Target className="h-4 w-4 text-signal" /></div><div className="font-display text-3xl font-bold tabular-nums text-text-primary">{derived.evaluatedTopics}<span className="ml-1 text-base font-semibold text-text-tertiary">/ {derived.totalTopics}</span></div><p className="mt-1 text-xs text-text-secondary">Topics with eligible mastery evidence</p></div>
-        <div className={`${panelClass} p-5 transition-colors hover:border-signal/30`}><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Resources accessed</span><BookOpen className="h-4 w-4 text-signal" /></div><div className="font-display text-3xl font-bold tabular-nums text-text-primary">{engagement ? engagement.accessedResources : '—'}</div><p className="mt-1 text-xs text-text-secondary">Distinct resources across active courses</p></div>
+        <div className={`${panelClass} p-5 transition-colors hover:border-signal/30`}><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">Overall performance</span><TrendingUp className="h-4 w-4 text-signal" /></div><div className="font-display text-3xl font-bold tabular-nums text-text-primary">{overallAccuracy === null ? '—' : `${overallAccuracy}%`}</div><p className="mt-1 text-xs text-text-secondary">Across {activityTotals.totalQuestionsAttempted} eligible questions</p></div>
       </section>
 
       {!hasAnyEvidence && (
         <section className={`${panelClass} border-dashed p-7 text-center sm:p-10`}>
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-signal-soft text-signal"><CircleHelp className="h-7 w-7" /></div>
           <h2 className="text-lg font-semibold text-text-primary">Your learning story starts here</h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-text-secondary">There is not enough eligible outcome evidence to analyse demonstrated understanding yet. Your course and resource engagement is still shown separately. To build a clearer picture of your understanding, work through an available topic and complete an eligible practice session or submit an assessment. Simply opening a lesson or resource does not count as mastery evidence.</p>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-text-secondary">There is not enough eligible outcome evidence to analyse demonstrated understanding yet. To build a clearer picture, work through an available topic and complete an eligible practice session or submit an assessment. Topic mastery is based on eligible learning evidence, not simply opening learning material.</p>
           <Link to="/learner/courses" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-signal px-5 py-2.5 text-sm font-semibold text-text-inverse hover:bg-signal/90">Go to my courses <ArrowRight className="h-4 w-4" /></Link>
         </section>
       )}
 
-      <section className={`${panelClass} p-5 sm:p-6`}>
-        <div className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-signal" /><h2 className="text-base font-semibold text-text-primary">Your learning engagement</h2></div>
-        <p className="mt-1 text-xs text-text-secondary">A view of the learning material you have accessed across your active courses, separate from demonstrated mastery.</p>
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{engagement ? engagement.accessedResources : '—'}</p><p className="mt-1 text-xs text-text-secondary">Distinct resources accessed</p></div>
-          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{engagement ? engagement.activeResourcesAvailable : '—'}</p><p className="mt-1 text-xs text-text-secondary">Active resources available</p></div>
-          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{engagement && engagement.lessonsAvailable > 0 ? engagement.lessonsAvailable : '—'}</p><p className="mt-1 text-xs text-text-secondary">{engagement && engagement.lessonsAvailable > 0 ? 'Lessons available' : 'No lessons available'}</p></div>
-        </div>
-        <p className="mt-3 text-xs leading-5 text-text-tertiary">{engagement?.note || 'Engagement data is not included in this analytics response. Missing data is not treated as zero.'}</p>
-      </section>
+
 
       <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.35fr_0.9fr]">
         <div className={`${panelClass} p-5 sm:p-6`}>
@@ -177,7 +182,7 @@ export const LearnerAnalyticsPage: React.FC = () => {
 
         <div className={`${panelClass} p-5 sm:p-6`}>
           <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-signal" /><h2 className="text-base font-semibold text-text-primary">Learning rhythm</h2></div>
-          <p className="mt-1 text-xs text-text-secondary">Your activity across the selected period</p>
+          <p className="mt-1 text-xs text-text-secondary">Submitted practice and eligible assessment activity across the selected period</p>
           <div className="mt-6 flex items-end justify-between gap-1.5" aria-label={`Activity on ${derived.activeDays} of ${days} days`}>
             {dailyTrends.map((item) => {
               const sessions = item.practiceCount + item.assessmentCount;
@@ -185,8 +190,36 @@ export const LearnerAnalyticsPage: React.FC = () => {
               return <div key={item.date} className="flex min-w-0 flex-1 flex-col items-center gap-2" title={`${formatDay(item.date)}: ${item.practiceCount} practices, ${item.assessmentCount} assessments`}><div className="flex h-28 w-full items-end justify-center rounded-lg bg-surface-elevated px-1 pt-2"><div className={`w-full max-w-7 rounded-t-md ${sessions ? 'bg-signal' : 'bg-border'}`} style={{ height: `${height}%` }} /></div><span className="text-[9px] text-text-tertiary">{days > 14 ? new Date(`${item.date}T00:00:00`).getDate() : formatDay(item.date).split(' ')[0]}</span></div>;
             })}
           </div>
-          <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><div><p className="text-2xl font-bold tabular-nums text-text-primary">{derived.activeDays}<span className="ml-1 text-sm font-medium text-text-tertiary">/ {days}</span></p><p className="text-xs text-text-secondary">Active days</p></div><div className="text-right"><p className="text-2xl font-bold tabular-nums text-text-primary">{derived.totalSessionsInWindow}</p><p className="text-xs text-text-secondary">Completed sessions</p></div></div>
+          <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><div><p className="text-2xl font-bold tabular-nums text-text-primary">{derived.activeDays}<span className="ml-1 text-sm font-medium text-text-tertiary">/ {days}</span></p><p className="text-xs text-text-secondary">Days with recorded activity</p></div><div className="text-right"><p className="text-2xl font-bold tabular-nums text-text-primary">{derived.totalSessionsInWindow}</p><p className="text-xs text-text-secondary">Completed sessions</p></div></div>
         </div>
+      </section>
+
+      <section className={`${panelClass} p-5 sm:p-6`}>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-signal"/><h2 className="text-base font-semibold text-text-primary">Practice activity across your courses</h2></div><p className="mt-1 text-xs text-text-secondary">Submitted practice attempts, including formative sets that are not used for mastery calculations.</p></div><span className="rounded-lg bg-surface-elevated px-3 py-1.5 text-xs font-semibold text-text-secondary">{data.practiceActivity.allTimeCompleted} completed all-time</span></div>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{data.practiceActivity.currentPeriod.attempts}</p><p className="mt-1 text-xs text-text-secondary">Completed in last {days} days</p></div>
+          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{data.practiceActivity.currentPeriod.averageScorePercent === null ? '—' : `${data.practiceActivity.currentPeriod.averageScorePercent}%`}</p><p className="mt-1 text-xs text-text-secondary">Average submitted practice score</p></div>
+          <div className="rounded-xl border border-border-muted bg-surface-elevated p-4"><p className="text-2xl font-bold tabular-nums text-text-primary">{data.practiceActivity.currentPeriod.totalQuestions}</p><p className="mt-1 text-xs text-text-secondary">Questions across submitted attempts</p></div>
+        </div>
+        <div className="mt-5 border-t border-border pt-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div><h3 className="text-sm font-semibold text-text-primary">Practice score trend</h3><p className="mt-1 text-xs text-text-secondary">Average score of submitted attempts on each day. Days without submissions are left unscored.</p></div>
+            <span className="text-[11px] text-text-tertiary">{data.practiceActivity.currentPeriod.eligibleAttempts} eligible for mastery</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 sm:gap-3">
+            {data.practiceActivity.dailyTrends.map((day) => (
+              <div key={day.date} className="min-w-9 flex-1 text-center" title={`${formatDay(day.date)} · ${day.attempts} submitted ${day.attempts === 1 ? 'attempt' : 'attempts'} · ${day.averageScorePercent === null ? 'No score' : `${day.averageScorePercent}% average score`}`}>
+                <div className="flex h-20 items-end justify-center rounded-lg bg-surface-elevated px-1 pt-2 sm:h-24">
+                  <div className={`w-full max-w-8 rounded-t-md ${day.averageScorePercent === null ? 'bg-border' : 'bg-signal'}`} style={{ height: day.averageScorePercent === null ? '3px' : `${Math.max(5, day.averageScorePercent)}%` }} />
+                </div>
+                <p className="mt-1.5 text-[10px] font-semibold tabular-nums text-text-secondary">{day.averageScorePercent === null ? '—' : `${day.averageScorePercent}%`}</p>
+                <p className="text-[9px] text-text-tertiary">{days > 14 ? new Date(`${day.date}T00:00:00`).getDate() : formatDay(day.date).split(' ')[0]}</p>
+                <p className="text-[9px] text-text-tertiary">{day.attempts} {day.attempts === 1 ? 'try' : 'tries'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="mt-3 text-[11px] leading-5 text-text-tertiary">Practice scores describe submitted attempts. Only attempts explicitly marked as eligible contribute to the platform's mastery evidence.</p>
       </section>
 
       <section className={`${panelClass} p-5 sm:p-6`}>
@@ -206,7 +239,7 @@ export const LearnerAnalyticsPage: React.FC = () => {
           {derived.accuracyDelta !== null && derived.current.totalQuestions > 0 && derived.previous.totalQuestions > 0 && <div className="flex gap-3 rounded-xl border border-border-muted bg-surface-elevated p-3.5"><div className={`mt-0.5 ${derived.accuracyDelta >= 0 ? 'text-sage' : 'text-signal'}`}>{derived.accuracyDelta >= 0 ? <TrendingUp className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}</div><div><p className="text-sm font-semibold text-text-primary">{derived.accuracyDelta > 0 ? 'Your accuracy improved' : derived.accuracyDelta < 0 ? 'Your accuracy dipped' : 'Your accuracy held steady'}</p><p className="mt-1 text-xs leading-5 text-text-secondary">{Math.abs(derived.accuracyDelta)} percentage points compared with the previous {days}-day period. Review the topics and question types from your recent attempts to understand the change.</p></div></div>}
           {derived.focusTopics.length > 0 && <div className="flex gap-3 rounded-xl border border-border-muted bg-surface-elevated p-3.5"><div className="mt-0.5 text-signal"><Target className="h-4 w-4" /></div><div><p className="text-sm font-semibold text-text-primary">Give {derived.focusTopics[0].topicTitle} another focused session</p><p className="mt-1 text-xs leading-5 text-text-secondary">Its current status is {statusMeta[derived.focusTopics[0].status]?.label || 'Developing'}. Revisit the topic and use targeted practice to build more evidence.</p><Link to={`/learner/courses/${derived.focusTopics[0].courseId}/learn?topicId=${encodeURIComponent(derived.focusTopics[0].topicId)}`} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-signal hover:underline">Review this topic <ArrowRight className="h-3 w-3" /></Link></div></div>}
           {derived.strengths.length > 0 && <div className="flex gap-3 rounded-xl border border-border-muted bg-surface-elevated p-3.5"><div className="mt-0.5 text-sage"><CheckCircle2 className="h-4 w-4" /></div><div><p className="text-sm font-semibold text-text-primary">Build on an established strength</p><p className="mt-1 text-xs leading-5 text-text-secondary">{derived.strengths[0].topicTitle} currently has {statusMeta[derived.strengths[0].status]?.label || 'strong'} mastery evidence. Use it as a foundation when approaching related topics.</p></div></div>}
-          {derived.activeDays === 0 && <div className="flex gap-3 rounded-xl border border-border-muted bg-surface-elevated p-3.5"><div className="mt-0.5 text-text-tertiary"><Clock3 className="h-4 w-4" /></div><div><p className="text-sm font-semibold text-text-primary">No eligible sessions in this window</p><p className="mt-1 text-xs leading-5 text-text-secondary">Complete a practice session or submit an assessment to create a recent performance signal. Lesson and resource views remain engagement activity, not mastery evidence.</p></div></div>}
+          {derived.activeDays === 0 && <div className="flex gap-3 rounded-xl border border-border-muted bg-surface-elevated p-3.5"><div className="mt-0.5 text-text-tertiary"><Clock3 className="h-4 w-4" /></div><div><p className="text-sm font-semibold text-text-primary">No recorded sessions in this window</p><p className="mt-1 text-xs leading-5 text-text-secondary">Complete a practice session or submit an assessment to create a recent activity signal. Only eligible completed submissions contribute to these performance metrics.</p></div></div>}
           {derived.current.attempts === 0 && derived.previous.attempts === 0 && derived.focusTopics.length === 0 && derived.strengths.length === 0 && <div className="rounded-xl border border-dashed border-border p-4 text-xs leading-5 text-text-secondary">There is not yet enough evidence to generate a personalized performance observation. Continue learning and check back after eligible attempts are recorded.</div>}
         </div></div>
         <div className={`${panelClass} p-5 sm:p-6`}><div className="flex items-center gap-2"><Activity className="h-5 w-5 text-signal" /><h2 className="text-base font-semibold text-text-primary">Course progression</h2></div><p className="mt-1 text-xs text-text-secondary">Topics with Strong or Mastered evidence, out of each active course curriculum</p>{courseProgressList.length ? <div className="mt-5 space-y-4">{courseProgressList.map((course) => <button type="button" key={course.courseId} onClick={() => setSelectedCourseId(course.courseId)} className="group block w-full cursor-pointer rounded-xl border border-border-muted bg-surface-elevated p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-signal/40 hover:bg-surface hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-text-primary">{course.courseTitle}</p>{course.domain && <p className="mt-0.5 text-xs text-text-tertiary">{course.domain}</p>}</div><span className="shrink-0 text-sm font-bold tabular-nums text-text-primary">{course.progressPercentage}%</span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-disabled"><div className="h-full rounded-full bg-signal transition-all" style={{ width: `${clampPercent(course.progressPercentage)}%` }} /></div><div className="mt-2 flex items-center justify-between text-[11px] text-text-tertiary"><span>{course.masteredTopics} of {course.totalTopics} topics Strong or Mastered</span><span className="inline-flex items-center gap-1">View course analytics <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" /></span></div></button>)}</div> : <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-center"><p className="text-sm font-medium text-text-primary">No active published courses</p><Link to="/learner/explore" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-signal hover:underline">Explore courses <ArrowRight className="h-3 w-3" /></Link></div>}</div>

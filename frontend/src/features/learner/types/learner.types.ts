@@ -147,6 +147,13 @@ export interface TopicMasteryAnalyticsItem {
   lastEvaluatedAt: string | null;
 }
 
+export interface AnalyticsSourceSummary {
+  attempts: number;
+  totalQuestions: number;
+  totalCorrect: number;
+  accuracyPercent: number | null;
+}
+
 export interface AnalyticsPeriodSummary {
   attempts: number;
   practiceCount: number;
@@ -154,11 +161,27 @@ export interface AnalyticsPeriodSummary {
   totalQuestions: number;
   totalCorrect: number;
   accuracyPercent: number | null;
+  practice?: AnalyticsSourceSummary;
+  assessment?: AnalyticsSourceSummary;
+}
+
+export interface SubmittedPracticeActivitySummary {
+  attempts: number;
+  totalQuestions: number;
+  totalCorrect: number;
+  averageScorePercent: number | null;
+  eligibleAttempts: number;
+}
+
+export interface SubmittedPracticeActivity {
+  allTimeCompleted: number;
+  currentPeriod: SubmittedPracticeActivitySummary;
+  previousPeriod: SubmittedPracticeActivitySummary;
+  dailyTrends: Array<SubmittedPracticeActivitySummary & { date: string }>;
 }
 
 export interface LearnerAnalyticsOverviewData {
   activityTotals: ActivityTotals;
-  engagement: { accessedResources: number; activeResourcesAvailable: number; lessonsAvailable: number; note: string };
   masteryDistribution: MasteryDistribution;
   topicMasteryList: TopicMasteryAnalyticsItem[];
   periodComparison: {
@@ -167,6 +190,7 @@ export interface LearnerAnalyticsOverviewData {
     previous: AnalyticsPeriodSummary;
   };
   dailyTrends: DailyTrendItem[];
+  practiceActivity: SubmittedPracticeActivity;
   courseProgressList: CourseProgressSummary[];
 }
 
@@ -209,6 +233,7 @@ export interface LearnerCourseAnalyticsData {
   };
   masteryDistribution: Record<string, number>;
   topics: LearnerCourseAnalyticsTopic[];
+  practiceActivity: SubmittedPracticeActivity;
   activity: {
     days: number;
     dailyTrends: DailyTrendItem[];
@@ -222,5 +247,6 @@ export interface LearnerCourseAnalyticsData {
     kind: 'GATHER_EVIDENCE' | 'REVIEW_TOPIC';
     explanation: string;
   } | null;
+  learningState: { unlockedTopicCount: number; allTopicsMastered: boolean; noTopicsAvailable: boolean };
   evidenceGuidance: string;
 }

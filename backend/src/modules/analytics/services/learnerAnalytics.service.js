@@ -97,6 +97,36 @@ export function buildContinuousDailyTrends(evidenceList, days = 7) {
     }));
 }
 
+export function summarizeSubmittedPracticeAttempts(attempts) {
+    const totalQuestions = attempts.reduce((sum, attempt) => sum + (Number(attempt.totalQuestions) || 0), 0);
+    const totalCorrect = attempts.reduce((sum, attempt) => sum + (Number(attempt.correctCount) || 0), 0);
+    const scoredAttempts = attempts.filter((attempt) => attempt.scorePercent !== null && attempt.scorePercent !== undefined && Number.isFinite(Number(attempt.scorePercent)));
+    return {
+        attempts: attempts.length,
+        totalQuestions,
+        totalCorrect,
+        averageScorePercent: scoredAttempts.length
+            ? Math.round(scoredAttempts.reduce((sum, attempt) => sum + Number(attempt.scorePercent), 0) / scoredAttempts.length)
+            : null,
+        eligibleAttempts: attempts.filter((attempt) => attempt.contributeToLearningEvidence === true).length,
+    };
+}
+
+export function buildPracticeActivityDailyTrends(attempts, days = 7) {
+    const byDate = new Map();
+    const now = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date(now.getTime() - i * 86400000).toISOString().slice(0, 10);
+        byDate.set(date, []);
+    }
+    for (const attempt of attempts) {
+        if (!attempt.submittedAt) continue;
+        const date = new Date(attempt.submittedAt).toISOString().slice(0, 10);
+        if (byDate.has(date)) byDate.get(date).push(attempt);
+    }
+    return Array.from(byDate, ([date, records]) => ({ date, ...summarizeSubmittedPracticeAttempts(records) }));
+}
+
 export async function getLearnerDashboardService(learnerId) {
     requireObjectId(learnerId, "learnerId");
     const activeEnrollments = await Enrollment.find({ learnerId, status: "ACTIVE" }).sort({ enrolledAt: -1 }).lean();
@@ -319,16 +349,6 @@ export async function getLearnerAnalyticsOverviewService(learnerId, options = {}
         TopicMastery.find({ learnerId, courseId: { $in: publishedActiveCourseIds } }).lean(),
         Topic.find({ courseId: { $in: publishedActiveCourseIds } }).select("_id courseId title order").sort({ order: 1 }).lean(),
     ]);
-    const activeTopicIds = activeCourseTopics.map((topic) => topic._id);
-    const [recordedResourceAccesses, activeResourceCount, availableLessonCount] = await Promise.all([
-        ResourceAccess.find({ learnerId, courseId: { $in: publishedActiveCourseIds } }).select("resourceId").lean(),
-        Resource.countDocuments({ topicId: { $in: activeTopicIds }, status: "ACTIVE" }),
-        Lesson.countDocuments({ topicId: { $in: activeTopicIds } }),
-    ]);
-    const activeAccessedResourceCount = recordedResourceAccesses.length
-        ? await Resource.countDocuments({ _id: { $in: recordedResourceAccesses.map((access) => access.resourceId) }, topicId: { $in: activeTopicIds }, status: "ACTIVE" })
-        : 0;
-
     const distributionCounts = {
         [MASTERY_STATUS.MASTERED]: 0,
         [MASTERY_STATUS.STRONG]: 0,
@@ -378,11 +398,32 @@ export async function getLearnerAnalyticsOverviewService(learnerId, options = {}
     currentPeriodStart.setUTCHours(0, 0, 0, 0);
     currentPeriodStart.setUTCDate(currentPeriodStart.getUTCDate() - (days - 1));
     const previousPeriodStart = new Date(currentPeriodStart.getTime() - days * 86400000);
-    const [windowEvidence, previousPeriodEvidence] = await Promise.all([
+    const practiceAttemptFilter = {
+        learnerId,
+        courseId: { $in: publishedActiveCourseIds },
+        status: "SUBMITTED",
+        submittedAt: { $gte: previousPeriodStart, $lte: now },
+    };
+    const [windowEvidence, previousPeriodEvidence, submittedPracticeAttempts, allTimeSubmittedPracticeCount] = await Promise.all([
         LearningEvidence.find({ ...eligibleEvidenceFilter, completedAt: { $gte: currentPeriodStart, $lte: now } }).lean(),
         LearningEvidence.find({ ...eligibleEvidenceFilter, completedAt: { $gte: previousPeriodStart, $lt: currentPeriodStart } }).lean(),
+        PracticeAttempt.find(practiceAttemptFilter).select("submittedAt totalQuestions correctCount scorePercent contributeToLearningEvidence").lean(),
+        PracticeAttempt.countDocuments({ learnerId, courseId: { $in: publishedActiveCourseIds }, status: "SUBMITTED" }),
     ]);
-    const dailyTrends = buildContinuousDailyTrends(windowEvidence, days);
+    const currentPracticeAttempts = submittedPracticeAttempts.filter((attempt) => attempt.submittedAt >= currentPeriodStart);
+    const previousPracticeAttempts = submittedPracticeAttempts.filter((attempt) => attempt.submittedAt < currentPeriodStart);
+    const practiceActivity = {
+        allTimeCompleted: allTimeSubmittedPracticeCount,
+        currentPeriod: summarizeSubmittedPracticeAttempts(currentPracticeAttempts),
+        previousPeriod: summarizeSubmittedPracticeAttempts(previousPracticeAttempts),
+        dailyTrends: buildPracticeActivityDailyTrends(currentPracticeAttempts, days),
+    };
+    const dailyTrends = buildContinuousDailyTrends(windowEvidence, days).map((day) => ({
+        ...day,
+        // Session counts include all submitted practice attempts; mastery/performance
+        // accuracy below remains sourced only from eligible LearningEvidence.
+        practiceCount: practiceActivity.dailyTrends.find((item) => item.date === day.date)?.attempts || 0,
+    }));
 
     const summarizePeriod = (records) => {
         const questions = records.reduce((sum, record) => sum + (record.totalQuestions || 0), 0);
@@ -417,17 +458,11 @@ export async function getLearnerAnalyticsOverviewService(learnerId, options = {}
     return {
         activityTotals: {
             activeCoursesCount: enrolledCourses.length,
-            totalPracticesCompleted: practiceCount,
+            totalPracticesCompleted: allTimeSubmittedPracticeCount,
             totalAssessmentsCompleted: assessmentCount,
             totalQuestionsAttempted: aggregateStats.totalQuestions,
             totalQuestionsCorrect: aggregateStats.totalCorrect,
             overallAccuracy,
-        },
-        engagement: {
-            accessedResources: activeAccessedResourceCount,
-            activeResourcesAvailable: activeResourceCount,
-            lessonsAvailable: availableLessonCount,
-            note: "Resource access is recorded engagement, not proof of understanding. Lesson completion and reading time are not currently tracked as learner progress.",
         },
         masteryDistribution: distributionCounts,
         topicMasteryList,
@@ -437,6 +472,7 @@ export async function getLearnerAnalyticsOverviewService(learnerId, options = {}
             previous: summarizePeriod(previousPeriodEvidence),
         },
         dailyTrends,
+        practiceActivity,
         courseProgressList,
     };
 }
@@ -457,12 +493,19 @@ export async function getLearnerCourseAnalyticsService(learnerId, courseId, opti
 
     const topics = await Topic.find({ courseId }).sort({ order: 1 }).select("_id title order").lean();
     const topicIds = topics.map((topic) => topic._id);
-    const [masteryRecords, evidence, recordedResourceAccesses, activeResources, lessonCounts] = await Promise.all([
+    const now = new Date();
+    const currentStart = new Date(now); currentStart.setUTCHours(0, 0, 0, 0); currentStart.setUTCDate(currentStart.getUTCDate() - (days - 1));
+    const previousStart = new Date(currentStart.getTime() - days * 86400000);
+    const [masteryRecords, evidence, recordedResourceAccesses, activeResources, lessonCounts, submittedPracticeAttempts, allTimeSubmittedPracticeCount] = await Promise.all([
         TopicMastery.find({ learnerId, courseId, topicId: { $in: topicIds } }).lean(),
         LearningEvidence.find({ learnerId, courseId, contributeToLearningEvidence: true }).sort({ completedAt: 1 }).lean(),
         ResourceAccess.find({ learnerId, courseId }).select("resourceId topicId accessedAt").lean(),
         Resource.countDocuments({ topicId: { $in: topicIds }, status: "ACTIVE" }),
         Lesson.countDocuments({ topicId: { $in: topicIds } }),
+        PracticeAttempt.find({ learnerId, courseId, status: "SUBMITTED", submittedAt: { $gte: previousStart, $lte: now } })
+            .select("topicId submittedAt totalQuestions correctCount scorePercent contributeToLearningEvidence")
+            .sort({ submittedAt: 1 }).lean(),
+        PracticeAttempt.countDocuments({ learnerId, courseId, status: "SUBMITTED" }),
     ]);
     const activeAccessedResources = recordedResourceAccesses.length
         ? await Resource.find({ _id: { $in: recordedResourceAccesses.map((access) => access.resourceId) }, topicId: { $in: topicIds }, status: "ACTIVE" }).select("_id").lean()
@@ -500,15 +543,35 @@ export async function getLearnerCourseAnalyticsService(learnerId, courseId, opti
     const totalCorrect = evidence.reduce((sum, item) => sum + (item.correctCount || 0), 0);
     const masteredTopics = topicAnalytics.filter((topic) => [MASTERY_STATUS.STRONG, MASTERY_STATUS.MASTERED].includes(topic.status)).length;
     const evaluatedTopics = topicAnalytics.filter((topic) => topic.evidenceCount > 0).length;
-    const now = new Date();
-    const currentStart = new Date(now); currentStart.setUTCHours(0, 0, 0, 0); currentStart.setUTCDate(currentStart.getUTCDate() - (days - 1));
-    const previousStart = new Date(currentStart.getTime() - days * 86400000);
     const currentEvidence = evidence.filter((item) => item.completedAt >= currentStart && item.completedAt <= now);
     const previousEvidence = evidence.filter((item) => item.completedAt >= previousStart && item.completedAt < currentStart);
+    const currentPracticeAttempts = submittedPracticeAttempts.filter((item) => item.submittedAt >= currentStart && item.submittedAt <= now);
+    const previousPracticeAttempts = submittedPracticeAttempts.filter((item) => item.submittedAt >= previousStart && item.submittedAt < currentStart);
+    const practiceActivity = {
+        allTimeCompleted: allTimeSubmittedPracticeCount,
+        currentPeriod: summarizeSubmittedPracticeAttempts(currentPracticeAttempts),
+        previousPeriod: summarizeSubmittedPracticeAttempts(previousPracticeAttempts),
+        dailyTrends: buildPracticeActivityDailyTrends(currentPracticeAttempts, days),
+    };
     const summarize = (records) => {
-        const questions = records.reduce((sum, item) => sum + (item.totalQuestions || 0), 0);
-        const correct = records.reduce((sum, item) => sum + (item.correctCount || 0), 0);
-        return { attempts: records.length, practiceCount: records.filter((item) => item.sourceType === "PRACTICE").length, assessmentCount: records.filter((item) => item.sourceType === "ASSESSMENT").length, totalQuestions: questions, totalCorrect: correct, accuracyPercent: questions ? Math.round(correct / questions * 100) : null };
+        const summarizeSource = (sourceType) => {
+            const sourceRecords = records.filter((item) => item.sourceType === sourceType);
+            const questions = sourceRecords.reduce((sum, item) => sum + (Number(item.totalQuestions) || 0), 0);
+            const correct = sourceRecords.reduce((sum, item) => sum + (Number(item.correctCount) || 0), 0);
+            return { attempts: sourceRecords.length, totalQuestions: questions, totalCorrect: correct, accuracyPercent: questions ? Math.round(correct / questions * 100) : null };
+        };
+        const questions = records.reduce((sum, item) => sum + (Number(item.totalQuestions) || 0), 0);
+        const correct = records.reduce((sum, item) => sum + (Number(item.correctCount) || 0), 0);
+        return {
+            attempts: records.length,
+            practiceCount: records.filter((item) => item.sourceType === "PRACTICE").length,
+            assessmentCount: records.filter((item) => item.sourceType === "ASSESSMENT").length,
+            totalQuestions: questions,
+            totalCorrect: correct,
+            accuracyPercent: questions ? Math.round(correct / questions * 100) : null,
+            practice: summarizeSource("PRACTICE"),
+            assessment: summarizeSource("ASSESSMENT"),
+        };
     };
     const dailyTrends = buildContinuousDailyTrends(currentEvidence, days);
     const focusTopic = topicAnalytics.find((topic) => topic.isUnlocked && [MASTERY_STATUS.NEEDS_IMPROVEMENT, MASTERY_STATUS.DEVELOPING].includes(topic.status))
@@ -521,6 +584,9 @@ export async function getLearnerCourseAnalyticsService(learnerId, courseId, opti
             ? "There is not enough eligible evidence to assess this topic yet. Work through its learning material and use an available practice or assessment to demonstrate your understanding."
             : `Your current mastery status is ${focusTopic.status.replaceAll("_", " ").toLowerCase()}. Revisit the topic and use focused practice to strengthen your understanding.`,
     } : null;
+    const unlockedTopicCount = topicAnalytics.filter((topic) => topic.isUnlocked).length;
+    const allTopicsMastered = topicAnalytics.length > 0 && topicAnalytics.every((topic) => [MASTERY_STATUS.STRONG, MASTERY_STATUS.MASTERED].includes(topic.status));
+    const noTopicsAvailable = topicAnalytics.length === 0;
     const distribution = Object.values(MASTERY_STATUS).reduce((result, status) => { result[status] = topicAnalytics.filter((topic) => topic.status === status).length; return result; }, {});
 
     return {
@@ -528,7 +594,9 @@ export async function getLearnerCourseAnalyticsService(learnerId, courseId, opti
         overview: { totalTopics: topics.length, evaluatedTopics, masteredTopics, masteryCoveragePercent: topics.length ? Math.round(evaluatedTopics / topics.length * 100) : 0, masteredTopicPercent: topics.length ? Math.round(masteredTopics / topics.length * 100) : 0, totalLessonsAvailable: lessonCounts, totalActiveResources: activeResources, accessedResources: resourceAccesses.length, totalEligibleAttempts: evidence.length, totalQuestions, totalCorrect, accuracyPercent: totalQuestions ? Math.round(totalCorrect / totalQuestions * 100) : null },
         masteryDistribution: distribution, topics: topicAnalytics,
         activity: { days, dailyTrends, currentPeriod: summarize(currentEvidence), previousPeriod: summarize(previousEvidence), resourceAccesses: resourceAccesses.length },
+        practiceActivity,
         nextAction,
+        learningState: { unlockedTopicCount, allTopicsMastered, noTopicsAvailable },
         evidenceGuidance: "Mastery and performance use only eligible LearningEvidence and the authoritative TopicMastery records. Resource access is engagement evidence only; it does not increase mastery. Lesson completion or reading time is not tracked by a dedicated learner progress record.",
     };
 }
