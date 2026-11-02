@@ -147,13 +147,6 @@ export interface TopicMasteryAnalyticsItem {
   lastEvaluatedAt: string | null;
 }
 
-export interface AnalyticsSourceSummary {
-  attempts: number;
-  totalQuestions: number;
-  totalCorrect: number;
-  accuracyPercent: number | null;
-}
-
 export interface AnalyticsPeriodSummary {
   attempts: number;
   practiceCount: number;
@@ -161,12 +154,11 @@ export interface AnalyticsPeriodSummary {
   totalQuestions: number;
   totalCorrect: number;
   accuracyPercent: number | null;
-  practice?: AnalyticsSourceSummary;
-  assessment?: AnalyticsSourceSummary;
 }
 
 export interface LearnerAnalyticsOverviewData {
   activityTotals: ActivityTotals;
+  engagement: { accessedResources: number; activeResourcesAvailable: number; lessonsAvailable: number; note: string };
   masteryDistribution: MasteryDistribution;
   topicMasteryList: TopicMasteryAnalyticsItem[];
   periodComparison: {
@@ -230,6 +222,5 @@ export interface LearnerCourseAnalyticsData {
     kind: 'GATHER_EVIDENCE' | 'REVIEW_TOPIC';
     explanation: string;
   } | null;
-  learningState: { unlockedTopicCount: number; allTopicsMastered: boolean; noTopicsAvailable: boolean };
   evidenceGuidance: string;
 }

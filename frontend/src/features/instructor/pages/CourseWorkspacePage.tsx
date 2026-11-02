@@ -16,6 +16,7 @@ import Button from '../../../components/ui/Button';
 import { useCourse } from '../hooks/useCourse';
 import { publishCourse, archiveCourse } from '../api/instructor.api';
 import TopicManagement from '../components/TopicManagement/TopicManagement';
+import { DiagnosticAssessmentManagement } from '../components/DiagnosticAssessmentManagement/DiagnosticAssessmentManagement';
 import type { CourseDifficulty, CourseStatus } from '../types/instructor.types';
 import type { Topic } from '../types/topic.types';
 
@@ -232,6 +233,12 @@ export const CourseWorkspacePage: React.FC = () => {
           </div>
         )}
       </motion.section>
+
+      <DiagnosticAssessmentManagement
+        course={course}
+        courseStatus={course.status}
+        onChanged={refetch}
+      />
 
       <motion.section
         initial={{ opacity: 0, y: 8 }}

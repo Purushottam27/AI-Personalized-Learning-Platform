@@ -12,7 +12,6 @@ import {
 
   AlertCircle,
 
-  Info,
 
   CheckCircle2,
 
@@ -329,6 +328,7 @@ interface FormState {
   title: string; description: string; domain: string; category: string; difficulty: CourseDifficulty | '';
 
   objectives: string[]; durationHours: string; durationWeeks: string; prereqKnowledge: string[]; prereqCourseIds: string[]; lockingEnabled: boolean;
+  diagnosticEnabled: boolean; diagnosticPassingScore: string; diagnosticQuestionsPerAttempt: string;
 
 }
 
@@ -339,6 +339,7 @@ const INITIAL_STATE: FormState = {
   title: '', description: '', domain: '', category: '', difficulty: '',
 
   objectives: [''], durationHours: '', durationWeeks: '', prereqKnowledge: [], prereqCourseIds: [], lockingEnabled: false,
+  diagnosticEnabled: false, diagnosticPassingScore: '60', diagnosticQuestionsPerAttempt: '5',
 
 };
 
@@ -492,6 +493,9 @@ export const CreateCoursePage: React.FC = () => {
           prereqCourseIds: course.prerequisites?.courses || [],
           prereqKnowledge: course.prerequisites?.knowledge || [],
           lockingEnabled: course.progressionPolicy?.lockingEnabled || false,
+          diagnosticEnabled: course.diagnosticPolicy?.enabled ?? false,
+          diagnosticPassingScore: String(course.diagnosticPolicy?.passingScore ?? 60),
+          diagnosticQuestionsPerAttempt: String(course.diagnosticPolicy?.questionsPerAttempt ?? 5),
         });
 
         // Empty optional objects are saved explicitly when the instructor chooses
@@ -505,7 +509,7 @@ export const CreateCoursePage: React.FC = () => {
         }
         if (course.estimatedDuration !== undefined) completed.push('duration');
         if (course.prerequisites !== undefined) completed.push('prerequisites');
-        if (course.progressionPolicy !== undefined) completed.push('settings');
+        if (course.progressionPolicy !== undefined || course.diagnosticPolicy !== undefined) completed.push('settings');
         setCompletedSections(completed);
 
         const firstIncomplete = SECTIONS.find((section) => !completed.includes(section.id));
@@ -594,6 +598,11 @@ export const CreateCoursePage: React.FC = () => {
     } else if (activeSectionId === 'settings') {
 
       payload.progressionPolicy = { lockingEnabled: form.lockingEnabled };
+      payload.diagnosticPolicy = {
+        enabled: form.diagnosticEnabled,
+        passingScore: Number(form.diagnosticPassingScore),
+        questionsPerAttempt: Number(form.diagnosticQuestionsPerAttempt),
+      };
 
     }
 
@@ -994,23 +1003,29 @@ export const CreateCoursePage: React.FC = () => {
 
                       </div>
 
-                      <div className="p-4 rounded-lg border border-border-muted bg-surface-elevated space-y-3">
-
-                        <div className="flex items-center gap-2">
-
-                          <h3 className="text-sm font-semibold text-text-primary">Diagnostic assessment</h3>
-
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-surface-disabled text-text-disabled border border-border-muted">Coming soon</span>
-
+                      <div className="rounded-xl border border-border bg-surface-elevated p-4 sm:p-5 space-y-5">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-signal/20 bg-signal-soft text-signal"><BookOpen className="h-4 w-4" /></div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-semibold text-text-primary">Diagnostic assessment</h3><span className="rounded-full border border-sage/20 bg-sage-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sage">Prior-knowledge baseline</span></div>
+                            <p className="mt-1 text-xs leading-relaxed text-text-secondary">Measure what learners already know before they begin. This baseline is separate from topic mastery and the final assessment.</p>
+                          </div>
                         </div>
-
-                        <div className="flex items-start gap-2 text-text-tertiary">
-
-                          <Info className="w-4 h-4 mt-0.5 shrink-0" />
-
-                          <p className="text-xs leading-relaxed">Question bank and assessment functionality are currently under development.</p>
-
+                        <div className="rounded-lg border border-border bg-surface p-4">
+                          <Toggle label="Enable diagnostic assessment" description="Learners will complete a course-level baseline assessment when this feature is enabled." checked={form.diagnosticEnabled} onChange={v => updateField('diagnosticEnabled', v)} />
                         </div>
+                        {form.diagnosticEnabled && <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="diagnostic-passing-score" className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Passing threshold (%)</label>
+                            <input id="diagnostic-passing-score" type="number" min={0} max={100} step={1} value={form.diagnosticPassingScore} onChange={e => updateField('diagnosticPassingScore', e.target.value)} className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-primary outline-none transition-colors focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" />
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="diagnostic-question-count" className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Questions per attempt</label>
+                            <input id="diagnostic-question-count" type="number" min={1} max={50} step={1} value={form.diagnosticQuestionsPerAttempt} onChange={e => updateField('diagnosticQuestionsPerAttempt', e.target.value)} className="w-full rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-primary outline-none transition-colors focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25" />
+                          </div>
+                          <p className="sm:col-span-2 text-xs leading-relaxed text-text-tertiary">Build the assessment question pool separately in the course workspace. The pool must contain enough active questions for the selected attempt size.</p>
+                        </div>}
+                      </div>
 
                       </div>
 
