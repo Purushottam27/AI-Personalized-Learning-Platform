@@ -9,7 +9,8 @@
     "test": "node --test",
     "migrate:resource-files": "node src/scripts/migrateResourceFilesToAuthenticated.js",
     "migrate:active-enrollment-index": "node src/scripts/migrateActiveEnrollmentUniqueIndex.js",
-    "migrate:study-plan-lifecycle": "node src/scripts/migrate-study-plan-generation-lifecycle.js"
+    "migrate:study-plan-lifecycle": "node src/scripts/migrate-study-plan-generation-lifecycle.js",
+    "migrate:ai-assistant-conversations": "node src/scripts/migrate-ai-assistant-conversations.js"
   },
   "keywords": [],
   "author": "",

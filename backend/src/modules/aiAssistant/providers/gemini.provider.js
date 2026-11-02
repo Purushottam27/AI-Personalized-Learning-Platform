@@ -9,7 +9,7 @@ export class GeminiProvider {
     constructor(config = {}) {
         this.apiKey = config.apiKey !== undefined ? config.apiKey : (process.env.GEMINI_API_KEY || null);
         this.model = config.model !== undefined && config.model !== null ? config.model : (process.env.GEMINI_MODEL || AI_CONSTANTS.DEFAULT_MODEL);
-        this.timeoutMs = config.timeoutMs || AI_CONSTANTS.REQUEST_TIMEOUT_MS;
+        this.timeoutMs = config.timeoutMs || Number.parseInt(process.env.GEMINI_REQUEST_TIMEOUT_MS || "75000", 10);
     }
 
     /**
@@ -147,9 +147,15 @@ export class GeminiProvider {
             );
         }
 
+        const usageMetadata = data.usageMetadata || {};
         return {
             text,
             model: this.model,
+            usage: {
+                promptTokens: Number.isFinite(usageMetadata.promptTokenCount) ? usageMetadata.promptTokenCount : null,
+                responseTokens: Number.isFinite(usageMetadata.candidatesTokenCount) ? usageMetadata.candidatesTokenCount : null,
+                totalTokens: Number.isFinite(usageMetadata.totalTokenCount) ? usageMetadata.totalTokenCount : null,
+            },
         };
     }
 }

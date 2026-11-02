@@ -6,6 +6,13 @@ import { Enrollment } from "../../enrollment/models/enrollment.model.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 import { AI_CONSTANTS, AI_ERROR_CODES } from "../constants/aiAssistant.constants.js";
 
+const requiredIdString = (value, label) => {
+    if (value === null || value === undefined || value === "") {
+        throw new ApiError(409, "INVALID_LEARNING_DATA", `The selected ${label} is missing a required reference. Please contact your instructor or try another course topic.`);
+    }
+    return typeof value === "string" ? value : value.toString();
+};
+
 /**
  * Safely extracts textual information from lesson content blocks.
  * Ignores binary data and formats structured blocks into readable text.
@@ -101,7 +108,7 @@ export async function retrieveAuthorizedContext({ learnerId, courseId = null, to
             throw new ApiError(404, "TOPIC_NOT_FOUND", "Topic for this lesson was not found");
         }
 
-        if (topicId && topicId.toString() !== targetLesson.topicId.toString()) {
+        if (topicId && requiredIdString(topicId, "topic") !== requiredIdString(targetLesson.topicId, "lesson topic")) {
             throw new ApiError(400, "INVALID_CONTEXT_REFERENCE", "Lesson does not belong to the specified topic");
         }
 
@@ -110,7 +117,7 @@ export async function retrieveAuthorizedContext({ learnerId, courseId = null, to
             throw new ApiError(404, "COURSE_NOT_FOUND", "Course for this topic was not found");
         }
 
-        if (courseId && courseId.toString() !== targetTopic.courseId.toString()) {
+        if (courseId && requiredIdString(courseId, "course") !== requiredIdString(targetTopic.courseId, "topic course")) {
             throw new ApiError(400, "INVALID_CONTEXT_REFERENCE", "Topic does not belong to the specified course");
         }
     }
@@ -126,7 +133,7 @@ export async function retrieveAuthorizedContext({ learnerId, courseId = null, to
             throw new ApiError(404, "COURSE_NOT_FOUND", "Course for this topic was not found");
         }
 
-        if (courseId && courseId.toString() !== targetTopic.courseId.toString()) {
+        if (courseId && requiredIdString(courseId, "course") !== requiredIdString(targetTopic.courseId, "topic course")) {
             throw new ApiError(400, "INVALID_CONTEXT_REFERENCE", "Topic does not belong to the specified course");
         }
     }
@@ -165,7 +172,7 @@ export async function retrieveAuthorizedContext({ learnerId, courseId = null, to
     // Add Course to sources & context
     sources.push({
         type: "course",
-        id: targetCourse._id.toString(),
+        id: requiredIdString(targetCourse._id, "course record"),
         title: targetCourse.title,
     });
 
@@ -181,12 +188,12 @@ export async function retrieveAuthorizedContext({ learnerId, courseId = null, to
     if (targetLesson) {
         sources.push({
             type: "topic",
-            id: targetTopic._id.toString(),
+            id: requiredIdString(targetTopic._id, "topic record"),
             title: targetTopic.title,
         });
         sources.push({
             type: "lesson",
-            id: targetLesson._id.toString(),
+            id: requiredIdString(targetLesson._id, "lesson record"),
             title: targetLesson.title,
         });
 
@@ -207,7 +214,7 @@ export async function retrieveAuthorizedContext({ learnerId, courseId = null, to
     else if (targetTopic) {
         sources.push({
             type: "topic",
-            id: targetTopic._id.toString(),
+            id: requiredIdString(targetTopic._id, "topic record"),
             title: targetTopic.title,
         });
 
@@ -226,7 +233,7 @@ export async function retrieveAuthorizedContext({ learnerId, courseId = null, to
         for (const lesson of lessons) {
             sources.push({
                 type: "lesson",
-                id: lesson._id.toString(),
+                id: requiredIdString(lesson._id, "lesson record"),
                 title: lesson.title,
             });
             const text = extractLessonText(lesson.content);
@@ -243,7 +250,7 @@ export async function retrieveAuthorizedContext({ learnerId, courseId = null, to
         for (const topic of topics) {
             sources.push({
                 type: "topic",
-                id: topic._id.toString(),
+                id: requiredIdString(topic._id, "topic record"),
                 title: topic.title,
             });
             contextSections.push(
