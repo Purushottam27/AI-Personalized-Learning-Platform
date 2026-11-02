@@ -59,13 +59,14 @@ export const WeeklyLearningReview: React.FC<Props> = ({ planId }) => {
         <div><div className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-sage" /><h2 className="font-display text-lg font-semibold text-text-primary">Weekly learning review</h2></div><p className="mt-2 text-sm text-text-secondary">A review of recorded learning evidence for {formatDate(review.plan.startDate)} – {formatDate(review.plan.endDate)}.</p><p className="mt-1 text-xs text-text-tertiary">Plan v{review.plan.version} · Calendar timezone: {review.plan.timeZone}</p></div>
         <button onClick={() => void loadReview()} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-text-secondary hover:border-signal"><RefreshCw className="h-3.5 w-3.5" /> Refresh</button>
       </div>
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Metric label="Scheduled" value={week.scheduledActivities} />
-        <Metric label="Completed" value={week.completedActivities} />
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
+        <Metric label="Scheduled" value={week.scheduledActivities} detail="All planned activities" />
+        <Metric label="Trackable" value={week.trackableActivities} detail="Practice, assessment, topic review" />
+        <Metric label="Completed" value={week.completedActivities} detail="Backed by eligible evidence" />
         <Metric label="Pending" value={week.pendingActivities} />
         <Metric label="Overdue" value={week.overdueActivities} />
         <Metric label="Active days" value={`${week.activeLearningDays}/7`} />
-        <Metric label="Completion" value={`${week.completionPercentage ?? 0}%`} />
+        <Metric label="Evidence completion" value={`${week.completionPercentage ?? 0}%`} detail="Trackable activities only" />
       </div>
     </header>
 
@@ -73,6 +74,8 @@ export const WeeklyLearningReview: React.FC<Props> = ({ planId }) => {
       <PerformancePanel title="Practice" data={review.performance.practice} empty={review.performance.practice.sessions === 0} />
       <PerformancePanel title="Assessments" data={review.performance.assessments} empty={review.performance.assessments.sessions === 0} />
     </div>
+
+    <p className="text-xs leading-relaxed text-text-tertiary">Scheduled lesson activities remain self-paced and are not counted as completed or pending because this platform does not record authoritative lesson-completion evidence.</p>
 
     <section className="rounded-2xl border border-border bg-surface p-5">
       <div className="flex items-center gap-2"><Target className="h-5 w-5 text-signal" /><h3 className="text-sm font-bold text-text-primary">Topic understanding</h3></div>

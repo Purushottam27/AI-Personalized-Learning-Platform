@@ -27,6 +27,7 @@ export interface WeeklyLearningReview {
   plan: { planId: string; version: number; status: string; startDate: string; endDate: string; timeZone: string };
   learningWeek: {
     scheduledActivities: number;
+    trackableActivities: number;
     completedActivities: number;
     pendingActivities: number;
     overdueActivities: number;

@@ -43,6 +43,7 @@ export interface StudyPreferences {
 }
 export interface PlanSummary {
   totalScheduled: number;
+  trackableActivityCount?: number;
   completedCount: number;
   pendingCount: number;
   missedCount: number;

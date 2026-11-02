@@ -247,27 +247,39 @@ export const LearnerAnalyticsPage: React.FC = () => {
 
       <section className={`${panelClass} p-5 sm:p-6`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><div className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-signal"/><h2 className="text-base font-semibold text-text-primary">Performance over time</h2></div><p className="mt-1 text-xs text-text-secondary">Question-weighted accuracy from eligible completed evidence in the selected {days}-day period.</p></div>
+          <div><div className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-signal"/><h2 className="text-base font-semibold text-text-primary">Performance over time</h2></div><p className="mt-1 text-xs text-text-secondary">Submitted practice scores and eligible evidence-based accuracy are shown separately for the selected {days}-day period.</p></div>
           <span className="text-xs text-text-tertiary">Missing days are not scored as zero</span>
         </div>
-        <div className="mt-5 space-y-4">
-          {[{key:'practiceAccuracyPercent',label:'Practice accuracy',tone:'bg-signal',questions:'practiceQuestions'},{key:'assessmentAccuracyPercent',label:'Assessment accuracy',tone:'bg-sage',questions:'assessmentQuestions'}].map((series) => {
-            const observed = dailyTrends.filter((day) => day[series.key as 'practiceAccuracyPercent' | 'assessmentAccuracyPercent'] !== null);
-            return <div key={series.key}>
-              <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold text-text-secondary">{series.label}</p><p className="text-[11px] text-text-tertiary">{observed.length} day{observed.length === 1 ? '' : 's'} with evidence</p></div>
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {dailyTrends.map((day) => {
-                  const value = day[series.key as 'practiceAccuracyPercent' | 'assessmentAccuracyPercent'];
-                  const questions = day[series.questions as 'practiceQuestions' | 'assessmentQuestions'];
-                  return <div key={`${series.key}-${day.date}`} className="min-w-10 flex-1 text-center" title={`${formatDay(day.date)} · ${series.label}: ${value === null ? 'No eligible evidence' : `${value}% from ${questions} questions`}`}>
-                    <div className="flex h-24 items-end justify-center rounded-lg bg-surface-elevated px-1 pt-2"><div className={`w-full max-w-8 rounded-t-md ${value === null ? 'bg-border' : series.tone}`} style={{height:value === null ? '3px' : `${Math.max(5, value)}%`}}/></div>
-                    <p className="mt-1.5 text-[10px] font-semibold tabular-nums text-text-secondary">{value === null ? '—' : `${value}%`}</p>
-                    <p className="text-[9px] text-text-tertiary">{new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined,{weekday:'short'})}</p>
-                  </div>;
-                })}
-              </div>
+        <div className="mt-5 rounded-xl border border-border-muted bg-surface-elevated p-4">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+            <div><h3 className="text-sm font-semibold text-text-primary">Submitted practice score</h3><p className="mt-1 text-xs text-text-secondary">Daily average from every submitted practice attempt, including formative attempts.</p></div>
+            <span className="text-[11px] text-text-tertiary">{data.practiceActivity.dailyTrends.reduce((sum, day) => sum + day.attempts, 0)} submissions · {data.practiceActivity.dailyTrends.filter((day) => day.attempts > 0).length} active days</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {data.practiceActivity.dailyTrends.map((day) => <div key={`submitted-practice-${day.date}`} className="min-w-10 flex-1 text-center" title={`${formatDay(day.date)} · ${day.attempts} submitted ${day.attempts === 1 ? 'attempt' : 'attempts'} · ${day.averageScorePercent === null ? 'No submitted score' : `${day.averageScorePercent}% average score`}`}>
+              <div className="flex h-24 items-end justify-center rounded-lg bg-surface px-1 pt-2"><div className={`w-full max-w-8 rounded-t-md ${day.averageScorePercent === null ? 'bg-border' : 'bg-signal'}`} style={{height:day.averageScorePercent === null ? '3px' : `${Math.max(5, day.averageScorePercent)}%`}}/></div>
+              <p className="mt-1.5 text-[10px] font-semibold tabular-nums text-text-secondary">{day.averageScorePercent === null ? '—' : `${day.averageScorePercent}%`}</p>
+              <p className="text-[9px] text-text-tertiary">{days > 14 ? new Date(`${day.date}T00:00:00`).getDate() : formatDay(day.date).split(' ')[0]}</p>
+              <p className="text-[9px] text-text-tertiary">{day.attempts} {day.attempts === 1 ? 'try' : 'tries'}</p>
+            </div>)}
+          </div>
+          {data.practiceActivity.currentPeriod.attempts === 0 && <p className="mt-2 text-xs text-text-secondary">No submitted practice attempts were recorded in this selected period.</p>}
+        </div>
+        <div className="mt-5 space-y-5">
+          {(() => {
+            const assessmentDays = dailyTrends.filter((day) => day.assessmentAccuracyPercent !== null);
+            return <div>
+              <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold text-text-secondary">Assessment accuracy</p><p className="text-[11px] text-text-tertiary">{assessmentDays.length} day{assessmentDays.length === 1 ? '' : 's'} with evidence</p></div>
+              <div className="flex gap-2 overflow-x-auto pb-2">{dailyTrends.map((day) => { const value = day.assessmentAccuracyPercent; return <div key={`assessment-${day.date}`} className="min-w-10 flex-1 text-center" title={`${formatDay(day.date)} · Assessment: ${value === null ? 'No eligible evidence' : `${value}% from ${day.assessmentQuestions} questions`}`}><div className="flex h-24 items-end justify-center rounded-lg bg-surface-elevated px-1 pt-2"><div className={`w-full max-w-8 rounded-t-md ${value === null ? 'bg-border' : 'bg-sage'}`} style={{height:value === null ? '3px' : `${Math.max(5, value)}%`}}/></div><p className="mt-1.5 text-[10px] font-semibold tabular-nums text-text-secondary">{value === null ? '—' : `${value}%`}</p><p className="text-[9px] text-text-tertiary">{new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined,{weekday:'short'})}</p></div>;})}</div>
             </div>;
-          })}
+          })()}
+          {(() => {
+            const practiceDays = dailyTrends.filter((day) => day.practiceAccuracyPercent !== null);
+            return <div>
+              <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold text-text-secondary">Eligible practice accuracy</p><p className="text-[11px] text-text-tertiary">{practiceDays.length} day{practiceDays.length === 1 ? '' : 's'} with evidence</p></div>
+              {practiceDays.length > 0 ? <div className="flex gap-2 overflow-x-auto pb-2">{dailyTrends.map((day) => { const value = day.practiceAccuracyPercent; return <div key={`eligible-practice-${day.date}`} className="min-w-10 flex-1 text-center" title={`${formatDay(day.date)} · Eligible practice: ${value === null ? 'No eligible evidence' : `${value}% from ${day.practiceQuestions} questions`}`}><div className="flex h-24 items-end justify-center rounded-lg bg-surface-elevated px-1 pt-2"><div className={`w-full max-w-8 rounded-t-md ${value === null ? 'bg-border' : 'bg-signal'}`} style={{height:value === null ? '3px' : `${Math.max(5, value)}%`}}/></div><p className="mt-1.5 text-[10px] font-semibold tabular-nums text-text-secondary">{value === null ? '—' : `${value}%`}</p><p className="text-[9px] text-text-tertiary">{new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined,{weekday:'short'})}</p></div>;})}</div> : <div className="rounded-xl border border-dashed border-border bg-surface-elevated p-4"><p className="text-sm font-medium text-text-primary">No eligible practice evidence in this period</p><p className="mt-1 text-xs leading-5 text-text-secondary">This is not a zero score. This chart appears after you submit a practice set that the instructor has enabled to contribute to learning evidence. Formative practice still appears in your submitted practice score trend above, but it does not affect mastery or eligible accuracy.</p></div>}
+            </div>;
+          })()}
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-border pt-3 text-[11px] text-text-tertiary"><span>Current period: {derived.current.totalQuestions} eligible questions · {derived.current.attempts} completed submissions</span><span>Practice and assessment accuracy are calculated separately.</span></div>
         {derived.current.totalQuestions === 0 && <p className="mt-3 rounded-xl border border-dashed border-border p-4 text-xs leading-5 text-text-secondary">No eligible completed evidence was recorded in this period. Accuracy is unavailable until a practice or assessment submission contributes eligible evidence.</p>}
