@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addCalendarDays, calendarDateKey, summarizePerformance } from "../src/modules/studyPlan/services/studyPlanReview.utils.js";
+import { addCalendarDays, calendarDateKey, summarizePerformance, summarizeActivityCounts } from "../src/modules/studyPlan/services/studyPlanReview.utils.js";
 
 test("Study Plan Weekly Review date helpers preserve calendar-day boundaries", () => {
     assert.equal(addCalendarDays("2026-11-02", -7), "2026-10-26");
@@ -32,4 +32,36 @@ test("Weekly performance reports no fabricated zero-accuracy result when evidenc
     assert.equal(result.questionsCorrect, 0);
     assert.equal(result.accuracyPercent, null);
     assert.equal(result.averageScorePercent, null);
+});
+
+
+test("Weekly activity counts exclude lessons and other untracked activities from evidence completion", () => {
+    const result = summarizeActivityCounts([
+        { activityType: "LESSON", isTrackable: false, isCompleted: false, temporalStatus: "PAST" },
+        { activityType: "PRACTICE", isTrackable: true, isCompleted: true, temporalStatus: "PAST" },
+        { activityType: "ASSESSMENT", isTrackable: true, isCompleted: false, temporalStatus: "PAST" },
+        { activityType: "TOPIC_REVIEW", isTrackable: true, isCompleted: false, temporalStatus: "TODAY" },
+        { activityType: "RESOURCE", isTrackable: false, isCompleted: false, temporalStatus: "PAST" },
+    ]);
+
+    assert.deepEqual(result, {
+        scheduledActivities: 5,
+        trackableActivities: 3,
+        completedActivities: 1,
+        pendingActivities: 2,
+        overdueActivities: 1,
+        completionPercentage: 33.3,
+    });
+});
+
+test("Weekly activity counts safely report zero completion when no activities are trackable", () => {
+    const result = summarizeActivityCounts([
+        { activityType: "LESSON", isTrackable: false, isCompleted: false, temporalStatus: "PAST" },
+    ]);
+    assert.equal(result.scheduledActivities, 1);
+    assert.equal(result.trackableActivities, 0);
+    assert.equal(result.completedActivities, 0);
+    assert.equal(result.pendingActivities, 0);
+    assert.equal(result.overdueActivities, 0);
+    assert.equal(result.completionPercentage, 0);
 });

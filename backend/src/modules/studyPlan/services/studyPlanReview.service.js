@@ -4,7 +4,7 @@ import { AssessmentAttempt } from "../../assessmentAttempt/models/assessmentAtte
 import { Topic } from "../../topic/models/topic.model.js";
 import { computeTopicMastery } from "../../topicMastery/services/masteryCalculation.service.js";
 import { MASTERY_STATUS } from "../../topicMastery/constants/mastery.constants.js";
-import { addCalendarDays, calendarDateKey, emptyPerformance, summarizePerformance } from "./studyPlanReview.utils.js";
+import { addCalendarDays, calendarDateKey, emptyPerformance, summarizeActivityCounts, summarizePerformance } from "./studyPlanReview.utils.js";
 import { ApiError } from "../../../shared/errors/ApiError.js";
 
 const VALID_ID = /^[0-9a-fA-F]{24}$/;
@@ -98,7 +98,7 @@ export async function getStudyPlanWeeklyReviewService(learnerId, planId, now = n
     if (!courseIds.length) {
         return {
             plan: { planId: String(plan._id), version: plan.version, status: plan.status, startDate, endDate, timeZone },
-            learningWeek: { scheduledActivities: 0, completedActivities: 0, pendingActivities: 0, overdueActivities: 0, activeLearningDays: 0 },
+            learningWeek: { scheduledActivities: 0, trackableActivities: 0, completedActivities: 0, pendingActivities: 0, overdueActivities: 0, activeLearningDays: 0, completionPercentage: 0, activities: [] },
             performance: { practice: emptyPerformance(), assessments: emptyPerformance(), combined: emptyPerformance(), hasEvidence: false },
             topicUnderstanding: { topics: [], evidenceCount: 0, hasSufficientEvidence: false },
             attentionItems: [], nextSteps: [{ type: "CONTINUE_LEARNING", title: "Continue your learning plan", reason: "This plan has no scheduled course activities to review." }],
@@ -184,7 +184,7 @@ export async function getStudyPlanWeeklyReviewService(learnerId, planId, now = n
         };
     });
 
-    const completedActivities = activities.filter((activity) => activity.isCompleted).length;
+    const activityCounts = summarizeActivityCounts(activities);
     const pendingActivities = activities.filter((activity) => activity.isTrackable && !activity.isCompleted);
     const overdueActivities = pendingActivities.filter((activity) => activity.temporalStatus === "PAST");
     const activeLearningDays = new Set(weeklyEvidence.map((item) => calendarDateKey(new Date(item.completedAt), timeZone))).size;
@@ -204,12 +204,8 @@ export async function getStudyPlanWeeklyReviewService(learnerId, planId, now = n
     return {
         plan: { planId: String(plan._id), version: plan.version, status: plan.status, startDate, endDate, timeZone },
         learningWeek: {
-            scheduledActivities: activities.length,
-            completedActivities,
-            pendingActivities: pendingActivities.length,
-            overdueActivities: overdueActivities.length,
+            ...activityCounts,
             activeLearningDays,
-            completionPercentage: activities.length ? Number(((completedActivities / activities.length) * 100).toFixed(1)) : 0,
             activities,
         },
         performance: {

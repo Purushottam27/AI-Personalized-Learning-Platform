@@ -510,12 +510,18 @@ export function buildDeterministicSchedule(candidates, weekInfo, preferences = {
         return [];
     }
 
-    // If studyDays preference is provided, prefer those days in order, otherwise all calendar days.
+    // A single explicitly selected study day remains a single-day preference.
+    // With multiple preferred days, keep the complete seven-day calendar available,
+    // prioritizing selected days before the remaining days. This avoids hiding
+    // useful study opportunities simply because only some days were preferred.
     let orderedDays = [...calendarDays];
     if (Array.isArray(preferences.studyDays) && preferences.studyDays.length > 0) {
-        const preferred = calendarDays.filter((d) => preferences.studyDays.includes(d.dayOfWeek));
-        if (preferred.length > 0) {
+        const preferred = calendarDays.filter((day) => preferences.studyDays.includes(day.dayOfWeek));
+        if (preferred.length === 1 && preferences.studyDays.length === 1) {
             orderedDays = preferred;
+        } else if (preferred.length > 0) {
+            const preferredSet = new Set(preferred.map((day) => day.date));
+            orderedDays = [...preferred, ...calendarDays.filter((day) => !preferredSet.has(day.date))];
         }
     }
 
@@ -567,7 +573,11 @@ export function buildDeterministicSchedule(candidates, weekInfo, preferences = {
 
             allocation.totalMinutes += activityDuration;
             allocation.order += 1;
-            currentDayIndex = dayIndex;
+            // Advance after every placement so a small pool of distinct activities
+            // is spread across days instead of being packed into the first day.
+            // Once every available day has received an activity, the rotation wraps
+            // and additional activities can share days subject to daily capacity.
+            currentDayIndex = (dayIndex + 1) % orderedDays.length;
             placed = true;
             break;
         }
@@ -852,8 +862,10 @@ export async function enrichPlanWithActualState(planDoc, learnerId) {
             ? "PAST"
             : act.scheduledDate === todayDate ? "TODAY" : "UPCOMING";
 
-        if (actualState === "COMPLETED") completedCount += 1;
-        else {
+        const isTrackable = ["PRACTICE", "ASSESSMENT", "TOPIC_REVIEW"].includes(act.activityType);
+        if (isTrackable && actualState === "COMPLETED") {
+            completedCount += 1;
+        } else if (isTrackable) {
             pendingCount += 1;
             if (temporalStatus === "PAST") overdueCount += 1;
         }
@@ -875,8 +887,11 @@ export async function enrichPlanWithActualState(planDoc, learnerId) {
 
     const weekDays = calendarDays.map((day) => {
         const activities = enrichedActivities.filter((a) => a.scheduledDate === day.date);
-        const completed = activities.filter((a) => a.isCompleted).length;
-        const pending = activities.length - completed;
+        const trackableActivities = activities.filter((activity) =>
+            ["PRACTICE", "ASSESSMENT", "TOPIC_REVIEW"].includes(activity.activityType)
+        );
+        const completed = trackableActivities.filter((activity) => activity.isCompleted).length;
+        const pending = trackableActivities.length - completed;
         const dayState = day.date < todayDate ? "PAST" : day.date === todayDate ? "TODAY" : "UPCOMING";
         return {
             ...day,
@@ -891,6 +906,10 @@ export async function enrichPlanWithActualState(planDoc, learnerId) {
         };
     });
 
+    const trackableActivityCount = enrichedActivities.filter((activity) =>
+        ["PRACTICE", "ASSESSMENT", "TOPIC_REVIEW"].includes(activity.activityType)
+    ).length;
+
     return {
         ...plan,
         scheduledActivities: enrichedActivities,
@@ -898,12 +917,13 @@ export async function enrichPlanWithActualState(planDoc, learnerId) {
         todayDate,
         summary: {
             totalScheduled: enrichedActivities.length,
+            trackableActivityCount,
             completedCount,
             pendingCount,
             missedCount: overdueCount,
             overdueCount,
-            progressPercentage: enrichedActivities.length > 0
-                ? Math.round((completedCount / enrichedActivities.length) * 100)
+            progressPercentage: trackableActivityCount > 0
+                ? Math.round((completedCount / trackableActivityCount) * 100)
                 : 0
         },
         todayActivities,

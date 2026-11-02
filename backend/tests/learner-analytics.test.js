@@ -666,6 +666,8 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
         assert.equal(data.practiceActivity.currentPeriod.averageScorePercent, 75);
         assert.equal(data.practiceActivity.currentPeriod.eligibleAttempts, 1);
         assert.equal(data.practiceActivity.dailyTrends.length, 7);
+        assert.equal(data.practiceActivity.dailyTrends.reduce((sum, day) => sum + day.attempts, 0), 2, "Daily submitted-practice trend includes eligible and formative submissions");
+        assert.equal(data.practiceActivity.dailyTrends.reduce((sum, day) => sum + (day.attempts > 0 ? 1 : 0), 0), 2, "The two submissions are represented on their respective dates");
 
         // The formative attempt must not inflate eligible outcome evidence.
         assert.equal(data.periodComparison.current.attempts, 2);
@@ -706,6 +708,8 @@ test("Stage 8 — Progress & Analytics Test Suite", async (t) => {
         assert.equal(data.practiceActivity.currentPeriod.attempts, 2);
         assert.equal(data.practiceActivity.currentPeriod.averageScorePercent, 75);
         assert.equal(data.practiceActivity.currentPeriod.eligibleAttempts, 1);
+        assert.equal(data.practiceActivity.dailyTrends.reduce((sum, day) => sum + day.attempts, 0), 2, "Course daily trend includes all submitted practice attempts");
+        assert.equal(data.practiceActivity.dailyTrends.reduce((sum, day) => sum + (day.averageScorePercent === null ? 0 : 1), 0), 2, "Both submitted-practice dates have score data");
         assert.equal(data.activity.currentPeriod.assessment.attempts, 1);
         assert.equal(data.activity.currentPeriod.assessment.totalQuestions, 8);
         assert.equal(data.activity.currentPeriod.assessment.accuracyPercent, 75);

@@ -579,6 +579,8 @@ test("Phase 4 — AI Learning Assistant & Personalized Study Plan Regression Tes
         );
 
         assert.equal(schedule.length, 3, "All three candidates should be scheduled across study days");
+        assert.equal(new Set(schedule.map((activity) => activity.dayOfWeek)).size, 3,
+            "A small set of distinct activities should be distributed across separate days before sharing a day");
         const totalScheduledMinutes = schedule.reduce((sum, a) => sum + a.estimatedDurationMinutes, 0);
         assert.equal(totalScheduledMinutes, 90);
 

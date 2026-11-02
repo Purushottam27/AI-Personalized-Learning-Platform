@@ -55,3 +55,27 @@ export function summarizePerformance(evidence) {
     return summary;
 }
 
+
+
+/**
+ * Summarizes scheduled activity outcomes without treating self-paced or otherwise
+ * untracked activities as incomplete work. Only the supplied canonical trackable
+ * types participate in completion and overdue metrics.
+ */
+export function summarizeActivityCounts(activities = []) {
+    const trackable = activities.filter((activity) => activity.isTrackable === true);
+    const completed = trackable.filter((activity) => activity.isCompleted === true).length;
+    const pending = trackable.filter((activity) => activity.isCompleted !== true);
+    const overdue = pending.filter((activity) => activity.temporalStatus === "PAST").length;
+
+    return {
+        scheduledActivities: activities.length,
+        trackableActivities: trackable.length,
+        completedActivities: completed,
+        pendingActivities: pending.length,
+        overdueActivities: overdue,
+        completionPercentage: trackable.length
+            ? Number(((completed / trackable.length) * 100).toFixed(1))
+            : 0,
+    };
+}
