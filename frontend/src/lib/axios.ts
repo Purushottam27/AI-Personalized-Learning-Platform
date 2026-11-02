@@ -21,6 +21,7 @@ export interface ApiError {
   code: string;
   message: string;
   status: number;
+  details?: unknown;
 }
 
 export function isApiError(err: unknown): err is ApiError {
@@ -81,6 +82,7 @@ api.interceptors.response.use(
       code: backendCode,
       message: backendMessage,
       status: status ?? 0,
+      details: backendError?.details,
     };
 
     // ── 401 → attempt silent refresh, then retry ─────────────────────────────

@@ -108,6 +108,9 @@ export const QuestionBankManagement: React.FC<QuestionBankManagementProps> = ({
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterLesson, setFilterLesson] = useState<string>('ALL');
 
+  // Additive question creation/import is supported for active banks in Draft and Published courses.
+  const canAddQuestions = (courseStatus === 'DRAFT' || courseStatus === 'PUBLISHED') && bank?.status === 'ACTIVE';
+  // Mutating existing bank/question records remains Draft-only.
   const canEdit = courseStatus === 'DRAFT' && bank?.status === 'ACTIVE';
 
   // Load questions and topic lessons whenever bank is available
@@ -558,7 +561,7 @@ export const QuestionBankManagement: React.FC<QuestionBankManagementProps> = ({
             <span>{questions.filter((q) => q.status === 'ARCHIVED').length} Archived</span>
           </div>
 
-          {canEdit && (
+          {canAddQuestions && (
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="secondary" size="sm" onClick={() => setIsImportModalOpen(true)} className={interactive}>
                 <FileSpreadsheet className="h-4 w-4 text-signal" aria-hidden="true" />

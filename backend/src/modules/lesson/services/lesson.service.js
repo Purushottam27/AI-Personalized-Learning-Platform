@@ -151,17 +151,9 @@ const restoreLessonService = async (instructorId, lessonId) => {
 
     if (lesson.status === "ACTIVE") return lesson;
 
-    // Keep the compound unique (topicId, order) index collision-free.
-    // Restored lessons re-enter at the end of the active sequence.
-    const lastLesson = await Lesson.findOne({
-        topicId: lesson.topicId,
-        status: "ACTIVE"
-    }).sort({ order: -1 }).select("order");
-
-    const maxStored = await Lesson.findOne({ topicId: lesson.topicId })
-        .sort({ order: -1 }).select("order");
-
-    lesson.order = Math.max(lastLesson?.order || 0, maxStored?.order || 0) + 1;
+    // The archived document retains its original order, and therefore still
+    // owns its unique (topicId, order) slot. Reuse that same order on restore
+    // instead of appending it to the end and unexpectedly renumbering it.
     lesson.status = "ACTIVE";
     await lesson.save();
     return lesson;

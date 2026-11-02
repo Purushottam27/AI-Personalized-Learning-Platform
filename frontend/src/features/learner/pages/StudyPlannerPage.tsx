@@ -4,7 +4,8 @@ import { Link } from 'react-router-dom';
 import { useStudyPlan } from '../hooks/useStudyPlan';
 import type { ScheduledActivity, StudyPreferences } from '../types/studyPlan.types';
 import { WeeklyLearningReview } from './WeeklyLearningReview';
-type Tab = 'WEEK' | 'TODAY' | 'REVIEW' | 'PREFERENCES';
+import { AIStudyAssistant } from '../components/AIStudyAssistant';
+type Tab = 'WEEK' | 'TODAY' | 'REVIEW' | 'ASSISTANT' | 'PREFERENCES';
 const DAY_NAMES = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
 const TRACKABLE_TYPES = new Set(['PRACTICE', 'ASSESSMENT', 'TOPIC_REVIEW']);
@@ -171,7 +172,7 @@ export const StudyPlannerPage: React.FC = () => {
       </section>}
 
       <nav className="-mx-1 flex gap-2 overflow-x-auto border-b border-border px-1 pb-3" aria-label="Study planner sections">
-        {([['WEEK','7-day schedule'],['TODAY',"Today's focus"],['REVIEW','Weekly review'],['PREFERENCES','Preferences']] as [Tab,string][]).map(([key,label]) => <button key={key} type="button" onClick={() => setTab(key)} className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2 text-xs font-semibold ${tab === key ? 'bg-signal text-white' : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'}`}>{label}</button>)}
+        {([['WEEK','7-day schedule'],['TODAY',"Today's focus"],['REVIEW','Weekly review'],['ASSISTANT','AI assistant'],['PREFERENCES','Preferences']] as [Tab,string][]).map(([key,label]) => <button key={key} type="button" onClick={() => setTab(key)} className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2 text-xs font-semibold ${tab === key ? 'bg-signal text-white' : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'}`}>{label}</button>)}
       </nav>
 
       {tab === 'WEEK' && <section className="space-y-3">
@@ -227,6 +228,13 @@ export const StudyPlannerPage: React.FC = () => {
       </section>}
 
       {tab === 'REVIEW' && <WeeklyLearningReview planId={plan._id} />}
+
+      {tab === 'ASSISTANT' && <AIStudyAssistant courses={Array.from(
+        new Map((plan.scheduledActivities ?? []).map((activity) => [activity.courseId, {
+          id: activity.courseId,
+          title: activity.courseTitle,
+        }])).values()
+      )} />}
 
       {tab === 'PREFERENCES' && <form onSubmit={savePreferences} className="max-w-3xl space-y-6 rounded-2xl border border-border bg-surface p-5 sm:p-6">
         <div><h2 className="font-semibold text-text-primary">Schedule preferences</h2><p className="mt-1 text-xs text-text-secondary">Choose a realistic daily workload and session length. Saving preferences may prepare a proposed schedule revision for your approval.</p></div>

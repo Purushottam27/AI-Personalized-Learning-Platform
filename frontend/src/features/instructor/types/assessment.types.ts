@@ -33,6 +33,8 @@ export interface CreateAssessmentPayload {
   questionsPerAttempt?: number;
   passingScore?: number;
   maxAttempts?: number;
+  opensAt?: string | null;
+  closesAt?: string | null;
   randomizeQuestions?: boolean;
   randomizeOptions?: boolean;
   timeLimitMinutes?: number | null;
@@ -45,6 +47,8 @@ export interface UpdateAssessmentPayload {
   questionsPerAttempt?: number;
   passingScore?: number;
   maxAttempts?: number;
+  opensAt?: string | null;
+  closesAt?: string | null;
   randomizeQuestions?: boolean;
   randomizeOptions?: boolean;
   timeLimitMinutes?: number | null;

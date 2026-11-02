@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  Archive,
   ArrowDown,
   ArrowUp,
   BookOpen,
@@ -14,17 +15,18 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
-  Trash2,
   Type,
   Video,
   X,
 } from "lucide-react";
 import Button from "../../../../components/ui/Button";
 import {
+  archiveLesson,
   createLesson,
-  deleteLesson,
   reorderTopicLessons,
+  restoreLesson,
   updateLesson,
 } from "../../api/lesson.api";
 import { useTopicLessons } from "../../hooks/useTopicLessons";
@@ -362,12 +364,20 @@ const LessonManagement: React.FC<LessonManagementProps> = ({
   const { lessons, setLessons, isLoading, error, refetch } =
     useTopicLessons(topicId);
   const isEditable = courseStatus === "DRAFT";
+  const isManageable = courseStatus !== "ARCHIVED";
+  const [lessonView, setLessonView] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
+  const activeLessons = lessons.filter((lesson) => lesson.status !== "ARCHIVED");
+  const archivedLessons = lessons.filter((lesson) => lesson.status === "ARCHIVED");
+  const visibleLessons = lessonView === "ACTIVE" ? activeLessons : archivedLessons;
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
   const [form, setForm] = useState<LessonFormState>(EMPTY_FORM);
   const [preservedMedia, setPreservedMedia] = useState<MediaMap>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [pendingLifecycle, setPendingLifecycle] = useState<{ action: "ARCHIVE" | "RESTORE"; lesson: Lesson } | null>(null);
+  const [isLifecycleSaving, setIsLifecycleSaving] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [reorderingLessonId, setReorderingLessonId] = useState<string | null>(
     null,
@@ -458,7 +468,7 @@ const LessonManagement: React.FC<LessonManagementProps> = ({
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!isEditable) return;
+    if (!isManageable) return;
     const blocks = parseMarkdown(form.markdown, preservedMedia);
     const validation = validateLesson(form.title, form.description, blocks);
     if (validation) {
@@ -496,8 +506,8 @@ const LessonManagement: React.FC<LessonManagementProps> = ({
   const moveLesson = async (index: number, direction: -1 | 1) => {
     if (!isEditable || isFormOpen || isSaving || reorderingLessonId) return;
     const target = index + direction;
-    if (target < 0 || target >= lessons.length) return;
-    const reordered = [...lessons];
+    if (target < 0 || target >= activeLessons.length) return;
+    const reordered = [...activeLessons];
     [reordered[index], reordered[target]] = [
       reordered[target],
       reordered[index],
@@ -517,18 +527,26 @@ const LessonManagement: React.FC<LessonManagementProps> = ({
     }
   };
 
-  const handleDelete = async (lesson: Lesson) => {
-    if (!isEditable || isSaving || reorderingLessonId || isFormOpen) return;
-    if (
-      !window.confirm(`Delete “${lesson.title}”? This action cannot be undone.`)
-    )
-      return;
+  const handleLifecycleConfirm = async () => {
+    if (!pendingLifecycle || !isManageable) return;
+    setIsLifecycleSaving(true);
     setActionError(null);
+    setActionMessage(null);
     try {
-      await deleteLesson(lesson._id);
+      if (pendingLifecycle.action === "ARCHIVE") {
+        await archiveLesson(pendingLifecycle.lesson._id);
+        setActionMessage(`“${pendingLifecycle.lesson.title}” was archived. Learners can no longer access this lesson.`);
+      } else {
+        await restoreLesson(pendingLifecycle.lesson._id);
+        setActionMessage(`“${pendingLifecycle.lesson.title}” was restored successfully.`);
+      }
       await refetch();
+      setLessonView(pendingLifecycle.action === "ARCHIVE" ? "ARCHIVED" : "ACTIVE");
+      setPendingLifecycle(null);
     } catch (err: unknown) {
       setActionError(getErrorMessage(err));
+    } finally {
+      setIsLifecycleSaving(false);
     }
   };
 
@@ -685,7 +703,7 @@ case 'CALLOUT': {
     }
   };
 
-  const isReadOnly = !isEditable;
+  const isReadOnly = !isManageable;
 
   return (
     <section className="space-y-4" aria-labelledby="lesson-management-heading">
@@ -710,7 +728,7 @@ case 'CALLOUT': {
             </p>
           </div>
         </div>
-        {isEditable && !isFormOpen && (
+        {isManageable && !isFormOpen && (
           <Button size="sm" onClick={openCreateForm} className={interactive}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add Lesson
@@ -725,10 +743,14 @@ case 'CALLOUT': {
             aria-hidden="true"
           />
           <p>
-            {courseStatus === "PUBLISHED"
-              ? "This course is published. Lessons are shown in read-only mode."
-              : "This course is archived. Its lessons are read-only."}
+            This course is archived. Its lessons are read-only.
           </p>
+        </div>
+      )}
+      {actionMessage && (
+        <div role="status" className="flex items-center justify-between gap-3 rounded-xl border border-sage/25 bg-sage-soft px-4 py-3 text-sm text-sage">
+          <span>{actionMessage}</span>
+          <button type="button" onClick={() => setActionMessage(null)} aria-label="Dismiss message" className="rounded-md p-1 hover:bg-sage/10"><X className="h-4 w-4" /></button>
         </div>
       )}
       {actionError && (
@@ -741,7 +763,7 @@ case 'CALLOUT': {
         </div>
       )}
 
-      {isFormOpen && isEditable && (
+      {isFormOpen && isManageable && (
         <form
           ref={formRef}
           onSubmit={handleSave}
@@ -1081,13 +1103,13 @@ case 'CALLOUT': {
             A fresh start
           </p>
           <h4 className="mt-2 font-serif text-xl font-semibold text-text-primary">
-            No lessons in this topic yet
+            {lessonView === "ACTIVE" ? "No active lessons in this topic" : "No archived lessons"}
           </h4>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-text-secondary">
             Start with a short explanation, paste your notes, then add headings,
             examples, and lists as needed.
           </p>
-          {isEditable && (
+          {lessonView === "ACTIVE" && isManageable && (
             <Button onClick={openCreateForm} className={`mt-5 ${interactive}`}>
               <Plus className="h-4 w-4" aria-hidden="true" />
               Create First Lesson
@@ -1096,37 +1118,59 @@ case 'CALLOUT': {
         </div>
       ) : lessons.length > 0 ? (
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3 px-1 text-xs text-text-tertiary">
-            <span>
-              {lessons.length} {lessons.length === 1 ? "lesson" : "lessons"}
-            </span>
-            {isEditable && lessons.length > 1 && (
-              <span>Use arrows to change the learning order.</span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="tablist" aria-label="Lesson status">
+              <button type="button" role="tab" aria-selected={lessonView === "ACTIVE"} onClick={() => setLessonView("ACTIVE")} className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${lessonView === "ACTIVE" ? "bg-signal-soft text-signal" : "text-text-secondary hover:bg-surface-elevated"}`}>
+                Active <span className="ml-1 opacity-70">{activeLessons.length}</span>
+              </button>
+              <button type="button" role="tab" aria-selected={lessonView === "ARCHIVED"} onClick={() => setLessonView("ARCHIVED")} className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${lessonView === "ARCHIVED" ? "bg-signal-soft text-signal" : "text-text-secondary hover:bg-surface-elevated"}`}>
+                Archived <span className="ml-1 opacity-70">{archivedLessons.length}</span>
+              </button>
+            </div>
+            {isEditable && lessonView === "ACTIVE" && activeLessons.length > 1 && (
+              <span className="text-xs text-text-tertiary">Use arrows to change the learning order.</span>
             )}
           </div>
-          {lessons.map((lesson, index) => (
+          {visibleLessons.length === 0 && (
+            <div className="rounded-xl border border-dashed border-border bg-surface px-5 py-7 text-center">
+              <p className="text-sm font-medium text-text-primary">
+                {lessonView === "ACTIVE" ? "No active lessons in this topic" : "No archived lessons"}
+              </p>
+              <p className="mt-1 text-xs text-text-secondary">
+                {lessonView === "ACTIVE"
+                  ? "Create a lesson or restore one from the Archived view."
+                  : "Archived lessons will appear here and can be restored."}
+              </p>
+            </div>
+          )}
+          {visibleLessons.map((lesson, index) => (
             <article
               key={lesson._id}
               className="rounded-2xl border border-border bg-surface p-4 transition-all duration-200 hover:border-text-tertiary/50 sm:p-5"
             >
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sage/25 bg-sage-soft text-sm font-bold text-sage">
-                  {String(lesson.order).padStart(2, "0")}
+                  {String(index + 1).padStart(2, "0")}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
-                      <h4 className="break-words font-semibold text-text-primary">
-                        {lesson.title}
-                      </h4>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="break-words font-semibold text-text-primary">
+                          {lesson.title}
+                        </h4>
+                        {lesson.status === "ARCHIVED" && <span className="rounded-full border border-border bg-surface-elevated px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">Archived</span>}
+                      </div>
                       {lesson.description && (
                         <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-secondary">
                           {lesson.description}
                         </p>
                       )}
                     </div>
-                    {isEditable && (
+                    {isManageable && (
                       <div className="flex shrink-0 items-center gap-1 self-start">
+                        {isEditable && (
+                        <>
                         <button
                           type="button"
                           onClick={() => void moveLesson(index, -1)}
@@ -1146,7 +1190,7 @@ case 'CALLOUT': {
                           type="button"
                           onClick={() => void moveLesson(index, 1)}
                           disabled={
-                            index === lessons.length - 1 ||
+                            index === activeLessons.length - 1 ||
                             reorderingLessonId !== null ||
                             isFormOpen ||
                             isSaving
@@ -1157,6 +1201,21 @@ case 'CALLOUT': {
                         >
                           <ArrowDown className="h-4 w-4" aria-hidden="true" />
                         </button>
+                        </>
+                        )}
+                        {lesson.status === "ARCHIVED" ? (
+                          <button
+                            type="button"
+                            onClick={() => setPendingLifecycle({ action: "RESTORE", lesson })}
+                            disabled={isSaving || isFormOpen}
+                            aria-label={`Restore ${lesson.title}`}
+                            title="Restore lesson"
+                            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-sage/30 bg-sage-soft text-sage hover:border-sage/50 ${interactive}`}
+                          >
+                            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        ) : (
+                          <>
                         <button
                           type="button"
                           onClick={() => openEditForm(lesson)}
@@ -1173,18 +1232,16 @@ case 'CALLOUT': {
                         </button>
                         <button
                           type="button"
-                          onClick={() => void handleDelete(lesson)}
-                          disabled={
-                            reorderingLessonId !== null ||
-                            isSaving ||
-                            isFormOpen
-                          }
-                          aria-label={`Delete ${lesson.title}`}
-                          title="Delete lesson"
+                          onClick={() => setPendingLifecycle({ action: "ARCHIVE", lesson })}
+                          disabled={reorderingLessonId !== null || isSaving || isFormOpen}
+                          aria-label={`Archive ${lesson.title}`}
+                          title="Archive lesson"
                           className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-text-secondary hover:border-error/40 hover:bg-error-soft hover:text-error ${interactive}`}
                         >
-                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          <Archive className="h-4 w-4" aria-hidden="true" />
                         </button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1200,6 +1257,38 @@ case 'CALLOUT': {
           ))}
         </div>
       ) : null}
+
+      {pendingLifecycle && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" role="presentation">
+          <div role="dialog" aria-modal="true" aria-labelledby="lesson-lifecycle-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl">
+            <div className="flex items-start gap-3 border-b border-border-muted bg-surface-elevated p-5">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${pendingLifecycle.action === "ARCHIVE" ? "bg-error-soft text-error" : "bg-sage-soft text-sage"}`}>
+                {pendingLifecycle.action === "ARCHIVE" ? <Archive className="h-5 w-5" /> : <RotateCcw className="h-5 w-5" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 id="lesson-lifecycle-title" className="font-serif text-lg font-semibold text-text-primary">
+                  {pendingLifecycle.action === "ARCHIVE" ? "Archive this lesson?" : "Restore this lesson?"}
+                </h3>
+                <p className="mt-1 break-words text-sm font-medium text-text-primary">{pendingLifecycle.lesson.title}</p>
+              </div>
+              <button type="button" onClick={() => setPendingLifecycle(null)} disabled={isLifecycleSaving} aria-label="Close confirmation" className="rounded-lg p-1.5 text-text-tertiary hover:bg-surface hover:text-text-primary"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="space-y-2 p-5">
+              <p className="text-sm leading-relaxed text-text-secondary">
+                {pendingLifecycle.action === "ARCHIVE"
+                  ? "Learners will no longer see this lesson. Its content and existing learning records will be preserved, and you can restore it later."
+                  : "This lesson will become active and visible to learners again. Its content and existing learning records will be preserved."}
+              </p>
+              <div className="flex flex-col-reverse gap-2 border-t border-border-muted pt-4 sm:flex-row sm:justify-end">
+                <Button type="button" variant="secondary" onClick={() => setPendingLifecycle(null)} disabled={isLifecycleSaving} className={interactive}>Cancel</Button>
+                <Button type="button" onClick={() => void handleLifecycleConfirm()} loading={isLifecycleSaving} className={interactive}>
+                  {pendingLifecycle.action === "ARCHIVE" ? "Archive Lesson" : "Restore Lesson"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

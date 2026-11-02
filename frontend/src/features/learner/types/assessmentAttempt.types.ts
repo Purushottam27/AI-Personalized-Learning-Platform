@@ -39,3 +39,33 @@ export interface AssessmentAttempt {
   createdAt: string;
   updatedAt: string;
 }
+
+
+/**
+ * History returned by GET /assessments/:assessmentId/attempts.
+ * The API returns an object containing assessment metadata and an attempts array.
+ */
+export interface AssessmentAttemptHistoryItem {
+  _id: string;
+  assessmentId: string;
+  attemptNumber: number;
+  status: AttemptStatus;
+  startedAt: string;
+  deadlineAt?: string | null;
+  submittedAt?: string | null;
+  submissionReason?: string | null;
+  totalMarks: number;
+  marksAwarded?: number | null;
+  scorePercent?: number | null;
+  passed?: boolean | null;
+}
+
+export interface AssessmentAttemptHistoryResponse {
+  assessment: {
+    _id: string;
+    courseId: string;
+    type: 'TOPIC' | 'DIAGNOSTIC' | 'FINAL';
+    title: string;
+  };
+  attempts: AssessmentAttemptHistoryItem[];
+}

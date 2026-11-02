@@ -122,7 +122,7 @@ export const TopicWorkspacePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const editFormRef = useRef<HTMLFormElement | null>(null);
-  const canEdit = course?.status === 'DRAFT';
+  const canEdit = course?.status === 'DRAFT' || course?.status === 'PUBLISHED';
 
   useEffect(() => {
     if (!topicId) {
@@ -228,7 +228,7 @@ export const TopicWorkspacePage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-text-secondary"><button type="button" onClick={() => navigate('/instructor/courses')} className="cursor-pointer rounded-md px-1 py-1 hover:bg-surface-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">My Courses</button><span className="text-text-tertiary">/</span><button type="button" onClick={goToCourse} className="max-w-[min(45vw,320px)] cursor-pointer truncate rounded-md px-1 py-1 hover:bg-surface-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">{course.title}</button><span className="text-text-tertiary">/</span><span className="max-w-[min(35vw,260px)] truncate font-semibold text-text-primary">{topic.title}</span></div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-2"><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-tertiary">Topic Workspace · Topic {String(topic.order).padStart(2, '0')}</p><h1 className="break-words font-serif text-3xl font-semibold leading-tight text-text-primary sm:text-4xl">{topic.title}</h1><p className="max-w-3xl whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">{topic.description || 'This topic does not have a description yet.'}</p></div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{canEdit ? <Button variant="secondary" onClick={openEdit} className={`${interactive} border-signal/25 hover:border-signal/50 hover:bg-signal-soft hover:text-signal`}><FileText className="h-4 w-4" aria-hidden="true" />Edit Topic</Button> : <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-disabled px-3 py-2 text-xs font-semibold text-text-secondary">{course.status === 'PUBLISHED' ? 'Published · Read only' : 'Archived · Read only'}</span>}</div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">{canEdit ? <Button variant="secondary" onClick={openEdit} className={`${interactive} border-signal/25 hover:border-signal/50 hover:bg-signal-soft hover:text-signal`}><FileText className="h-4 w-4" aria-hidden="true" />Edit Topic</Button> : <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-disabled px-3 py-2 text-xs font-semibold text-text-secondary">{course.status === 'PUBLISHED' ? 'Published · Maintained' : 'Archived · Read only'}</span>}</div>
         </div>
       </motion.header>
 
@@ -244,7 +244,7 @@ export const TopicWorkspacePage: React.FC = () => {
       )}
 
       {!isEditing && actionMessage && <div role="status" className="flex items-center gap-2 rounded-xl border border-sage/25 bg-sage-soft px-4 py-3 text-sm text-sage"><Check className="h-4 w-4" aria-hidden="true" />{actionMessage}</div>}
-      {!canEdit && <div className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3 text-sm text-text-secondary"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" /><p>This course is {course.status.toLowerCase()}. Topic details and learning content are shown read-only here.</p></div>}
+      {!canEdit && <div className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3 text-sm text-text-secondary"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" /><p>This course is archived. Topic details and learning content are read-only.</p></div>}
 
       {!isEditing && topic.learningObjectives.length > 0 && (
         <section aria-labelledby="topic-objectives-heading" className="rounded-2xl border border-border bg-surface p-4 sm:p-5">

@@ -26,20 +26,23 @@ const createTopicService = async (courseId, userId, topicData) => {
 
     if (course.status === "ARCHIVED") {
         throw new ApiError(
-            27,
+            409,
             "COURSE_NOT_EDITABLE",
-            "Topics cannot  be created while the course is archived"
+            "Topics cannot be created while the course is archived"
         );
     }
 
-    const lastTopic = await Topic.findOne({
-        courseId
-    }).sort({order:-1}).select('order')
+    // Published-course additions are append-only. Never renumber existing
+    // topics: their order participates in learner progression and unlocking.
+    const lastTopic = await Topic.findOne({ courseId })
+        .sort({ order: -1 })
+        .select("order")
+        .lean();
 
     const topic = await Topic.create({
         ...topicData,
         courseId,
-        order:  lastTopic ? lastTopic.order + 1 : 1  
+        order: lastTopic ? lastTopic.order + 1 : 1,
     });
 
     return topic;

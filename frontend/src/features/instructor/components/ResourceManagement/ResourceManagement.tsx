@@ -146,7 +146,7 @@ const ResourceManagement: React.FC<ResourceManagementProps> = ({
   courseStatus,
 }) => {
   const { resources, setResources, isLoading, error, refetch } = useTopicResources(topicId);
-  const canEdit = courseStatus === 'DRAFT';
+  const canEdit = courseStatus === 'DRAFT' || courseStatus === 'PUBLISHED';
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [lessonLoadWarning, setLessonLoadWarning] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -433,7 +433,7 @@ const ResourceManagement: React.FC<ResourceManagementProps> = ({
         {!canEdit && (
           <div className="flex items-start gap-2 border-b border-border-muted bg-surface px-5 py-3 text-sm text-text-secondary">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
-            <p>This {courseStatus.toLowerCase()} course is read-only in the instructor workspace.</p>
+            <p>This course is archived. Resources are read-only here.</p>
           </div>
         )}
 

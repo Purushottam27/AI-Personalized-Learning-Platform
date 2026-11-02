@@ -16,6 +16,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import type { AssessmentAttempt, AssessmentAttemptQuestion } from '../types/assessmentAttempt.types';
+import { isApiError } from '../../../lib/axios';
 
 export const AssessmentSessionPage: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
@@ -49,8 +50,10 @@ export const AssessmentSessionPage: React.FC = () => {
           }
         });
         setAnswers(initialAnswers);
-      } catch (err: any) {
-        setError(err?.response?.data?.message || 'Failed to load assessment attempt');
+      } catch (err: unknown) {
+        setError(isApiError(err)
+          ? err.message
+          : 'Failed to load assessment attempt. Please check your connection and try again.');
       } finally {
         setLoading(false);
       }
@@ -65,8 +68,10 @@ export const AssessmentSessionPage: React.FC = () => {
       const finalized = await submitAssessmentAttempt(attemptId, 'MANUAL');
       setAttempt(finalized);
       setIsSubmitModalOpen(false);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to submit assessment');
+    } catch (err: unknown) {
+      setError(isApiError(err)
+        ? err.message
+        : 'Failed to submit assessment. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -103,8 +108,10 @@ export const AssessmentSessionPage: React.FC = () => {
 
     try {
       await saveAssessmentAnswer(attemptId!, questionId, answerValue);
-    } catch (err) {
-      console.error('Failed to auto-save answer', err);
+    } catch (err: unknown) {
+      setError(isApiError(err)
+        ? err.message
+        : 'Your answer could not be saved. Please retry before moving on.');
     }
   };
 

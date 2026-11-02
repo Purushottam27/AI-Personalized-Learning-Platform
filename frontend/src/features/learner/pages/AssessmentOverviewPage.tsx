@@ -237,6 +237,20 @@ export const AssessmentOverviewPage: React.FC = () => {
           </div>
         </div>
 
+        {(assessment.opensAt || assessment.closesAt) && (
+          <div className="rounded-xl border border-border bg-surface-elevated px-4 py-3 text-sm">
+            <p className="font-semibold text-text-primary">Assessment availability</p>
+            <p className="mt-1 text-text-secondary">
+              {assessment.opensAt
+                ? `Opens ${new Date(assessment.opensAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`
+                : 'Available immediately'}
+              {assessment.closesAt
+                ? ` · Closes ${new Date(assessment.closesAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`
+                : ' · No closing date'}
+            </p>
+          </div>
+        )}
+
         {/* Action Button */}
         <div>
           <button

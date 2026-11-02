@@ -1,5 +1,5 @@
 import api from '../../../lib/axios';
-import type { AssessmentAttempt } from '../types/assessmentAttempt.types';
+import type { AssessmentAttempt, AssessmentAttemptHistoryResponse } from '../types/assessmentAttempt.types';
 
 export async function startAssessmentAttempt(assessmentId: string): Promise<AssessmentAttempt> {
   const response = await api.post<{ data: AssessmentAttempt }>(`/assessments/${assessmentId}/attempts`);
@@ -32,8 +32,8 @@ export async function submitAssessmentAttempt(
 
 export async function getAssessmentAttemptHistory(
   assessmentId: string
-): Promise<AssessmentAttempt[]> {
-  const response = await api.get<{ data: AssessmentAttempt[] }>(
+): Promise<AssessmentAttemptHistoryResponse> {
+  const response = await api.get<{ data: AssessmentAttemptHistoryResponse }>(
     `/assessments/${assessmentId}/attempts`
   );
   return response.data.data;

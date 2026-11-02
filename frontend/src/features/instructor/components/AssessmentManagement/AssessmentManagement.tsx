@@ -54,6 +54,10 @@ export const AssessmentManagement: React.FC<AssessmentManagementProps> = ({
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    type: 'PUBLISH' | 'ARCHIVE' | 'RESTORE';
+    assessment: Assessment;
+  } | null>(null);
 
   // Form State
   const [title, setTitle] = useState('');
@@ -171,12 +175,11 @@ export const AssessmentManagement: React.FC<AssessmentManagementProps> = ({
 
         let payload: UpdateAssessmentPayload;
         if (activeAssessment.status === 'PUBLISHED') {
-          // Published assessments permit metadata / time limit / attempt limits only
+          // Backend allowlist for published assessments: title, description, availability window, and maxAttempts.
           payload = {
             title: title.trim(),
             description: description.trim() || undefined,
             maxAttempts,
-            timeLimitMinutes: timeLimitMinutes ? Number(timeLimitMinutes) : null,
           };
         } else {
           // Draft assessments permit full configuration updates
@@ -211,43 +214,36 @@ export const AssessmentManagement: React.FC<AssessmentManagementProps> = ({
     }
   };
 
-  const onPublish = async (assessment: Assessment) => {
+  const runPendingAction = async () => {
+    if (!pendingAction) return;
+    const { type, assessment } = pendingAction;
     try {
       setActionLoadingId(assessment._id);
       setActionError(null);
-      await handlePublish(assessment._id);
-      setActionMessage(`Assessment "${assessment.title}" published successfully.`);
+      if (type === 'PUBLISH') {
+        await handlePublish(assessment._id);
+        setActionMessage(`Assessment "${assessment.title}" published successfully. Its core evaluation settings are now locked.`);
+      } else if (type === 'ARCHIVE') {
+        await handleArchive(assessment._id);
+        setActionMessage(`Assessment "${assessment.title}" archived successfully. Learners can no longer start new attempts.`);
+      } else {
+        await handleRestore(assessment._id);
+        setActionMessage(`Assessment "${assessment.title}" restored to Draft successfully. Review it before publishing again.`);
+      }
+      setPendingAction(null);
     } catch (err: any) {
-      setActionError(err?.response?.data?.message || 'Failed to publish assessment.');
+      setActionError(err?.response?.data?.message ||
+        (type === 'PUBLISH' ? 'Failed to publish assessment.' :
+         type === 'ARCHIVE' ? 'Failed to archive assessment.' : 'Failed to restore assessment.'));
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  const onArchive = async (assessment: Assessment) => {
-    try {
-      setActionLoadingId(assessment._id);
-      setActionError(null);
-      await handleArchive(assessment._id);
-      setActionMessage(`Assessment "${assessment.title}" archived successfully.`);
-    } catch (err: any) {
-      setActionError(err?.response?.data?.message || 'Failed to archive assessment.');
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
-
-  const onRestore = async (assessment: Assessment) => {
-    try {
-      setActionLoadingId(assessment._id);
-      setActionError(null);
-      await handleRestore(assessment._id);
-      setActionMessage(`Assessment "${assessment.title}" restored successfully and moved to Draft.`);
-    } catch (err: any) {
-      setActionError(err?.response?.data?.message || 'Failed to restore assessment.');
-    } finally {
-      setActionLoadingId(null);
-    }
+  const requestAction = (type: 'PUBLISH' | 'ARCHIVE' | 'RESTORE', assessment: Assessment) => {
+    setActionError(null);
+    setActionMessage(null);
+    setPendingAction({ type, assessment });
   };
 
   const filteredAssessments = useMemo(() => {
@@ -459,7 +455,7 @@ export const AssessmentManagement: React.FC<AssessmentManagementProps> = ({
                     {a.status === 'DRAFT' && (
                       <button
                         disabled={isActing}
-                        onClick={() => onPublish(a)}
+                        onClick={() => requestAction('PUBLISH', a)}
                         className="py-1.5 px-3 rounded-lg bg-signal text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5 transition-opacity"
                       >
                         {isActing ? (
@@ -474,7 +470,7 @@ export const AssessmentManagement: React.FC<AssessmentManagementProps> = ({
                     {a.status === 'PUBLISHED' && (
                       <button
                         disabled={isActing}
-                        onClick={() => onArchive(a)}
+                        onClick={() => requestAction('ARCHIVE', a)}
                         className="py-1.5 px-3 rounded-lg border border-border text-text-secondary hover:text-error text-xs font-semibold flex items-center gap-1.5 transition-colors"
                       >
                         {isActing ? (
@@ -489,7 +485,7 @@ export const AssessmentManagement: React.FC<AssessmentManagementProps> = ({
                     {a.status === 'ARCHIVED' && (
                       <button
                         disabled={isActing}
-                        onClick={() => onRestore(a)}
+                        onClick={() => requestAction('RESTORE', a)}
                         className="py-1.5 px-3 rounded-lg border border-border text-text-primary hover:bg-surface text-xs font-semibold flex items-center gap-1.5 transition-colors"
                       >
                         {isActing ? (
@@ -509,6 +505,66 @@ export const AssessmentManagement: React.FC<AssessmentManagementProps> = ({
       )}
 
       {/* Create / Edit Assessment Modal */}
+      {pendingAction && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="assessment-action-title"
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl">
+            <div className="flex items-start gap-3 border-b border-border-muted bg-surface-elevated p-5">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                pendingAction.type === 'ARCHIVE' ? 'bg-error-soft text-error' :
+                pendingAction.type === 'PUBLISH' ? 'bg-signal/10 text-signal' : 'bg-sage-soft text-sage'
+              }`}>
+                {pendingAction.type === 'ARCHIVE' ? <Archive className="h-5 w-5" /> :
+                 pendingAction.type === 'PUBLISH' ? <Send className="h-5 w-5" /> : <RotateCcw className="h-5 w-5" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 id="assessment-action-title" className="text-base font-bold text-text-primary">
+                  {pendingAction.type === 'PUBLISH' ? 'Publish this assessment?' :
+                   pendingAction.type === 'ARCHIVE' ? 'Archive this assessment?' : 'Restore this assessment?'}
+                </h3>
+                <p className="mt-1 break-words text-sm font-semibold text-text-primary">{pendingAction.assessment.title}</p>
+              </div>
+              <button type="button" onClick={() => setPendingAction(null)} disabled={actionLoadingId !== null}
+                className="rounded-lg p-1 text-text-tertiary hover:bg-surface hover:text-text-primary disabled:opacity-50"
+                aria-label="Close confirmation"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="space-y-3 p-5">
+              {pendingAction.type === 'PUBLISH' ? (
+                <>
+                  <p className="text-sm leading-relaxed text-text-secondary">
+                    Publishing makes this assessment available to learners. After publishing, you cannot change its question pool, questions per attempt, passing score, or randomization settings. These core evaluation settings are locked to protect assessment consistency and learner attempt history.
+                  </p>
+                  <div className="rounded-xl border border-signal/20 bg-signal/5 p-3 text-xs leading-relaxed text-text-secondary">
+                    After publishing, the question pool, questions per attempt, passing score, randomization, and time limit cannot be changed. You may update the title and description and increase the total allowed attempts. Active attempts keep their existing configuration.
+                  </div>
+                  <p className="text-sm font-semibold text-text-primary">Review the assessment carefully before publishing.</p>
+                </>
+              ) : pendingAction.type === 'ARCHIVE' ? (
+                <p className="text-sm leading-relaxed text-text-secondary">
+                  This assessment will be removed from the active assessment list. Learners will no longer be able to start new attempts. Existing submitted attempts and historical records will be preserved.
+                </p>
+              ) : (
+                <p className="text-sm leading-relaxed text-text-secondary">
+                  This assessment will return to Draft status. It will not be available to learners until you review it and publish it again. Existing attempt history will remain preserved.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-border-muted p-4 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setPendingAction(null)} disabled={actionLoadingId !== null}
+                className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary hover:bg-surface-elevated disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={runPendingAction} disabled={actionLoadingId !== null}
+                className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+                  pendingAction.type === 'ARCHIVE' ? 'bg-error hover:opacity-90' : 'bg-signal hover:opacity-90'
+                }`}>
+                {actionLoadingId !== null ? 'Please wait…' :
+                 pendingAction.type === 'PUBLISH' ? 'Publish Assessment' :
+                 pendingAction.type === 'ARCHIVE' ? 'Archive Assessment' : 'Restore to Draft'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="w-full max-w-3xl bg-surface-elevated border border-border rounded-3xl p-6 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -527,7 +583,7 @@ export const AssessmentManagement: React.FC<AssessmentManagementProps> = ({
 
             {modalMode === 'EDIT' && activeAssessment?.status === 'PUBLISHED' && (
               <div className="p-3.5 rounded-xl bg-surface border border-border text-xs text-text-secondary leading-relaxed">
-                <strong className="text-text-primary font-semibold">Published Assessment Notice:</strong> Core evaluation configuration (questions, attempts per session, passing score) is locked to protect active learner evaluation history. You may adjust the title, description, time limit, and increase total allowed attempts.
+                <strong className="text-text-primary font-semibold">Published Assessment Notice:</strong> Core evaluation configuration (question pool, questions per attempt, passing score, randomization, and time limit) is locked after publication. You may update the title and description, and increase the total allowed attempts.
               </div>
             )}
 
@@ -602,11 +658,12 @@ export const AssessmentManagement: React.FC<AssessmentManagementProps> = ({
                     type="number"
                     min={1}
                     placeholder="None"
+                    disabled={activeAssessment?.status === 'PUBLISHED'}
                     value={timeLimitMinutes}
                     onChange={(e) =>
                       setTimeLimitMinutes(e.target.value ? Number(e.target.value) : '')
                     }
-                    className="w-full px-3 py-1.5 text-sm rounded-xl bg-surface-elevated border border-border text-text-primary"
+                    className="w-full px-3 py-1.5 text-sm rounded-xl bg-surface-elevated border border-border text-text-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
